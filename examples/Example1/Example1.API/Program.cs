@@ -1,25 +1,63 @@
-var builder = WebApplication.CreateBuilder(args);
+using Example1.API.Middlewares;
+using Example1.DAL.Configuration;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Mvc.ApplicationParts;
+using Microsoft.AspNetCore.Mvc.Controllers;
+using Microsoft.AspNetCore.Mvc.Routing;
+using Microsoft.Extensions.Configuration;
+using QBCore.Configuration;
+using QBCore.Controllers;
+using QBCore.Extensions;
+using QBCore.Extensions.Runtime;
 
-// Add services to the container.
+EagerLoading.Initialize();
 
-builder.Services.AddControllers();
-// Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
-builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+var appBuilder = WebApplication.CreateBuilder(args);
 
-var app = builder.Build();
+var builder = appBuilder.Services
+	.AddControllers(options =>
+	{
+		options.SuppressAsyncSuffixInActionNames = false;
+		options.Conventions.Add(new DataSourceControllerRouteConvention
+		{
+			RoutePrefix = "api/"
+		});
+	})
+	.AddApplicationPart(typeof(Example1.DAL.Entities.Brands.Brand).Assembly)
+	.AddApplicationPart(typeof(Example1.BLL.Services.BrandService).Assembly)
+	.AddQBCore()
+	.ConfigureApplicationPartManager(partManager =>
+	{
+		partManager.FeatureProviders.Add(new DataSourceControllerFeatureProvider());
+	});
 
-// Configure the HTTP request pipeline.
+builder.Services
+	.Configure<MongoDbSettings>(appBuilder.Configuration.GetSection(nameof(MongoDbSettings)))
+	.Configure<SqlDbSettings>(appBuilder.Configuration.GetSection(nameof(SqlDbSettings)))
+	.AddSingleton<IDataContextProvider, DataContextProvider>()
+	.AddRouting(options =>
+	{
+		options.LowercaseUrls = true;
+		options.AppendTrailingSlash = true;
+	})
+	.AddEndpointsApiExplorer()
+	.AddSwaggerGen();
+
+var app = appBuilder.Build();
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
     app.UseSwaggerUI();
 }
-
+app.UseMiddleware<ExceptionHandlingMiddleware>();
 app.UseHttpsRedirection();
-
+app.UseRouting();
 app.UseAuthorization();
-
-app.MapControllers();
+app.UseEndpoints(endpoints =>
+{
+	endpoints.MapControllers();
+	endpoints.MapDataSourceControllers();
+});
 
 app.Run();
