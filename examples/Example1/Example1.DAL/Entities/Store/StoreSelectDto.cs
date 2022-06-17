@@ -1,33 +1,28 @@
-using Example1.DAL.Entities.OrderPositions;
 using QBCore.DataSource.QueryBuilder;
 using QBCore.Extensions.Runtime;
 
-namespace Example1.DAL.Entities.Orders;
+namespace Example1.DAL.Entities.Stores;
 
-public class OrderSelectDto
+public class StoreSelectDto
 {
 	public int Id { get; set; }
 	public string Name { get; set; } = null!;
-
-	public List<OrderPosition> OrderPositions { get; set; } = null!;
-
-	public decimal? Total { get; set; }
 
 	public DateTimeOffset Created { get; set; }
 	public DateTimeOffset? Updated { get; set; }
 	public DateTimeOffset? Deleted { get; set; }
 
 	[EagerLoading]
-	static OrderSelectDto()
+	static StoreSelectDto()
 	{
-		QueryBuilders.RegisterSelect<Order, OrderSelectDto>(qb =>
+		QueryBuilders.RegisterSelect<Store, StoreSelectDto>(qb =>
 		{
 			qb.Map(c =>
 			{
 				c.AutoMap();
 			});
 
-			qb.SelectFromTable("orders");
+			qb.SelectFromTable("stores");
 		});
 	}
 }

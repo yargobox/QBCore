@@ -1,4 +1,5 @@
 using System.Linq.Expressions;
+using QBCore.Extensions.Linq.Expressions;
 using QBCore.ObjectFactory;
 
 namespace QBCore.DataSource;
@@ -20,7 +21,7 @@ public class DSSortOrder<TProjection> : IDSSortOrder
 
 	public DSSortOrder(Expression<Func<TProjection, object?>> field, bool descending, Origin valueSource)
 	{
-		FieldName = null!;//!!!GetMemberName(leftOperand);
+		FieldName = field.GetMemberName();
 		Descending = descending;
 		ValueSource = valueSource;
 	}

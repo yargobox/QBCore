@@ -6,7 +6,7 @@ namespace QBCore.DataSource;
 
 public abstract partial class DataSource<TKey, TDocument, TCreate, TSelect, TUpdate, TDelete, TDataSource>
 {
-	internal static readonly DataSourceDesc _dataSourceDesc;
+	private static readonly DataSourceDesc _dataSourceDesc;
 	protected static readonly Func<IServiceProvider, DataSourceListener<TKey, TDocument, TCreate, TSelect, TUpdate, TDelete>>? _createNativeListener;
 	protected static readonly Func<ITestInsertQueryBuilder<TDocument, TCreate>>? _createTestInsert;
 	protected static readonly Func<IInsertQueryBuilder<TDocument, TCreate>>? _createInsert;

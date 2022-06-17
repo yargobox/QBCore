@@ -76,4 +76,16 @@ public static class QBCoreExtensions
 		}
 		return null;
 	}
+
+	public static Type? GetInterfaceOf(this Type @this, Type test)
+	{
+		if (test.IsGenericTypeDefinition)
+		{
+			return @this.GetInterfaces().FirstOrDefault(i => i.IsGenericType && i.GetGenericTypeDefinition() == test);
+		}
+		else
+		{
+			return @this.GetInterfaces().FirstOrDefault(i => i == test);
+		}
+	}
 }

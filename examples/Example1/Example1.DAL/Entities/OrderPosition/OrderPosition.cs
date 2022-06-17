@@ -1,6 +1,6 @@
 using Example1.DAL.Entities.Products;
 
-namespace Example1.DAL.Entities.Orders;
+namespace Example1.DAL.Entities.OrderPositions;
 
 public class OrderPosition
 {
@@ -10,7 +10,7 @@ public class OrderPosition
 	public int ProductId { get; set; }
 	public Product? Product { get; set; }
 
-	public decimal Price { get; set; }
+	public decimal? Price { get; set; }
 	public decimal Quantity { get; set; }
 
 	public DateTimeOffset Created { get; set; }

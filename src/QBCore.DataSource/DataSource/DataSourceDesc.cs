@@ -1,5 +1,4 @@
 using System.Reflection;
-using QBCore.DataSource.QueryBuilder;
 using QBCore.ObjectFactory;
 
 namespace QBCore.DataSource;
@@ -26,17 +25,17 @@ internal sealed class DataSourceDesc : IDataSourceDesc
 
 	internal static readonly string[] ReservedNames = { "area", "controller", "action", "page", "filter", "cell", "id" };
 
-	public DataSourceDesc(Type dataSourceConcreteType)
+	public DataSourceDesc(Type concreteType)
 	{
-		if (!dataSourceConcreteType.IsClass || dataSourceConcreteType.IsAbstract || dataSourceConcreteType.IsInterface)
+		if (!concreteType.IsClass || concreteType.IsAbstract || concreteType.IsGenericType || concreteType.IsGenericTypeDefinition)
 		{
-			throw new InvalidOperationException($"Invalid data source type {dataSourceConcreteType.ToPretty()}.");
+			throw new InvalidOperationException($"Invalid complex datasource type {concreteType.ToPretty()}.");
 		}
 
-		DataSourceConcreteType = dataSourceConcreteType;
+		DataSourceConcreteType = concreteType;
 
 		DataSourceAttribute = DataSourceConcreteType.GetCustomAttribute<DataSourceAttribute>(false) ??
-			throw new InvalidOperationException($"Data source {DataSourceConcreteType.ToPretty()} is not configured with attribute {nameof(DataSourceDesc.DataSourceAttribute)}.");
+			throw new InvalidOperationException($"Data source {DataSourceConcreteType.ToPretty()} is not configured with attribute {nameof(DataSourceAttribute)}.");
 
 		Name = DataSourceAttribute.Name;
 		if (string.IsNullOrWhiteSpace(Name))
@@ -46,7 +45,7 @@ internal sealed class DataSourceDesc : IDataSourceDesc
 		Name = string.Intern(Name);
 		if (ReservedNames.Contains(Name, StringComparer.OrdinalIgnoreCase))
 		{
-			throw new ArgumentException("These names are reserved and cannot be used as names for a data source or controller: " + string.Join(", ", ReservedNames));
+			throw new ArgumentException("These names are reserved and cannot be used as names for a datasource, CDS, or controller: " + string.Join(", ", ReservedNames));
 		}
 
 		DataContextName = DataSourceAttribute.DataContextName ?? "default";
@@ -90,18 +89,8 @@ internal sealed class DataSourceDesc : IDataSourceDesc
 		// Get document types from a generic interface IDataSource<,,,,,>
 		//
 
-		var interfaces = DataSourceConcreteType
-			.GetInterfaces()
-			.Where(x => x.IsGenericType && x.GetGenericTypeDefinition() == typeof(IDataSource<,,,,,>))
-			.ToArray();
-		if (interfaces.Length == 1)
-		{
-			DataSourceInterfaceType = interfaces[0];
-		}
-		else
-		{
+		DataSourceInterfaceType = DataSourceConcreteType.GetInterfaceOf(typeof(IDataSource<,,,,,>)) ??
 			throw new InvalidOperationException($"Invalid data source type {DataSourceConcreteType.ToPretty()}.");
-		}
 
 		var genericArgs = DataSourceInterfaceType.GetGenericArguments();
 		IdType = genericArgs[0];
@@ -210,35 +199,26 @@ internal sealed class DataSourceDesc : IDataSourceDesc
 		{
 			Type listenerType = DataSourceAttribute.Listener;
 
-			if (!listenerType.IsClass || listenerType.IsAbstract || listenerType.IsInterface || !typeof(IDataSourceListener).IsAssignableFrom(listenerType) || Nullable.GetUnderlyingType(listenerType) != null)
+			if (!listenerType.IsClass || listenerType.IsAbstract || !typeof(IDataSourceListener).IsAssignableFrom(listenerType) || Nullable.GetUnderlyingType(listenerType) != null)
 			{
 				throw new InvalidOperationException($"Incompatible data source listener type '{listenerType.ToPretty()}'.");
 			}
 
-			var type = listenerType;
-			do
-			{
-				if (type.IsGenericType && type.GetGenericTypeDefinition() == typeof(DataSourceListener<,,,,,>))
-				{
-					var genericArgs = type.GetGenericArguments();
-					if (IdType != genericArgs[0]
-						|| DocumentType != genericArgs[1]
-						|| CreateDocumentType != genericArgs[2]
-						|| SelectDocumentType != genericArgs[3]
-						|| UpdateDocumentType != genericArgs[4]
-						|| DeleteDocumentType != genericArgs[5])
-					{
-						throw new InvalidOperationException($"Invalid data source listener type {listenerType.ToPretty()}.");
-					}
-
-					break;
-				}
-				type = type.BaseType;
-			}
-			while (type != null);
+			var type = listenerType.GetSubclassOf(typeof(DataSourceListener<,,,,,>));
 			if (type == null)
 			{
 				throw new InvalidOperationException($"Incompatible data source listener type {listenerType.ToPretty()}.");
+			}
+
+			var genericArgs = type.GetGenericArguments();
+			if (IdType != genericArgs[0]
+				|| DocumentType != genericArgs[1]
+				|| CreateDocumentType != genericArgs[2]
+				|| SelectDocumentType != genericArgs[3]
+				|| UpdateDocumentType != genericArgs[4]
+				|| DeleteDocumentType != genericArgs[5])
+			{
+				throw new InvalidOperationException($"Invalid data source listener type {listenerType.ToPretty()}.");
 			}
 
 			if (listenerType.GetConstructors(BindingFlags.Instance | BindingFlags.Public).Length != 1)

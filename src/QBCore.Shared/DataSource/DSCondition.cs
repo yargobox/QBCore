@@ -1,4 +1,5 @@
 using System.Linq.Expressions;
+using QBCore.Extensions.Linq.Expressions;
 using QBCore.ObjectFactory;
 
 namespace QBCore.DataSource;
@@ -22,7 +23,7 @@ public class DSCondition<TProjection> : IDSCondition
 
 	public DSCondition(Expression<Func<TProjection, object?>> field, ConditionOperations operation, object? value, Origin valueSource)
 	{
-		FieldName = null!;//!!!GetMemberName(field);
+		FieldName = field.GetMemberName();
 		Operation = operation;
 		Value = value;
 		ValueSource = valueSource;

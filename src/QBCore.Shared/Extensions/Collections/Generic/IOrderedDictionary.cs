@@ -1,4 +1,3 @@
-using System.Collections.Generic;
 using System.Reflection;
 
 namespace QBCore.Extensions.Collections.Generic;

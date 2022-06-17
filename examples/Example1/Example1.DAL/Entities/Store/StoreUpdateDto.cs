@@ -1,23 +1,23 @@
 using QBCore.DataSource.QueryBuilder;
 using QBCore.Extensions.Runtime;
 
-namespace Example1.DAL.Entities.Orders;
+namespace Example1.DAL.Entities.Stores;
 
-public class OrderCreateDto
+public class StoreUpdateDto
 {
 	public string Name { get; set; } = null!;
 
 	[EagerLoading]
-	static OrderCreateDto()
+	static StoreUpdateDto()
 	{
-		QueryBuilders.RegisterInsert<Order, OrderCreateDto>(qb =>
+		QueryBuilders.RegisterUpdate<Store, StoreUpdateDto>(qb =>
 		{
 			qb.Map(c =>
 			{
 				c.AutoMap();
 			});
 
-			qb.InsertToTable("orders");
+			qb.UpdateTable("stores");
 		});
 	}
 }

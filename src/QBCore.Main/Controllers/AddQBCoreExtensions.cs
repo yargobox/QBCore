@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Reflection;
 using System.Text;
 using Microsoft.AspNetCore.Builder;
@@ -18,6 +19,17 @@ using QBCore.DataSource;
 using QBCore.ObjectFactory;
 
 namespace QBCore.Controllers;
+
+public record AddQBCoreOptions
+{
+	public Func<AssemblyPart, bool> AssemblyPartSelector { get; set; } = _ => true;
+	public Func<Assembly, bool> AssemblySelector { get; set; } = _ => true;
+	public Func<Type, bool> TypeSelector { get; set; } = _ => true;
+	public Func<Type, bool> DataSourceSelector { get; set; } = type
+		=> type.IsClass && !type.IsAbstract && !type.IsGenericType && !type.IsGenericTypeDefinition && type.GetSubclassOf(typeof(DataSource<,,,,,,>)) != null;
+	public Func<Type, bool> ComplexDataSourceSelector { get; set; } = type
+		=> type.IsClass && !type.IsAbstract && !type.IsGenericType && !type.IsGenericTypeDefinition && type.GetSubclassOf(typeof(ComplexDataSource<>)) != null;
+}
 
 public static class AddQBCoreExtensions
 {
@@ -41,44 +53,64 @@ public static class AddQBCoreExtensions
 	}
 	private static string _routePrefix = string.Empty;
 
-	public static IMvcBuilder AddQBCore(this IMvcBuilder builder)
+	public static IMvcBuilder AddQBCore(this IMvcBuilder builder, Action<AddQBCoreOptions>? setupOptions = null)
 	{
-		AddQBCoreRegisters(builder.Services, builder.PartManager);
+		var options = new AddQBCoreOptions();
+		if (setupOptions != null)
+		{
+			setupOptions(options);
+		}
+
+		AddQBCoreRegisters(builder.Services, options, builder.PartManager);
 		return builder;
 	}
-	public static IMvcCoreBuilder AddQBCore(this IMvcCoreBuilder builder)
+	public static IMvcCoreBuilder AddQBCore(this IMvcCoreBuilder builder, Action<AddQBCoreOptions>? setupOptions = null)
 	{
-		AddQBCoreRegisters(builder.Services, builder.PartManager);
+		var options = new AddQBCoreOptions();
+		if (setupOptions != null)
+		{
+			setupOptions(options);
+		}
+
+		AddQBCoreRegisters(builder.Services, options, builder.PartManager);
 		return builder;
 	}
-	public static IServiceCollection AddQBCore(this IServiceCollection services, params Assembly[] assemblies)
+	public static IServiceCollection AddQBCore(this IServiceCollection services, Action<AddQBCoreOptions>? setupOptions = null, params Assembly[] assemblies)
 	{
-		AddQBCoreRegisters(services, assemblies);
+		var options = new AddQBCoreOptions();
+		if (setupOptions != null)
+		{
+			setupOptions(options);
+		}
+
+		AddQBCoreRegisters(services, options, assemblies);
 		return services;
 	}
 
-	private static IServiceCollection AddQBCoreRegisters(this IServiceCollection services, params Assembly[] assemblies)
+	private static IServiceCollection AddQBCoreRegisters(this IServiceCollection services, AddQBCoreOptions options, params Assembly[] assemblies)
 	{
 		var types = assemblies
+			.Where(x => options.AssemblySelector(x))
 			.SelectMany(x => x.DefinedTypes)
 			.Select(x => x.AsType())
-			.Distinct()
-			.ToArray();
+			.Where(x => options.TypeSelector(x))
+			.Distinct();
 
-		return services.AddQBCoreRegisters(types);
+		return services.AddQBCoreRegisters(options, types);
 	}
-	private static IServiceCollection AddQBCoreRegisters(this IServiceCollection services, ApplicationPartManager partManager)
+	private static IServiceCollection AddQBCoreRegisters(this IServiceCollection services, AddQBCoreOptions options, ApplicationPartManager partManager)
 	{
 		var types = partManager
 			.ApplicationParts
 			.Where(x => x is AssemblyPart)
 			.Cast<AssemblyPart>()
-			.SelectMany(x => x.Types)
-			.ToArray();
-		
-		return services.AddQBCoreRegisters(types);
+			.Where(x => options.AssemblyPartSelector(x) && options.AssemblySelector(x.Assembly))
+			.SelectMany(x => x.Types.Where(x => options.TypeSelector(x)))
+			.Distinct();
+
+		return services.AddQBCoreRegisters(options, types);
 	}
-	private static IServiceCollection AddQBCoreRegisters(this IServiceCollection services, IEnumerable<Type> types)
+	private static IServiceCollection AddQBCoreRegisters(this IServiceCollection services, AddQBCoreOptions options, IEnumerable<Type> types)
 	{
 		if (IsAddQBCoreCalled)
 		{
@@ -86,10 +118,22 @@ public static class AddQBCoreExtensions
 		}
 		IsAddQBCoreCalled = true;
 
-		RegisterDataSources.FromTypes(types);
+		var atypes = (types as Type[]) ?? types.ToArray();
+
+		foreach (var type in types.Where(x => options.DataSourceSelector(x)))
+		{
+			DataSources.TryRegister(type);
+		}
+		foreach (var type in types.Where(x => options.ComplexDataSourceSelector(x)))
+		{
+			ComplexDataSources.TryRegister(type);
+		}
+
 		AddBusinessObjects();
-		AddDataSourcesAsServices(services);
+
 		services.TryAddSingleton<DataSourceRouteValueTransformer>();
+		AddDataSourcesAsServices(services);
+
 		return services;
 	}
 

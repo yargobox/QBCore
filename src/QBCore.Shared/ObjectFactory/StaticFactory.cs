@@ -7,6 +7,7 @@ public static class StaticFactory
 {
 	public static IFactoryObjectDictionary<Type, Func<IQueryBuilder>> QueryBuilders { get; } = new FactoryObjectRegistry<Type, Func<IQueryBuilder>>();
 	public static IFactoryObjectDictionary<Type, IDataSourceDesc> DataSources { get; } = new FactoryObjectRegistry<Type, IDataSourceDesc>();
+	public static IFactoryObjectDictionary<Type, ICDSDefinition> ComplexDataSources { get; } = new FactoryObjectRegistry<Type, ICDSDefinition>();
 	public static IFactoryObjectDictionary<string, BusinessObject> BusinessObjects { get; } = new FactoryObjectRegistry<string, BusinessObject>();
 
 

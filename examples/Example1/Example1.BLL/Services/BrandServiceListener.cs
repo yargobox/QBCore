@@ -1,4 +1,3 @@
-using System.Threading;
 using Example1.DAL.Entities.Brands;
 using QBCore.DataSource;
 
