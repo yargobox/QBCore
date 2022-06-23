@@ -66,7 +66,7 @@ internal sealed class CDSNode : ICDSNode
 		{
 			throw new InvalidOperationException($"Invalid data source type {dataSourceConcreteType.ToPretty()}.");
 		}
-		if (dataSourceConcreteType.GetInterfaceOf(typeof(IDataSource<,,,,,>)) == null)
+		if (dataSourceConcreteType.GetInterfaceOf(typeof(IDataSource<,,,,,,>)) == null)
 		{
 			throw new InvalidOperationException($"Invalid data source type {dataSourceConcreteType.ToPretty()}.");
 		}

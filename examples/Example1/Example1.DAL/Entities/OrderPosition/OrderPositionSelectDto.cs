@@ -1,6 +1,5 @@
 using Example1.DAL.Entities.Products;
 using QBCore.DataSource.QueryBuilder;
-using QBCore.Extensions.Runtime;
 
 namespace Example1.DAL.Entities.OrderPositions;
 
@@ -19,17 +18,13 @@ public class OrderPositionSelectDto
 	public DateTimeOffset? Updated { get; set; }
 	public DateTimeOffset? Deleted { get; set; }
 
-	[EagerLoading]
-	static OrderPositionSelectDto()
+	private static void SelectBuilder(IQBSelectBuilder<OrderPosition, OrderPositionSelectDto> builder)
 	{
-		QueryBuilders.RegisterSelect<OrderPosition, OrderPositionSelectDto>(qb =>
+		builder.Map(c =>
 		{
-			qb.Map(c =>
-			{
-				c.AutoMap();
-			});
-
-			qb.SelectFromTable("order_positions");
+			c.AutoMap();
 		});
+
+		builder.SelectFromTable("order_positions");
 	}
 }

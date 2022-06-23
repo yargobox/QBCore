@@ -10,14 +10,14 @@ public class DsApiControllerAttribute : Attribute
 	/// Datasource controller name
 	/// </summary>
 	/// <remarks>
-	/// You can use the placeholders "[DS]" or "[DS:guessPlural]" to specify the name of the data source or its plural form, respectively.
+	/// You can use the placeholders "[DS]" or "[DS:guessPlural]" to specify the name of the datasource or its plural form, respectively.
 	/// </remarks>
 	public string Name { get; init; }
 
 	/// <summary>
 	/// Whether or not to build a generic datasource controller for the datasource. True by default.
 	/// </summary>
-	public bool AutoBuild { get; init; } = true;
+	public bool IsAutoController { get; init; } = true;
 
 	public DsApiControllerAttribute(string name = "[DS:guessPlural]")
 	{
@@ -27,7 +27,7 @@ public class DsApiControllerAttribute : Attribute
 		{
 			throw new ArgumentNullException($"{nameof(DsApiControllerAttribute)}.{nameof(DsApiControllerAttribute.Name)}");
 		}
-		if (string.IsNullOrEmpty(name) || name.Contains('/') || name.Contains('*'))
+		if (string.IsNullOrWhiteSpace(name) || name.Contains('/') || name.Contains('*'))
 		{
 			throw new ArgumentException($"{nameof(DsApiControllerAttribute)}.{nameof(DsApiControllerAttribute.Name)}");
 		}

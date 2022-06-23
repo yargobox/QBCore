@@ -1,22 +1,15 @@
-using System.Linq.Expressions;
-using QBCore.DataSource.Builders;
-
 namespace QBCore.DataSource;
 
 [AttributeUsage(AttributeTargets.Class, AllowMultiple = false, Inherited = false)]
 public class ComplexDataSourceAttribute : Attribute
 {
-	public string Name { get; init; } = "[CDS]";
+	public string? Name { get; init; }
 	public Type? Builder { get; init; }
 	public string? BuilderMethod { get; init; }
 
 	public ComplexDataSourceAttribute() { }
-	public ComplexDataSourceAttribute(string name)
+	public ComplexDataSourceAttribute(string Name)
 	{
-		if (string.IsNullOrEmpty(name))
-		{
-			throw new ArgumentNullException(nameof(name));
-		}
-		Name = name;
+		this.Name = Name;
 	}
 }

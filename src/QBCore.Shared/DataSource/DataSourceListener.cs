@@ -1,6 +1,8 @@
+using QBCore.DataSource.Options;
+
 namespace QBCore.DataSource;
 
-public abstract class DataSourceListener<TKey, TDocument, TCreate, TSelect, TUpdate, TDelete> : IDataSourceListener
+public abstract class DataSourceListener<TKey, TDocument, TCreate, TSelect, TUpdate, TDelete, TRestore> : IDataSourceListener
 {
 	public abstract ValueTask OnAttachAsync(IDataSource dataSource);
 	public abstract ValueTask OnDetachAsync(IDataSource dataSource);

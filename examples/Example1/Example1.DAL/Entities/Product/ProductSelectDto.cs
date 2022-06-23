@@ -1,6 +1,5 @@
 using Example1.DAL.Entities.Brands;
 using QBCore.DataSource.QueryBuilder;
-using QBCore.Extensions.Runtime;
 
 namespace Example1.DAL.Entities.Products;
 
@@ -16,17 +15,13 @@ public class ProductSelectDto
 	public DateTimeOffset? Updated { get; set; }
 	public DateTimeOffset? Deleted { get; set; }
 
-	[EagerLoading]
-	static ProductSelectDto()
+	private static void SelectBuilder(IQBSelectBuilder<Product, ProductSelectDto> builder)
 	{
-		QueryBuilders.RegisterSelect<Product, ProductSelectDto>(qb =>
+		builder.Map(c =>
 		{
-			qb.Map(c =>
-			{
-				c.AutoMap();
-			});
-
-			qb.SelectFromTable("products");
+			c.AutoMap();
 		});
+
+		builder.SelectFromTable("products");
 	}
 }

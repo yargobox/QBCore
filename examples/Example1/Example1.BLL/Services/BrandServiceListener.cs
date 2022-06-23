@@ -1,9 +1,11 @@
+using Example1.DAL.Entities;
 using Example1.DAL.Entities.Brands;
 using QBCore.DataSource;
+using QBCore.DataSource.Options;
 
 namespace Example1.BLL.Services;
 
-internal sealed class BrandServiceListener : DataSourceListener<int?, Brand, BrandCreateDto, BrandSelectDto, BrandUpdateDto, EmptyDto>
+internal sealed class BrandServiceListener : DataSourceListener<int?, Brand, BrandCreateDto, BrandSelectDto, BrandUpdateDto, SoftDelDto, SoftDelDto>
 {
 	BrandService _dataSource = null!;
 

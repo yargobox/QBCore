@@ -26,7 +26,7 @@ public record AddQBCoreOptions
 	public Func<Assembly, bool> AssemblySelector { get; set; } = _ => true;
 	public Func<Type, bool> TypeSelector { get; set; } = _ => true;
 	public Func<Type, bool> DataSourceSelector { get; set; } = type
-		=> type.IsClass && !type.IsAbstract && !type.IsGenericType && !type.IsGenericTypeDefinition && type.GetSubclassOf(typeof(DataSource<,,,,,,>)) != null;
+		=> type.IsClass && !type.IsAbstract && !type.IsGenericType && !type.IsGenericTypeDefinition && type.GetSubclassOf(typeof(DataSource<,,,,,,,>)) != null;
 	public Func<Type, bool> ComplexDataSourceSelector { get; set; } = type
 		=> type.IsClass && !type.IsAbstract && !type.IsGenericType && !type.IsGenericTypeDefinition && type.GetSubclassOf(typeof(ComplexDataSource<>)) != null;
 }
@@ -120,6 +120,7 @@ public static class AddQBCoreExtensions
 
 		var atypes = (types as Type[]) ?? types.ToArray();
 
+#if DEBUG
 		foreach (var type in types.Where(x => options.DataSourceSelector(x)))
 		{
 			DataSources.TryRegister(type);
@@ -128,6 +129,10 @@ public static class AddQBCoreExtensions
 		{
 			ComplexDataSources.TryRegister(type);
 		}
+#else
+		types.AsParallel().Where(x => options.DataSourceSelector(x)).ForAll(x => DataSources.TryRegister(x));
+		types.AsParallel().Where(x => options.ComplexDataSourceSelector(x)).ForAll(x => ComplexDataSources.TryRegister(x));
+#endif
 
 		AddBusinessObjects();
 
@@ -142,9 +147,9 @@ public static class AddQBCoreExtensions
 		var registry = (IFactoryObjectRegistry<string, BusinessObject>)StaticFactory.BusinessObjects;
 		BusinessObject bo;
 		
-		foreach (var desc in StaticFactory.DataSources)
+		foreach (var definition in StaticFactory.DataSources)
 		{
-			bo = new BusinessObject("DS", string.Intern(desc.Value.Name), desc.Value.DataSourceConcreteType);
+			bo = new BusinessObject("DS", string.Intern(definition.Value.Name), definition.Value.DataSourceConcrete);
 			
 			registry.TryRegisterObject(bo.Key, bo);
 		}
@@ -155,14 +160,14 @@ public static class AddQBCoreExtensions
 		Type transientInterface, transientType = typeof(ITransient<>);
 		Func<IServiceProvider, object> implementationFactory;
 
-		foreach (var desc in StaticFactory.DataSources)
+		foreach (var definition in StaticFactory.DataSources)
 		{
-			var dataSourceType = desc.Value.DataSourceConcreteType;
+			var dataSourceType = definition.Value.DataSourceConcrete;
 			implementationFactory = sp => ActivatorUtilities.CreateInstance(sp, dataSourceType, sp, sp.GetRequiredService<IDataContextProvider>());
 
-			if (desc.Value.DataSourceServiceType == dataSourceType)
+			if (definition.Value.DataSourceService == dataSourceType)
 			{
-				if (desc.Value.IsServiceSingleton)
+				if (definition.Value.IsServiceSingleton)
 				{
 					services.TryAddSingleton(dataSourceType, implementationFactory);
 				}
@@ -179,16 +184,16 @@ public static class AddQBCoreExtensions
 			}
 			else
 			{
-				if (desc.Value.IsServiceSingleton)
+				if (definition.Value.IsServiceSingleton)
 				{
-					services.TryAddSingleton(desc.Value.DataSourceServiceType, implementationFactory);
+					services.TryAddSingleton(definition.Value.DataSourceService, implementationFactory);
 				}
 				else
 				{
-					services.TryAddScoped(desc.Value.DataSourceServiceType, implementationFactory);
+					services.TryAddScoped(definition.Value.DataSourceService, implementationFactory);
 				}
 
-				transientInterface = transientType.MakeGenericType(desc.Value.DataSourceServiceType);
+				transientInterface = transientType.MakeGenericType(definition.Value.DataSourceService);
 				if (transientInterface.IsAssignableFrom(dataSourceType))
 				{
 					services.TryAddTransient(transientInterface, implementationFactory);

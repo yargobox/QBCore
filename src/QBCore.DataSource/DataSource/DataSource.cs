@@ -1,19 +1,22 @@
 using QBCore.Configuration;
+using QBCore.DataSource.Options;
+using QBCore.DataSource.QueryBuilder;
+using QBCore.Extensions.Threading.Tasks;
 using QBCore.ObjectFactory;
-using QBCore.Threading.Tasks;
 
 namespace QBCore.DataSource;
 
-public abstract partial class DataSource<TKey, TDocument, TCreate, TSelect, TUpdate, TDelete, TDataSource> :
-	IDataSource<TKey, TDocument, TCreate, TSelect, TUpdate, TDelete>,
-	IDataSourceHost<TKey, TDocument, TCreate, TSelect, TUpdate, TDelete>,
+public abstract partial class DataSource<TKey, TDocument, TCreate, TSelect, TUpdate, TDelete, TRestore, TDataSource> :
+	IDataSource<TKey, TDocument, TCreate, TSelect, TUpdate, TDelete, TRestore>,
+	IDataSourceHost<TKey, TDocument, TCreate, TSelect, TUpdate, TDelete, TRestore>,
 	ITransient<TDataSource>,
 	IAsyncDisposable,
 	IDisposable
 {
+	private readonly DSDefinition _definition;
 	private IServiceProvider _serviceProvider;
 	private IDataContext _dataContext;
-	protected DataSourceListener<TKey, TDocument, TCreate, TSelect, TUpdate, TDelete>? _nativeListener;
+	protected DataSourceListener<TKey, TDocument, TCreate, TSelect, TUpdate, TDelete, TRestore>? _listener;
 	private object? _syncRoot;
 
 	public object SyncRoot
@@ -27,19 +30,25 @@ public abstract partial class DataSource<TKey, TDocument, TCreate, TSelect, TUpd
 
 	public DataSource(IServiceProvider serviceProvider, IDataContextProvider dataContextProvider)
 	{
+		_definition = (DSDefinition) StaticFactory.DataSources[typeof(TDataSource)];
 		_serviceProvider = serviceProvider;
-		_dataContext = dataContextProvider.GetContext(_dataSourceDesc.DatabaseContextInterfaceType, _dataSourceDesc.DataContextName);
+		_dataContext = dataContextProvider.GetContext(_definition.QBFactory.DatabaseContextInterface, _definition.DataContextName);
 
-		if (_createNativeListener != null)
+		if (_definition.ListenerFactory != null)
 		{
-			_nativeListener = _createNativeListener(_serviceProvider);
-			AsyncHelper.RunSync(async () => await _nativeListener.OnAttachAsync(this));
+			_listener = (DataSourceListener<TKey, TDocument, TCreate, TSelect, TUpdate, TDelete, TRestore>) _definition.ListenerFactory(_serviceProvider);
+			AsyncHelper.RunSync(async () => await _listener.OnAttachAsync(this));
 		}
 	}
 
-	public IDataSourceDesc DataSourceDesc => _dataSourceDesc;
+	public IDSDefinition Definition => _definition;
 
 	public Origin Source => throw new NotImplementedException();
+
+	public Task<TCreate> InsertAsync(TCreate document, DataSourceInsertOptions? options = null, CancellationToken cancellationToken = default(CancellationToken))
+	{
+		throw new NotImplementedException();
+	}
 
 	public Task<IEnumerable<KeyValuePair<string, object?>>> AggregateAsync(IReadOnlyCollection<IDSAggregation> aggregations, SoftDel mode = SoftDel.Actual, IReadOnlyCollection<IDSCondition>? conditions = null, DataSourceSelectOptions? options = null, CancellationToken cancellationToken = default(CancellationToken))
 	{
@@ -47,31 +56,6 @@ public abstract partial class DataSource<TKey, TDocument, TCreate, TSelect, TUpd
 	}
 
 	public Task<long> CountAsync(SoftDel mode = SoftDel.Actual, IReadOnlyCollection<IDSCondition>? conditions = null, DataSourceCountOptions? options = null, CancellationToken cancellationToken = default(CancellationToken))
-	{
-		throw new NotImplementedException();
-	}
-
-	public Task DeleteAsync(TKey id, TDelete document, DataSourceDeleteOptions? options = null, CancellationToken cancellationToken = default(CancellationToken))
-	{
-		throw new NotImplementedException();
-	}
-
-	public Task DeleteAsync(TDelete document, IReadOnlyCollection<IDSCondition> conditions, DataSourceDeleteOptions? options = null, CancellationToken cancellationToken = default(CancellationToken))
-	{
-		throw new NotImplementedException();
-	}
-
-	public Task<TCreate> InsertAsync(TCreate document, DataSourceInsertOptions? options = null, CancellationToken cancellationToken = default(CancellationToken))
-	{
-		throw new NotImplementedException();
-	}
-
-	public Task RestoreAsync(TKey id, TDelete document, DataSourceRestoreOptions? options = null, CancellationToken cancellationToken = default(CancellationToken))
-	{
-		throw new NotImplementedException();
-	}
-
-	public Task RestoreAsync(TDelete document, IReadOnlyCollection<IDSCondition> conditions, DataSourceRestoreOptions? options = null, CancellationToken cancellationToken = default(CancellationToken))
 	{
 		throw new NotImplementedException();
 	}
@@ -86,32 +70,32 @@ public abstract partial class DataSource<TKey, TDocument, TCreate, TSelect, TUpd
 		throw new NotImplementedException();
 	}
 
-	public Task<bool> TestDeleteAsync(TKey? id = default, TDelete? document = default, DataSourceTestDeleteOptions? options = null, CancellationToken cancellationToken = default(CancellationToken))
-	{
-		throw new NotImplementedException();
-	}
-
-	public Task<bool> TestInsertAsync(DataSourceTestInsertOptions? options = null, CancellationToken cancellationToken = default(CancellationToken))
-	{
-		throw new NotImplementedException();
-	}
-
-	public Task<bool> TestRestoreAsync(TKey? id = default, TDelete? document = default, DataSourceTestRestoreOptions? options = null, CancellationToken cancellationToken = default(CancellationToken))
-	{
-		throw new NotImplementedException();
-	}
-
-	public Task<bool> TestUpdateAsync(TKey? id = default, DataSourceTestUpdateOptions? options = null, CancellationToken cancellationToken = default(CancellationToken))
-	{
-		throw new NotImplementedException();
-	}
-
 	public Task<TUpdate> UpdateAsync(TKey id, TUpdate document, IReadOnlyCollection<string>? modifiedFieldNames = null, DataSourceUpdateOptions? options = null, CancellationToken cancellationToken = default(CancellationToken))
 	{
 		throw new NotImplementedException();
 	}
 
 	public Task<TUpdate> UpdateAsync(TUpdate document, IReadOnlyCollection<IDSCondition> conditions, IReadOnlyCollection<string>? modifiedFieldNames = null, DataSourceUpdateOptions? options = null, CancellationToken cancellationToken = default(CancellationToken))
+	{
+		throw new NotImplementedException();
+	}
+
+	public Task DeleteAsync(TKey id, TDelete document, DataSourceDeleteOptions? options = null, CancellationToken cancellationToken = default(CancellationToken))
+	{
+		throw new NotImplementedException();
+	}
+
+	public Task DeleteAsync(TDelete document, IReadOnlyCollection<IDSCondition> conditions, DataSourceDeleteOptions? options = null, CancellationToken cancellationToken = default(CancellationToken))
+	{
+		throw new NotImplementedException();
+	}
+
+	public Task RestoreAsync(TKey id, TRestore document, DataSourceRestoreOptions? options = null, CancellationToken cancellationToken = default(CancellationToken))
+	{
+		throw new NotImplementedException();
+	}
+
+	public Task RestoreAsync(TRestore document, IReadOnlyCollection<IDSCondition> conditions, DataSourceRestoreOptions? options = null, CancellationToken cancellationToken = default(CancellationToken))
 	{
 		throw new NotImplementedException();
 	}

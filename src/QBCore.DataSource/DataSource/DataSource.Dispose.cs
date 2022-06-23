@@ -1,8 +1,8 @@
-using QBCore.Threading.Tasks;
+using QBCore.Extensions.Threading.Tasks;
 
 namespace QBCore.DataSource;
 
-public abstract partial class DataSource<TKey, TDocument, TCreate, TSelect, TUpdate, TDelete, TDataSource>
+public abstract partial class DataSource<TKey, TDocument, TCreate, TSelect, TUpdate, TDelete, TRestore, TDataSource>
 {
 	~DataSource()
 	{
@@ -30,11 +30,11 @@ public abstract partial class DataSource<TKey, TDocument, TCreate, TSelect, TUpd
 				AsyncHelper.RunSync(async () => await ClearListenersAsync().ConfigureAwait(false));
 			}
 
-			if (_nativeListener != null)
+			if (_listener != null)
 			{
-				AsyncHelper.RunSync(async () => await _nativeListener.OnDetachAsync(this).ConfigureAwait(false));
-				DisposeObject(_nativeListener);
-				_nativeListener = null;
+				AsyncHelper.RunSync(async () => await _listener.OnDetachAsync(this).ConfigureAwait(false));
+				DisposeObject(_listener);
+				_listener = null;
 			}
 
 			_serviceProvider = null!;
@@ -47,11 +47,11 @@ public abstract partial class DataSource<TKey, TDocument, TCreate, TSelect, TUpd
 			await ClearListenersAsync().ConfigureAwait(false);
 		}
 
-		if (_nativeListener != null)
+		if (_listener != null)
 		{
-			await _nativeListener.OnDetachAsync(this).ConfigureAwait(false);
-			await DisposeObjectAsync(_nativeListener).ConfigureAwait(false);
-			_nativeListener = null;
+			await _listener.OnDetachAsync(this).ConfigureAwait(false);
+			await DisposeObjectAsync(_listener).ConfigureAwait(false);
+			_listener = null;
 		}
 
 		_serviceProvider = null!;

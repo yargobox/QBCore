@@ -1,6 +1,13 @@
 namespace QBCore.DataSource.QueryBuilder;
 
-internal class QBBuilder<TDocument, TProjection> : IQBBuilder<TDocument, TProjection>, ICloneable
+internal class QBBuilder<TDocument, TProjection> :
+	IQBInsertBuilder<TDocument, TProjection>,
+	IQBSelectBuilder<TDocument, TProjection>,
+	IQBUpdateBuilder<TDocument, TProjection>,
+	IQBDeleteBuilder<TDocument, TProjection>,
+	IQBSoftDelBuilder<TDocument, TProjection>,
+	IQBRestoreBuilder<TDocument, TProjection>,
+	ICloneable
 {
 	public QBBuilder() { }
 	public QBBuilder(QBBuilder<TDocument, TProjection> other)
@@ -38,7 +45,7 @@ internal class QBBuilder<TDocument, TProjection> : IQBBuilder<TDocument, TProjec
 
 	public List<BuilderContainer> Containers => _containers ?? (_containers = new List<BuilderContainer>(3));
 	public List<BuilderParameter> Parameters => _parameters ?? (_parameters = new List<BuilderParameter>(3));
-	public List<BuilderCondition> Conditions =>_conditions ?? (_conditions = new List<BuilderCondition>(3));
+	public List<BuilderCondition> Conditions => _conditions ?? (_conditions = new List<BuilderCondition>(3));
 	public List<BuilderSortOrder> SortOrders => _sortOrders ?? (_sortOrders = new List<BuilderSortOrder>(3));
 	public List<BuilderAggregation> Aggregations => _aggregations ?? (_aggregations = new List<BuilderAggregation>(3));
 

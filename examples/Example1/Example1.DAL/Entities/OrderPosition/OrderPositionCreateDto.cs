@@ -10,17 +10,13 @@ public class OrderPositionCreateDto
 	public int ProductId { get; set; }
 	public decimal Quantity { get; set; }
 
-	[EagerLoading]
-	static OrderPositionCreateDto()
+	private static void InsertBuilder(IQBInsertBuilder<OrderPosition, OrderPositionCreateDto> builder)
 	{
-		QueryBuilders.RegisterInsert<OrderPosition, OrderPositionCreateDto>(qb =>
+		builder.Map(c =>
 		{
-			qb.Map(c =>
-			{
-				c.AutoMap();
-			});
-
-			qb.InsertToTable("order_positions");
+			c.AutoMap();
 		});
+
+		builder.InsertToTable("order_positions");
 	}
 }

@@ -12,17 +12,13 @@ public class BrandSelectDto
 	public DateTimeOffset? Updated { get; set; }
 	public DateTimeOffset? Deleted { get; set; }
 
-	[EagerLoading]
-	static BrandSelectDto()
+	public static void SelectBuilder(IQBSelectBuilder<Brand, BrandSelectDto> builder)
 	{
-		QueryBuilders.RegisterSelect<Brand, BrandSelectDto>(qb =>
+		builder.Map(c =>
 		{
-			qb.Map(c =>
-			{
-				c.AutoMap();
-			});
-
-			qb.SelectFromTable("brands");
+			c.AutoMap();
 		});
+
+		builder.SelectFromTable("brands");
 	}
 }

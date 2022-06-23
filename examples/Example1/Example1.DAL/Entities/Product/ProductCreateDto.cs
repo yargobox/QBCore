@@ -1,5 +1,4 @@
 using QBCore.DataSource.QueryBuilder;
-using QBCore.Extensions.Runtime;
 
 namespace Example1.DAL.Entities.Products;
 
@@ -8,17 +7,13 @@ public class ProductCreateDto
 	public string Name { get; set; } = null!;
 	public int ProductId { get; set; }
 
-	[EagerLoading]
-	static ProductCreateDto()
+	private static void InsertBuilder(IQBInsertBuilder<Product, ProductCreateDto> builder)
 	{
-		QueryBuilders.RegisterInsert<Product, ProductCreateDto>(qb =>
+		builder.Map(c =>
 		{
-			qb.Map(c =>
-			{
-				c.AutoMap();
-			});
-
-			qb.InsertToTable("products");
+			c.AutoMap();
 		});
+
+		builder.InsertToTable("products");
 	}
 }

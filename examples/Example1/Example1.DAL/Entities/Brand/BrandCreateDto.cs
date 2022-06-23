@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using QBCore.DataSource;
 using QBCore.DataSource.QueryBuilder;
 using QBCore.Extensions.Runtime;
 
@@ -9,17 +10,13 @@ public class BrandCreateDto
 	[MaxLength(60)]
 	public string? Name { get; set; }
 
-	[EagerLoading]
-	static BrandCreateDto()
+	public static void InsertBuilder(IQBInsertBuilder<Brand, BrandCreateDto> builder)
 	{
-		QueryBuilders.RegisterInsert<Brand, BrandCreateDto>(qb =>
+		builder.Map(c =>
 		{
-			qb.Map(c =>
-			{
-				c.AutoMap();
-			});
-
-			qb.InsertToTable("brands");
+			c.AutoMap();
 		});
+
+		builder.InsertToTable("brands");
 	}
 }

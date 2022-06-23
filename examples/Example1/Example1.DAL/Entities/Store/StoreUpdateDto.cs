@@ -1,5 +1,4 @@
 using QBCore.DataSource.QueryBuilder;
-using QBCore.Extensions.Runtime;
 
 namespace Example1.DAL.Entities.Stores;
 
@@ -7,17 +6,13 @@ public class StoreUpdateDto
 {
 	public string Name { get; set; } = null!;
 
-	[EagerLoading]
-	static StoreUpdateDto()
+	private static void UpdateBuilder(IQBUpdateBuilder<Store, StoreUpdateDto> builder)
 	{
-		QueryBuilders.RegisterUpdate<Store, StoreUpdateDto>(qb =>
+		builder.Map(c =>
 		{
-			qb.Map(c =>
-			{
-				c.AutoMap();
-			});
-
-			qb.UpdateTable("stores");
+			c.AutoMap();
 		});
+
+		builder.UpdateTable("stores");
 	}
 }

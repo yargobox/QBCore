@@ -1,5 +1,6 @@
 using System.Runtime.CompilerServices;
 using MongoDB.Driver;
+using QBCore.DataSource.Options;
 using QBCore.ObjectFactory;
 
 namespace QBCore.DataSource.QueryBuilder;
@@ -8,7 +9,7 @@ internal sealed class SelectQueryBuilder<TDocument, TSelect> : QueryBuilder<TDoc
 {
 	public override QueryBuilderTypes QueryBuilderType => QueryBuilderTypes.Select;
 
-	public override Origin Source => new Origin(typeof(SelectQueryBuilder<TDocument, TSelect>));
+	public override Origin Source => new Origin(this.GetType());
 
 	public SelectQueryBuilder(QBBuilder<TDocument, TSelect> building)
 		: base(building)

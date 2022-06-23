@@ -1,8 +1,8 @@
 namespace QBCore.DataSource;
 
-public abstract partial class DataSource<TKey, TDocument, TCreate, TSelect, TUpdate, TDelete, TDataSource>
+public abstract partial class DataSource<TKey, TDocument, TCreate, TSelect, TUpdate, TDelete, TRestore, TDataSource>
 {
-	private KeyValuePair<DataSourceListener<TKey, TDocument, TCreate, TSelect, TUpdate, TDelete>, bool>[]? _listeners;
+	private KeyValuePair<DataSourceListener<TKey, TDocument, TCreate, TSelect, TUpdate, TDelete, TRestore>, bool>[]? _listeners;
 
 	/// <summary>
 	/// Gets and adds a listener from the DI container to the data source.
@@ -13,7 +13,7 @@ public abstract partial class DataSource<TKey, TDocument, TCreate, TSelect, TUpd
 	/// <remarks>
 	/// The method itself is thread safe. However, calling <c>OnAttach()</c> on shared listeners will not.
 	/// </remarks>
-	public async ValueTask CreateListenerAsync<T>(bool attachTransient = false) where T : DataSourceListener<TKey, TDocument, TCreate, TSelect, TUpdate, TDelete>
+	public async ValueTask CreateListenerAsync<T>(bool attachTransient = false) where T : DataSourceListener<TKey, TDocument, TCreate, TSelect, TUpdate, TDelete, TRestore>
 	{
 		var listener = _serviceProvider.GetRequiredInstance<T>();
 		await AddListenerInternalAsync(listener, attachTransient);
@@ -29,7 +29,7 @@ public abstract partial class DataSource<TKey, TDocument, TCreate, TSelect, TUpd
 	/// <remarks>
 	/// The method itself is thread safe. However, calling <c>OnAttach()</c> on shared listeners will not.
 	/// </remarks>
-	public async ValueTask CreateListenerAsync<T>(Func<IServiceProvider, T> implementationFactory, bool attachTransient = false) where T : DataSourceListener<TKey, TDocument, TCreate, TSelect, TUpdate, TDelete>
+	public async ValueTask CreateListenerAsync<T>(Func<IServiceProvider, T> implementationFactory, bool attachTransient = false) where T : DataSourceListener<TKey, TDocument, TCreate, TSelect, TUpdate, TDelete, TRestore>
 	{
 		var listener = implementationFactory(_serviceProvider);
 		if (listener == null)
@@ -47,12 +47,12 @@ public abstract partial class DataSource<TKey, TDocument, TCreate, TSelect, TUpd
 	/// <remarks>
 	/// The method itself is thread safe. However, calling <c>OnDetach()</c> and <c>DisposeAsync()</c> on the listener will not.
 	/// </remarks>
-	public async ValueTask<bool> RemoveListenerAsync<T>() where T : DataSourceListener<TKey, TDocument, TCreate, TSelect, TUpdate, TDelete>
+	public async ValueTask<bool> RemoveListenerAsync<T>() where T : DataSourceListener<TKey, TDocument, TCreate, TSelect, TUpdate, TDelete, TRestore>
 	{
 		return await RemoveListenerInternalAsync(typeof(T));
 	}
 
-	private async ValueTask AddListenerInternalAsync(DataSourceListener<TKey, TDocument, TCreate, TSelect, TUpdate, TDelete> listener, bool attachTransient)
+	private async ValueTask AddListenerInternalAsync(DataSourceListener<TKey, TDocument, TCreate, TSelect, TUpdate, TDelete, TRestore> listener, bool attachTransient)
 	{
 		var entry = KeyValuePair.Create(listener, attachTransient);
 		await entry.Key.OnAttachAsync(this);
@@ -72,31 +72,31 @@ public abstract partial class DataSource<TKey, TDocument, TCreate, TSelect, TUpd
 		}
 		return false;
 	}
-	private void AddListenerToArray(KeyValuePair<DataSourceListener<TKey, TDocument, TCreate, TSelect, TUpdate, TDelete>, bool> entry)
+	private void AddListenerToArray(KeyValuePair<DataSourceListener<TKey, TDocument, TCreate, TSelect, TUpdate, TDelete, TRestore>, bool> entry)
 	{
-		KeyValuePair<DataSourceListener<TKey, TDocument, TCreate, TSelect, TUpdate, TDelete>, bool>[]? newOne, oldOne;
+		KeyValuePair<DataSourceListener<TKey, TDocument, TCreate, TSelect, TUpdate, TDelete, TRestore>, bool>[]? newOne, oldOne;
 		do
 		{
 			oldOne = _listeners;
 
 			if (oldOne == null)
 			{
-				newOne = new KeyValuePair<DataSourceListener<TKey, TDocument, TCreate, TSelect, TUpdate, TDelete>, bool>[1];
+				newOne = new KeyValuePair<DataSourceListener<TKey, TDocument, TCreate, TSelect, TUpdate, TDelete, TRestore>, bool>[1];
 				newOne[0] = entry;
 			}
 			else
 			{
-				newOne = new KeyValuePair<DataSourceListener<TKey, TDocument, TCreate, TSelect, TUpdate, TDelete>, bool>[oldOne.Length + 1];
+				newOne = new KeyValuePair<DataSourceListener<TKey, TDocument, TCreate, TSelect, TUpdate, TDelete, TRestore>, bool>[oldOne.Length + 1];
 				Array.Copy(oldOne, newOne, oldOne.Length);
 				newOne[oldOne.Length] = entry;
 			}
 		}
 		while (Interlocked.CompareExchange(ref _listeners, newOne, oldOne) != oldOne);
 	}
-	private KeyValuePair<DataSourceListener<TKey, TDocument, TCreate, TSelect, TUpdate, TDelete>, bool>? RemoveListenerFromArray(Type listenerType)
+	private KeyValuePair<DataSourceListener<TKey, TDocument, TCreate, TSelect, TUpdate, TDelete, TRestore>, bool>? RemoveListenerFromArray(Type listenerType)
 	{
-		KeyValuePair<DataSourceListener<TKey, TDocument, TCreate, TSelect, TUpdate, TDelete>, bool>? entry;
-		KeyValuePair<DataSourceListener<TKey, TDocument, TCreate, TSelect, TUpdate, TDelete>, bool>[]? newOne = null, oldOne;
+		KeyValuePair<DataSourceListener<TKey, TDocument, TCreate, TSelect, TUpdate, TDelete, TRestore>, bool>? entry;
+		KeyValuePair<DataSourceListener<TKey, TDocument, TCreate, TSelect, TUpdate, TDelete, TRestore>, bool>[]? newOne = null, oldOne;
 
 		do
 		{
@@ -113,7 +113,7 @@ public abstract partial class DataSource<TKey, TDocument, TCreate, TSelect, TUpd
 
 						if (oldOne.Length > 1)
 						{
-							newOne = new KeyValuePair<DataSourceListener<TKey, TDocument, TCreate, TSelect, TUpdate, TDelete>, bool>[oldOne.Length - 1];
+							newOne = new KeyValuePair<DataSourceListener<TKey, TDocument, TCreate, TSelect, TUpdate, TDelete, TRestore>, bool>[oldOne.Length - 1];
 							Array.Copy(oldOne, newOne, i);
 							if (i + 1 < oldOne.Length)
 							{
@@ -138,7 +138,7 @@ public abstract partial class DataSource<TKey, TDocument, TCreate, TSelect, TUpd
 		var oldOne = _listeners;
 		if (oldOne != null && Interlocked.CompareExchange(ref _listeners, null, oldOne) == oldOne)
 		{
-			KeyValuePair<DataSourceListener<TKey, TDocument, TCreate, TSelect, TUpdate, TDelete>, bool> entry;
+			KeyValuePair<DataSourceListener<TKey, TDocument, TCreate, TSelect, TUpdate, TDelete, TRestore>, bool> entry;
 			for (var i = oldOne.Length - 1; i >= 0; i--)
 			{
 				entry = oldOne[i];

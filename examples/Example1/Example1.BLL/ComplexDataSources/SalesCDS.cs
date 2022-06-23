@@ -6,15 +6,13 @@ using QBCore.DataSource.Builders;
 
 namespace Example1.BLL.Services;
 
-//[ComplexDataSource]
+[ComplexDataSource]
 public class SalesCDS : ComplexDataSource<SalesCDS>
 {
-	private static void CDSBuilder(ICDSBuilder builder)
+	static void CDSBuilder(ICDSBuilder builder)
 	{
-		builder
-			.SetName("sales")
-
-			.NodeBuilder
+//		builder.Name = "sales";
+		builder.NodeBuilder
 
 			.AddNode<StoreService>("stores")
 

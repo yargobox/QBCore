@@ -2,17 +2,26 @@ namespace QBCore.DataSource.Builders;
 
 internal sealed class CDSBuilder : ICDSBuilder
 {
-	public string Name { get; set; } = "[CDS]";
-	public ICDSNodeBuilder NodeBuilder { get; }
+	public Type ConcreteType { get; }
 
-	public CDSBuilder()
+	public string? Name
 	{
-		NodeBuilder = new CDSNodeBuilder(new CDSNode());
+		get => _name;
+		set
+		{
+			if (_name != null)
+				throw new InvalidOperationException($"Complex datasource '{ConcreteType.ToPretty()}' builder option '{nameof(Name)}' is already set.");
+			_name = value;
+		}
 	}
 
-	public ICDSBuilder SetName(string name)
+	public ICDSNodeBuilder NodeBuilder { get; }
+
+	private string? _name;
+
+	public CDSBuilder(Type concreteType)
 	{
-		Name = name;
-		return this;
+		ConcreteType = concreteType;
+		NodeBuilder = new CDSNodeBuilder(new CDSNode());
 	}
 }

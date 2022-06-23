@@ -1,5 +1,4 @@
 using QBCore.DataSource.QueryBuilder;
-using QBCore.Extensions.Runtime;
 
 namespace Example1.DAL.Entities.OrderPositions;
 
@@ -9,17 +8,13 @@ public class OrderPositionUpdateDto
 	public int ProductId { get; set; }
 	public decimal Quantity { get; set; }
 
-	[EagerLoading]
-	static OrderPositionUpdateDto()
+	private static void UpdateBuilder(IQBUpdateBuilder<OrderPosition, OrderPositionUpdateDto> builder)
 	{
-		QueryBuilders.RegisterUpdate<OrderPosition, OrderPositionUpdateDto>(qb =>
+		builder.Map(c =>
 		{
-			qb.Map(c =>
-			{
-				c.AutoMap();
-			});
-
-			qb.UpdateTable("orderpositions");
+			c.AutoMap();
 		});
+
+		builder.UpdateTable("order_positions");
 	}
 }

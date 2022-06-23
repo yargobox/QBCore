@@ -1,3 +1,4 @@
+using QBCore.DataSource.Options;
 using QBCore.ObjectFactory;
 
 namespace QBCore.DataSource.QueryBuilder;
@@ -14,9 +15,6 @@ public interface IQueryBuilder<TDocument, TProjection> : IQueryBuilder
 {
 }
 
-public interface ITestInsertQueryBuilder<TDocument, TCreate> : IQueryBuilder<TDocument, TCreate>
-{
-}
 public interface IInsertQueryBuilder<TDocument, TCreate> : IQueryBuilder<TDocument, TCreate>
 {
 	Task<TCreate> InsertAsync(
@@ -47,9 +45,6 @@ public interface ISelectQueryBuilder<TDocument, TSelect> : IQueryBuilder<TDocume
 	);
 }
 
-public interface ITestUpdateQueryBuilder<TDocument, TUpdate> : IQueryBuilder<TDocument, TUpdate>
-{
-}
 public interface IUpdateQueryBuilder<TDocument, TUpdate> : IQueryBuilder<TDocument, TUpdate>
 {
 	Task<TUpdate> UpdateAsync(
@@ -62,16 +57,10 @@ public interface IUpdateQueryBuilder<TDocument, TUpdate> : IQueryBuilder<TDocume
 	);
 }
 
-public interface ITestDeleteQueryBuilder<TDocument, TDelete> : IQueryBuilder<TDocument, TDelete>
-{
-}
 public interface IDeleteQueryBuilder<TDocument, TDelete> : IQueryBuilder<TDocument, TDelete>
 {
 }
 
-public interface ITestRestoreQueryBuilder<TDocument, TDelete> : IQueryBuilder<TDocument, TDelete>
-{
-}
-public interface IRestoreQueryBuilder<TDocument, TDelete> : IQueryBuilder<TDocument, TDelete>
+public interface IRestoreQueryBuilder<TDocument, TRestore> : IQueryBuilder<TDocument, TRestore>
 {
 }

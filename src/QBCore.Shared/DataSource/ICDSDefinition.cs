@@ -3,6 +3,6 @@ namespace QBCore.DataSource;
 public interface ICDSDefinition
 {
 	string Name { get; }
-	Type ComplexDataSourceType { get; }
+	Type ComplexDataSourceConcrete { get; }
 	IReadOnlyDictionary<string, ICDSNode> Nodes { get; }
 }

@@ -1,4 +1,4 @@
-namespace QBCore.DataSource;
+namespace QBCore.DataSource.Options;
 
 public class DataSourceOperationOptions
 {

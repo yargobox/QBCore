@@ -1,6 +1,6 @@
 using System.Globalization;
 
-namespace QBCore.Threading.Tasks;
+namespace QBCore.Extensions.Threading.Tasks;
 
 public static class AsyncHelper
 {

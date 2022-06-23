@@ -7,7 +7,7 @@ using QBCore.ObjectFactory;
 namespace QBCore.Controllers;
 
 /// <summary>
-/// Renames controllers to DataSourceDesc.Name from their generic type names (DataSourceController`7).
+/// Renames controllers to DSDefinition.Name from their generic type names (DataSourceController`7).
 /// Applies RouteAttribute for each of them according to RouteTemplate.
 /// Builds index of controller names.
 /// </summary>
@@ -27,7 +27,7 @@ public class DataSourceControllerRouteConvention : IControllerModelConvention
 		}
 		AddQBCoreExtensions.IsDataSourceControllerRouteConventionCreated = true;
 
-		var controllerSubclass = controller.ControllerType.GetSubclassOf(typeof(DataSourceController<,,,,,,>));
+		var controllerSubclass = controller.ControllerType.GetSubclassOf(typeof(DataSourceController<,,,,,,,>));
 
 		if (controllerSubclass != null)
 		{
@@ -35,16 +35,16 @@ public class DataSourceControllerRouteConvention : IControllerModelConvention
 			var dataSourceServiceType = controller.ControllerType.GetGenericArguments().Last();
 
 			// A service type may be not a concrete type. If it is not, we have to find it :(
-			var desc = StaticFactory.DataSources.GetValueOrDefault(dataSourceServiceType) ??
-				StaticFactory.DataSources.Values.First(x => x.DataSourceServiceType == dataSourceServiceType);
+			var definition = StaticFactory.DataSources.GetValueOrDefault(dataSourceServiceType) ??
+				StaticFactory.DataSources.Values.First(x => x.DataSourceService == dataSourceServiceType);
 
 			if (controllerSubclass == controller.ControllerType)
 			{
-				ApplyToAutoDataSourceController(controller, desc);
+				ApplyToAutoDataSourceController(controller, definition);
 			}
 			else
 			{
-				ApplyToCustomDataSourceController(controller, desc);
+				ApplyToCustomDataSourceController(controller, definition);
 			}
 		}
 		else
@@ -53,14 +53,14 @@ public class DataSourceControllerRouteConvention : IControllerModelConvention
 		}
 	}
 
-	public virtual void ApplyToAutoDataSourceController(ControllerModel controller, IDataSourceDesc desc)
+	public virtual void ApplyToAutoDataSourceController(ControllerModel controller, IDSDefinition definition)
 	{
-		if (string.IsNullOrEmpty(desc.ControllerName))
+		if (string.IsNullOrEmpty(definition.ControllerName))
 		{
-			throw new InvalidOperationException($"No controller name was specified for data source '{desc.Name}'.");
+			throw new InvalidOperationException($"No controller name was specified for data source '{definition.Name}'.");
 		}
 
-		controller.ControllerName = desc.ControllerName;
+		controller.ControllerName = definition.ControllerName;
 
 		var attributeRouteModel = new AttributeRouteModel(new RouteAttribute(RoutePrefix + "[controller]"));
 		var nullRouteSelector = controller.Selectors.FirstOrDefault(x => x.AttributeRouteModel == null);
@@ -74,13 +74,13 @@ public class DataSourceControllerRouteConvention : IControllerModelConvention
 		}
 	}
 
-	protected virtual void ApplyToCustomDataSourceController(ControllerModel controller, IDataSourceDesc desc)
+	protected virtual void ApplyToCustomDataSourceController(ControllerModel controller, IDSDefinition definition)
 	{
-		if (!string.IsNullOrEmpty(desc?.ControllerName))
+		if (!string.IsNullOrEmpty(definition?.ControllerName))
 		{
-			if (desc.DataSourceConcreteType.GetCustomAttribute<DsApiControllerAttribute>(false)?.AutoBuild == false)
+			if (definition.DataSourceConcrete.GetCustomAttribute<DsApiControllerAttribute>(false)?.IsAutoController == false)
 			{
-				controller.ControllerName = desc.ControllerName;
+				controller.ControllerName = definition.ControllerName;
 			}
 		}
 	}

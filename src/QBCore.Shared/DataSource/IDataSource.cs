@@ -1,22 +1,19 @@
+using QBCore.DataSource.Options;
 using QBCore.ObjectFactory;
 
 namespace QBCore.DataSource;
 
 public interface IDataSource : IOriginal
 {
-	IDataSourceDesc DataSourceDesc { get; }
+	IDSDefinition Definition { get; }
 }
 
-public interface IDataSource<TKey, TDocument, TCreate, TSelect, TUpdate, TDelete> : IDataSource
+public interface IDataSource<TKey, TDocument, TCreate, TSelect, TUpdate, TDelete, TRestore> : IDataSource
 {
 	Task<long> CountAsync(
 		SoftDel mode = SoftDel.Actual,
 		IReadOnlyCollection<IDSCondition>? conditions = null,
 		DataSourceCountOptions? options = null,
-		CancellationToken cancellationToken = default(CancellationToken)
-	);
-	Task<bool> TestInsertAsync(
-		DataSourceTestInsertOptions? options = null,
 		CancellationToken cancellationToken = default(CancellationToken)
 	);
 	Task<TCreate> InsertAsync(
@@ -45,11 +42,6 @@ public interface IDataSource<TKey, TDocument, TCreate, TSelect, TUpdate, TDelete
 		DataSourceSelectOptions? options = null,
 		CancellationToken cancellationToken = default(CancellationToken)
 	);
-	Task<bool> TestUpdateAsync(
-		TKey? id = default(TKey?),
-		DataSourceTestUpdateOptions? options = null,
-		CancellationToken cancellationToken = default(CancellationToken)
-	);
 	Task<TUpdate> UpdateAsync(
 		TKey id,
 		TUpdate document,
@@ -64,12 +56,6 @@ public interface IDataSource<TKey, TDocument, TCreate, TSelect, TUpdate, TDelete
 		DataSourceUpdateOptions? options = null,
 		CancellationToken cancellationToken = default(CancellationToken)
 	);
-	Task<bool> TestDeleteAsync(
-		TKey? id = default(TKey?),
-		TDelete? document = default(TDelete?),
-		DataSourceTestDeleteOptions? options = null,
-		CancellationToken cancellationToken = default(CancellationToken)
-	);
 	Task DeleteAsync(
 		TKey id,
 		TDelete document,
@@ -80,22 +66,16 @@ public interface IDataSource<TKey, TDocument, TCreate, TSelect, TUpdate, TDelete
 		TDelete document,
 		IReadOnlyCollection<IDSCondition> conditions,
 		DataSourceDeleteOptions? options = null,
-		CancellationToken cancellationToken = default(CancellationToken)
-	);
-	Task<bool> TestRestoreAsync(
-		TKey? id = default(TKey?),
-		TDelete? document = default(TDelete?),
-		DataSourceTestRestoreOptions? options = null,
 		CancellationToken cancellationToken = default(CancellationToken)
 	);
 	Task RestoreAsync(
 		TKey id,
-		TDelete document,
+		TRestore document,
 		DataSourceRestoreOptions? options = null,
 		CancellationToken cancellationToken = default(CancellationToken)
 	);
 	Task RestoreAsync(
-		TDelete document,
+		TRestore document,
 		IReadOnlyCollection<IDSCondition> conditions,
 		DataSourceRestoreOptions? options = null,
 		CancellationToken cancellationToken = default(CancellationToken)

@@ -7,17 +7,13 @@ public class OrderCreateDto
 {
 	public string Name { get; set; } = null!;
 
-	[EagerLoading]
-	static OrderCreateDto()
+	private static void InsertBuilder(IQBInsertBuilder<Order, OrderCreateDto> builder)
 	{
-		QueryBuilders.RegisterInsert<Order, OrderCreateDto>(qb =>
+		builder.Map(c =>
 		{
-			qb.Map(c =>
-			{
-				c.AutoMap();
-			});
-
-			qb.InsertToTable("orders");
+			c.AutoMap();
 		});
+
+		builder.InsertToTable("orders");
 	}
 }

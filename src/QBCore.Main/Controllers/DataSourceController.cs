@@ -6,8 +6,8 @@ using QBCore.DataSource;
 namespace QBCore.Controllers;
 
 [Produces("application/json")]
-public class DataSourceController<TKey, TDocument, TCreate, TSelect, TUpdate, TDelete, TDataSource> : ControllerBase
-	where TDataSource : IDataSource<TKey, TDocument, TCreate, TSelect, TUpdate, TDelete>
+public class DataSourceController<TKey, TDocument, TCreate, TSelect, TUpdate, TDelete, TRestore, TDataSource> : ControllerBase
+	where TDataSource : IDataSource<TKey, TDocument, TCreate, TSelect, TUpdate, TDelete, TRestore>
 {
 	protected ILogger<TDataSource> _logger;
 	protected TDataSource _service;
@@ -72,7 +72,9 @@ public class DataSourceController<TKey, TDocument, TCreate, TSelect, TUpdate, TD
 	}
 
 	[HttpDelete("{id}"), ActionName("delete")]
-	public async Task<ActionResult> DeleteAsync([FromRoute, Required] TKey id)
+	public async Task<ActionResult> DeleteAsync(
+		[FromRoute, Required] TKey id,
+		[FromBody] TDelete? model)
 	{
 		Console.WriteLine(ControllerContext.ActionDescriptor.ActionName);
 		Console.WriteLine(string.Join(", ", ControllerContext.ActionDescriptor.RouteValues.Select(x => x.Key + " = " + x.Value)));
@@ -81,7 +83,9 @@ public class DataSourceController<TKey, TDocument, TCreate, TSelect, TUpdate, TD
 	}
 
 	[HttpPatch("{id}"), ActionName("restore")]
-	public async Task<ActionResult> RestoreAsync([FromRoute, Required] TKey id)
+	public async Task<ActionResult> RestoreAsync(
+		[FromRoute, Required] TKey id,
+		[FromBody] TRestore? model)
 	{
 		Console.WriteLine(ControllerContext.ActionDescriptor.ActionName);
 		Console.WriteLine(string.Join(", ", ControllerContext.ActionDescriptor.RouteValues.Select(x => x.Key + " = " + x.Value)));

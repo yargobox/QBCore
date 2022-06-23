@@ -7,17 +7,13 @@ public class BrandUpdateDto
 {
 	public string? Name { get; set; }
 
-	[EagerLoading]
-	static BrandUpdateDto()
+	public static void UpdateBuilder(IQBUpdateBuilder<Brand, BrandUpdateDto> builder)
 	{
-		QueryBuilders.RegisterUpdate<Brand, BrandUpdateDto>(qb =>
+		builder.Map(c =>
 		{
-			qb.Map(c =>
-			{
-				c.AutoMap();
-			});
-
-			qb.UpdateTable("brands");
+			c.AutoMap();
 		});
+
+		builder.UpdateTable("brands");
 	}
 }
