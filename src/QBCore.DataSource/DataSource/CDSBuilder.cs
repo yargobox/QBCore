@@ -1,4 +1,4 @@
-namespace QBCore.DataSource.Builders;
+namespace QBCore.DataSource;
 
 internal sealed class CDSBuilder : ICDSBuilder
 {

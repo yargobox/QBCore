@@ -3,7 +3,7 @@ using System.Diagnostics.CodeAnalysis;
 using System.Linq.Expressions;
 using QBCore.ObjectFactory;
 
-namespace QBCore.DataSource.Builders;
+namespace QBCore.DataSource;
 
 internal sealed class CDSNodeBuilder : ICDSNodeBuilder
 {

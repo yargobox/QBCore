@@ -1,6 +1,5 @@
 using QBCore.Configuration;
 using QBCore.DataSource.Options;
-using QBCore.DataSource.QueryBuilder;
 using QBCore.Extensions.Threading.Tasks;
 using QBCore.ObjectFactory;
 
@@ -13,7 +12,6 @@ public abstract partial class DataSource<TKey, TDocument, TCreate, TSelect, TUpd
 	IAsyncDisposable,
 	IDisposable
 {
-	private readonly DSDefinition _definition;
 	private IServiceProvider _serviceProvider;
 	private IDataContext _dataContext;
 	protected DataSourceListener<TKey, TDocument, TCreate, TSelect, TUpdate, TDelete, TRestore>? _listener;
@@ -30,18 +28,18 @@ public abstract partial class DataSource<TKey, TDocument, TCreate, TSelect, TUpd
 
 	public DataSource(IServiceProvider serviceProvider, IDataContextProvider dataContextProvider)
 	{
-		_definition = (DSDefinition) StaticFactory.DataSources[typeof(TDataSource)];
+		Definition = StaticFactory.DataSources[typeof(TDataSource)];
 		_serviceProvider = serviceProvider;
-		_dataContext = dataContextProvider.GetContext(_definition.QBFactory.DatabaseContextInterface, _definition.DataContextName);
+		_dataContext = dataContextProvider.GetContext(Definition.QBFactory.DatabaseContextInterface, Definition.DataContextName);
 
-		if (_definition.ListenerFactory != null)
+		if (Definition.ListenerFactory != null)
 		{
-			_listener = (DataSourceListener<TKey, TDocument, TCreate, TSelect, TUpdate, TDelete, TRestore>) _definition.ListenerFactory(_serviceProvider);
+			_listener = (DataSourceListener<TKey, TDocument, TCreate, TSelect, TUpdate, TDelete, TRestore>) Definition.ListenerFactory(_serviceProvider);
 			AsyncHelper.RunSync(async () => await _listener.OnAttachAsync(this));
 		}
 	}
 
-	public IDSDefinition Definition => _definition;
+	public IDSDefinition Definition { get; }
 
 	public Origin Source => throw new NotImplementedException();
 

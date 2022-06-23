@@ -1,6 +1,6 @@
 namespace QBCore.DataSource;
 
-public sealed class DSBuilder : IDSBuilder
+internal sealed class DSBuilder : IDSBuilder
 {
 	public Type ConcreteType { get; }
 

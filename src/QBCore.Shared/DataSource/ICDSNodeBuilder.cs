@@ -1,6 +1,6 @@
 using System.Linq.Expressions;
 
-namespace QBCore.DataSource.Builders;
+namespace QBCore.DataSource;
 
 public interface ICDSNodeBuilder
 {
