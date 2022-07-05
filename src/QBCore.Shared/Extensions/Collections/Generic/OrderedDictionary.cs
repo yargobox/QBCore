@@ -1,5 +1,4 @@
 using System.Collections;
-using System.Collections.Generic;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 
@@ -167,6 +166,8 @@ public class OrderedDictionary<TKey, TValue> :
 	}
 
 	public IEnumerator<KeyValuePair<TKey, TValue>> GetEnumerator() => _list.GetEnumerator();
+
+	public IReadOnlyList<KeyValuePair<TKey, TValue>> List => _list;
 
 	public int IndexOf(TKey key) => _index[key];
 

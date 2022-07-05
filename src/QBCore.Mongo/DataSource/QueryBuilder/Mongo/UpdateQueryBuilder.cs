@@ -1,7 +1,7 @@
 using QBCore.DataSource.Options;
 using QBCore.ObjectFactory;
 
-namespace QBCore.DataSource.QueryBuilder;
+namespace QBCore.DataSource.QueryBuilder.Mongo;
 
 internal sealed class UpdateQueryBuilder<TDocument, TUpdate> : QueryBuilder<TDocument, TUpdate>, IUpdateQueryBuilder<TDocument, TUpdate>
 {

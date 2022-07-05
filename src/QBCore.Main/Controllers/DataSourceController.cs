@@ -31,6 +31,8 @@ public class DataSourceController<TKey, TDocument, TCreate, TSelect, TUpdate, TD
 				var actionName = ControllerContext.ActionDescriptor.ActionName;
 				var controllerName = ControllerContext.ActionDescriptor.ControllerName; */
 
+		return await Task.FromResult(Ok(_service.SelectAsync()));
+
 
 		Console.WriteLine(ControllerContext.ActionDescriptor.ActionName);
 		Console.WriteLine(string.Join(", ", ControllerContext.ActionDescriptor.RouteValues.Select(x => x.Key + " = " + x.Value)));

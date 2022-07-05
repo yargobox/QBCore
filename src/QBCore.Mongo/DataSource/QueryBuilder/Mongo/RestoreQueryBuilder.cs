@@ -1,6 +1,6 @@
 using QBCore.ObjectFactory;
 
-namespace QBCore.DataSource.QueryBuilder;
+namespace QBCore.DataSource.QueryBuilder.Mongo;
 
 internal sealed class RestoreQueryBuilder<TDocument, TRestore> : QueryBuilder<TDocument, TRestore>, IRestoreQueryBuilder<TDocument, TRestore>
 {

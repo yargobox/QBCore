@@ -4,15 +4,10 @@ namespace Example1.DAL.Entities.Stores;
 
 public class StoreUpdateDto
 {
-	public string Name { get; set; } = null!;
+	public string? Name { get; set; }
 
-	private static void UpdateBuilder(IQBUpdateBuilder<Store, StoreUpdateDto> builder)
+	static void Builder(IQBUpdateBuilder<Store, StoreUpdateDto> builder)
 	{
-		builder.Map(c =>
-		{
-			c.AutoMap();
-		});
-
-		builder.UpdateTable("stores");
+		//builder.UpdateTable("stores");
 	}
 }

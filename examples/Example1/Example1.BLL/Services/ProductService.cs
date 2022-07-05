@@ -15,10 +15,10 @@ public sealed class ProductService : DataSource<int?, Product, ProductCreateDto,
 
 	static void SoftDelBuilder(IQBSoftDelBuilder<Product, SoftDelDto> qb)
 	{
-		qb.UpdateTable("products");
+		//qb.UpdateTable("products");
 	}
 	static void RestoreBuilder(IQBRestoreBuilder<Product, SoftDelDto> qb)
 	{
-		qb.UpdateTable("products");
+		//qb.UpdateTable("products");
 	}
 }

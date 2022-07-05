@@ -4,15 +4,10 @@ namespace Example1.DAL.Entities.Stores;
 
 public class StoreCreateDto
 {
-	public string Name { get; set; } = null!;
+	public string? Name { get; set; }
 
-	private static void InsertBuilder(IQBInsertBuilder<Store, StoreCreateDto> builder)
+	static void Builder(IQBInsertBuilder<Store, StoreCreateDto> builder)
 	{
-		builder.Map(c =>
-		{
-			c.AutoMap();
-		});
-
-		builder.InsertToTable("stores");
+		//builder.InsertToTable("stores");
 	}
 }

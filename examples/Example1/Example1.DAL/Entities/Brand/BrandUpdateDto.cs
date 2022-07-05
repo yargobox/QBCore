@@ -7,13 +7,8 @@ public class BrandUpdateDto
 {
 	public string? Name { get; set; }
 
-	public static void UpdateBuilder(IQBUpdateBuilder<Brand, BrandUpdateDto> builder)
+	public static void Builder(IQBUpdateBuilder<Brand, BrandUpdateDto> builder)
 	{
-		builder.Map(c =>
-		{
-			c.AutoMap();
-		});
-
-		builder.UpdateTable("brands");
+		//builder.UpdateTable("brands");
 	}
 }

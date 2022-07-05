@@ -1,4 +1,4 @@
-namespace QBCore.DataSource.QueryBuilder;
+namespace QBCore.DataSource.QueryBuilder.Mongo;
 
 [Flags]
 internal enum BuilderContainerOperations
@@ -11,6 +11,7 @@ internal enum BuilderContainerOperations
 	Exec = 0x10,
 	Join = 0x20,
 	LeftJoin = 0x40,
+	CrossJoin = 0x80,
 
 	MainMask = BuilderContainerOperations.Insert | BuilderContainerOperations.Select | BuilderContainerOperations.Update | BuilderContainerOperations.Delete | BuilderContainerOperations.Exec,
 	SlaveMask = BuilderContainerOperations.Join | BuilderContainerOperations.LeftJoin

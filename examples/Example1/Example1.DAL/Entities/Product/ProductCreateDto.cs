@@ -4,16 +4,11 @@ namespace Example1.DAL.Entities.Products;
 
 public class ProductCreateDto
 {
-	public string Name { get; set; } = null!;
-	public int ProductId { get; set; }
+	public string? Name { get; set; }
+	public int? ProductId { get; set; }
 
-	private static void InsertBuilder(IQBInsertBuilder<Product, ProductCreateDto> builder)
+	static void Builder(IQBInsertBuilder<Product, ProductCreateDto> builder)
 	{
-		builder.Map(c =>
-		{
-			c.AutoMap();
-		});
-
-		builder.InsertToTable("products");
+		//builder.InsertToTable("products");
 	}
 }

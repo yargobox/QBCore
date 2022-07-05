@@ -1,5 +1,4 @@
-using QBCore.DataSource.QueryBuilder;
-using QBCore.Extensions.Runtime;
+using QBCore.DataSource.QueryBuilder.Mongo;
 
 namespace Example1.DAL.Entities.Brands;
 
@@ -12,13 +11,8 @@ public class BrandSelectDto
 	public DateTimeOffset? Updated { get; set; }
 	public DateTimeOffset? Deleted { get; set; }
 
-	public static void SelectBuilder(IQBSelectBuilder<Brand, BrandSelectDto> builder)
+	static void Builder(IQBMongoSelectBuilder<Brand, BrandSelectDto> builder)
 	{
-		builder.Map(c =>
-		{
-			c.AutoMap();
-		});
-
 		builder.SelectFromTable("brands");
 	}
 }

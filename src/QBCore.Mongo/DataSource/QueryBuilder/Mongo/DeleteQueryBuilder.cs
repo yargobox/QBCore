@@ -1,6 +1,6 @@
 using QBCore.ObjectFactory;
 
-namespace QBCore.DataSource.QueryBuilder;
+namespace QBCore.DataSource.QueryBuilder.Mongo;
 
 internal sealed class DeleteQueryBuilder<TDocument, TDelete> : QueryBuilder<TDocument, TDelete>, IDeleteQueryBuilder<TDocument, TDelete>
 {

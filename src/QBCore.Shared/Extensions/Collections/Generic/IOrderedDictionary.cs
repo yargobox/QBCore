@@ -5,6 +5,7 @@ namespace QBCore.Extensions.Collections.Generic;
 [DefaultMember("Item")]
 public interface IOrderedDictionary<TKey, TValue> : IDictionary<TKey, TValue> where TKey : notnull
 {
+	IReadOnlyList<KeyValuePair<TKey, TValue>> List { get; }
 	TKey KeyOf(int index);
 	int IndexOf(TKey key);
 	void Insert(int index, TKey key, TValue value);

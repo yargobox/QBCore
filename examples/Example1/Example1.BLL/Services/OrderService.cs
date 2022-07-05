@@ -15,10 +15,10 @@ public sealed class OrderService : DataSource<int?, Order, OrderCreateDto, Order
 
 	static void SoftDelBuilder(IQBSoftDelBuilder<Order, SoftDelDto> qb)
 	{
-		qb.UpdateTable("orders");
+		//qb.UpdateTable("orders");
 	}
 	static void RestoreBuilder(IQBRestoreBuilder<Order, SoftDelDto> qb)
 	{
-		qb.UpdateTable("orders");
+		//qb.UpdateTable("orders");
 	}
 }

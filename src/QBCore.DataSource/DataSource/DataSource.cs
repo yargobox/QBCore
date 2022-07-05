@@ -1,5 +1,6 @@
 using QBCore.Configuration;
 using QBCore.DataSource.Options;
+using QBCore.DataSource.QueryBuilder;
 using QBCore.Extensions.Threading.Tasks;
 using QBCore.ObjectFactory;
 
@@ -65,7 +66,10 @@ public abstract partial class DataSource<TKey, TDocument, TCreate, TSelect, TUpd
 
 	public IAsyncEnumerable<TSelect> SelectAsync(SoftDel mode = SoftDel.Actual, IReadOnlyCollection<IDSCondition>? conditions = null, IReadOnlyCollection<IDSSortOrder>? sortOrders = null, long? skip = null, int? take = null, DataSourceSelectOptions? options = null, CancellationToken cancellationToken = default(CancellationToken))
 	{
-		throw new NotImplementedException();
+		var queryBuilder = Definition.QBFactory.CreateQBSelect<TDocument, TSelect>();
+		queryBuilder.DbContext = _dataContext.Context;
+
+		return queryBuilder.SelectAsync();
 	}
 
 	public Task<TUpdate> UpdateAsync(TKey id, TUpdate document, IReadOnlyCollection<string>? modifiedFieldNames = null, DataSourceUpdateOptions? options = null, CancellationToken cancellationToken = default(CancellationToken))

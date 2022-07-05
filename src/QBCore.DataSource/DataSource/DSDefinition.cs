@@ -1,5 +1,6 @@
 using System.Reflection;
 using QBCore.DataSource.QueryBuilder;
+using QBCore.Extensions.ComponentModel;
 using QBCore.Extensions.Text;
 using QBCore.ObjectFactory;
 

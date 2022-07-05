@@ -1,3 +1,4 @@
+using QBCore.Configuration;
 using QBCore.DataSource.Options;
 using QBCore.ObjectFactory;
 
@@ -5,10 +6,12 @@ namespace QBCore.DataSource.QueryBuilder;
 
 public interface IQueryBuilder : IOriginal
 {
-	Type DatabaseContextInterface { get; }
 	QueryBuilderTypes QueryBuilderType { get; }
 	Type DocumentType { get; }
 	Type ProjectionType { get; }
+	
+	Type DatabaseContextInterface { get; }
+	object DbContext { get; set; }
 }
 
 public interface IQueryBuilder<TDocument, TProjection> : IQueryBuilder
@@ -27,6 +30,8 @@ public interface IInsertQueryBuilder<TDocument, TCreate> : IQueryBuilder<TDocume
 
 public interface ISelectQueryBuilder<TDocument, TSelect> : IQueryBuilder<TDocument, TSelect>
 {
+	IQueryable<TDocument> AsQueryable(DataSourceQueryableOptions? options = null);
+
 	Task<long> CountAsync(
 		IReadOnlyCollection<QBCondition>? conditions = null,
 		IReadOnlyCollection<QBParameter>? parameters = null,

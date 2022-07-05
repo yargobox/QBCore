@@ -15,10 +15,10 @@ public sealed class StoreService : DataSource<int?, Store, StoreCreateDto, Store
 
 	static void SoftDelBuilder(IQBSoftDelBuilder<Store, SoftDelDto> qb)
 	{
-		qb.UpdateTable("stores");
+		//qb.UpdateTable("stores");
 	}
 	static void RestoreBuilder(IQBRestoreBuilder<Store, SoftDelDto> qb)
 	{
-		qb.UpdateTable("stores");
+		//qb.UpdateTable("stores");
 	}
 }

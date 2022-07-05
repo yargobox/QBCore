@@ -1,7 +1,7 @@
 using QBCore.DataSource.Options;
 using QBCore.ObjectFactory;
 
-namespace QBCore.DataSource.QueryBuilder;
+namespace QBCore.DataSource.QueryBuilder.Mongo;
 
 internal sealed class InsertQueryBuilder<TDocument, TCreate> : QueryBuilder<TDocument, TCreate>, IInsertQueryBuilder<TDocument, TCreate>
 {

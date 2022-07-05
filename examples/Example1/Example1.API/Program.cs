@@ -6,12 +6,20 @@ using Microsoft.AspNetCore.Mvc.ApplicationParts;
 using Microsoft.AspNetCore.Mvc.Controllers;
 using Microsoft.AspNetCore.Mvc.Routing;
 using Microsoft.Extensions.Configuration;
+using MongoDB.Bson;
+using MongoDB.Bson.Serialization;
+using MongoDB.Bson.Serialization.Serializers;
 using QBCore.Configuration;
 using QBCore.Controllers;
 using QBCore.Extensions;
 using QBCore.Extensions.Runtime;
 
 EagerLoading.Initialize();
+
+BsonSerializer.RegisterSerializer(new GuidSerializer(BsonType.String));
+BsonSerializer.RegisterSerializer(new DateTimeOffsetSerializer(BsonType.String));
+//BsonSerializer.RegisterSerializer(new EnumSerializer<UserRoles>(BsonType.String));
+BsonSerializer.RegisterSerializer(new DecimalSerializer(BsonType.String));
 
 var appBuilder = WebApplication.CreateBuilder(args);
 

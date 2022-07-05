@@ -225,14 +225,15 @@ public class MongoQBFactory : IQueryBuilderFactory
 		var setupAction =
 		(
 			_builderMethods?.SelectBuilder != null
-				? _builderMethods.SelectBuilder as Action<IQBSelectBuilder<TDocument, TSelect>>
-				: FactoryHelper.FindBuilder<IQBSelectBuilder<TDocument, TSelect>>(typeof(TSelect), null)
-					?? FactoryHelper.FindBuilder<IQBSelectBuilder<TDocument, TSelect>>(DataSourceConcrete, null)
+				? _builderMethods.SelectBuilder as Action<IQBMongoSelectBuilder<TDocument, TSelect>>
+				: FactoryHelper.FindBuilder<IQBMongoSelectBuilder<TDocument, TSelect>>(typeof(TSelect), null)
+					?? FactoryHelper.FindBuilder<IQBMongoSelectBuilder<TDocument, TSelect>>(DataSourceConcrete, null)
 		)
-		?? throw new InvalidOperationException($"Datasource {DataSourceConcrete.ToPretty()} does not have a query builder setup {typeof(IQBSelectBuilder<TDocument, TSelect>).ToPretty()}.");
+		?? throw new InvalidOperationException($"Datasource {DataSourceConcrete.ToPretty()} does not have a query builder setup {typeof(IQBMongoSelectBuilder<TDocument, TSelect>).ToPretty()}.");
 
 		var setup = new QBBuilder<TDocument, TSelect>();
 		setupAction(setup);
+		setup.NormalizeSelect();
 
 		return () => new SelectQueryBuilder<TDocument, TSelect>(new QBBuilder<TDocument, TSelect>(setup));
 	}

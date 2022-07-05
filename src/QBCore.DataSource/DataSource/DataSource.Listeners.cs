@@ -1,3 +1,5 @@
+using QBCore.Extensions.ComponentModel;
+
 namespace QBCore.DataSource;
 
 public abstract partial class DataSource<TKey, TDocument, TCreate, TSelect, TUpdate, TDelete, TRestore, TDataSource>

@@ -32,10 +32,10 @@ public sealed class BrandService : DataSource<int?, Brand, BrandCreateDto, Brand
 	}
 	static void SoftDelBuilder(IQBSoftDelBuilder<Brand, SoftDelDto> qb)
 	{
-		qb.UpdateTable("brands");
+		//qb.UpdateTable("brands");
 	}
 	static void RestoreBuilder(IQBRestoreBuilder<Brand, SoftDelDto> qb)
 	{
-		qb.UpdateTable("brands");
+		//qb.UpdateTable("brands");
 	}
 }

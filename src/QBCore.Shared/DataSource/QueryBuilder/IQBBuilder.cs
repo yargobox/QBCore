@@ -6,7 +6,6 @@ public interface IQBBuilder
 
 public interface IQBBuilder<TDocument, TProjection> : IQBBuilder
 {
-	void Map(Action<IQBMapper<TDocument, TProjection>> mapper);
 }
 
 public interface IQBInsertBuilder<TDocument, TCreate> : IQBBuilder<TDocument, TCreate>
