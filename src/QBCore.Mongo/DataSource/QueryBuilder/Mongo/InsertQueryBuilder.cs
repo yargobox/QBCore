@@ -16,7 +16,7 @@ internal sealed class InsertQueryBuilder<TDocument, TCreate> : QueryBuilder<TDoc
 
 	public Task<TCreate> InsertAsync(
 		TCreate document,
-		IReadOnlyCollection<QBParameter>? parameters = null,
+		IReadOnlyCollection<QBArgument>? parameters = null,
 		DataSourceInsertOptions? options = null,
 		CancellationToken cancellationToken = default(CancellationToken)
 	)

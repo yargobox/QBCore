@@ -1,11 +1,11 @@
 namespace QBCore.DataSource.QueryBuilder;
 
-public class QBParameter
+public class QBArgument
 {
 	public string FieldName { get; }
 	public object? Value { get; }
 
-	public QBParameter(string fieldName, object? value)
+	public QBArgument(string fieldName, object? value)
 	{
 		FieldName = fieldName;
 		Value = value;

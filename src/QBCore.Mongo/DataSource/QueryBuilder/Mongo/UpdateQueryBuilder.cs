@@ -18,7 +18,7 @@ internal sealed class UpdateQueryBuilder<TDocument, TUpdate> : QueryBuilder<TDoc
 		TUpdate document,
 		IReadOnlyCollection<QBCondition> conditions,
 		IReadOnlyCollection<string>? modifiedFieldNames = null,
-		IReadOnlyCollection<QBParameter>? parameters = null,
+		IReadOnlyCollection<QBArgument>? parameters = null,
 		DataSourceUpdateOptions? options = null,
 		CancellationToken cancellationToken = default(CancellationToken)
 	)

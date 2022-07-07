@@ -7,6 +7,7 @@ using MongoDB.Bson.Serialization;
 using MongoDB.Driver;
 using QBCore.Configuration;
 using QBCore.Extensions.Linq.Expressions;
+using QBCore.Extensions.Text;
 using QBCore.ObjectFactory;
 
 namespace QBCore.DataSource.QueryBuilder.Mongo;
@@ -25,7 +26,7 @@ internal abstract class QueryBuilder<TDocument, TProjection> : IQueryBuilder<TDo
 
 
 	#region Static ReadOnly & Const Properties
-	
+
 	private const ConditionOperations _supportedOperations =
 		  ConditionOperations.Equal
 		| ConditionOperations.NotEqual
@@ -49,10 +50,6 @@ internal abstract class QueryBuilder<TDocument, TProjection> : IQueryBuilder<TDo
 		typeof(sbyte), typeof(byte), typeof(short), typeof(ushort), typeof(int), typeof(uint), typeof(long), typeof(ulong)
 	};
 
-	private static MethodInfo _makeConditionWithConstantValue = typeof(QueryBuilder<TDocument, TProjection>)
-		.GetMethod(nameof(MakeConditionWithConstantValue), 1, new Type[] { typeof(BuilderCondition), typeof(object) })
-			?? throw new NotImplementedException("Failed to find method " + nameof(MakeConditionWithConstantValue));
-
 	#endregion
 
 	public QueryBuilder(QBBuilder<TDocument, TProjection> builder)
@@ -61,30 +58,15 @@ internal abstract class QueryBuilder<TDocument, TProjection> : IQueryBuilder<TDo
 		_dbContext = null!;
 	}
 
-	protected static string GetDBSideFieldName(Type documentType, string documentPropertyOrField)
-	{
-		var bsonClassMap = BsonClassMap.LookupClassMap(documentType);
-		return bsonClassMap.GetMemberMap(documentPropertyOrField).ElementName;
-	}
-	protected static string GetDBSideFieldPath(Type documentType, LambdaExpression documentPropertyOrFieldSelector)
-	{
-		var path = documentPropertyOrFieldSelector.GetPropertyOrFieldPathAsArray();
-		for (int i = 0; i < path.Length; i++)
-		{
-			path[i] = GetDBSideFieldName(documentType, path[i]);
-		}
-		return string.Join(".", path);
-	}
-
-	protected static BsonDocument MakeConditionWithConstantValue(bool useExprFormat, BuilderCondition cond, object? paramValue = null)
+	protected static BsonDocument MakeConditionOnConst(bool useExprFormat, BuilderCondition cond, object? paramValue = null)
 	{
 		if (!cond.IsOnParam && !cond.IsOnConst)
 		{
-			throw new InvalidOperationException(nameof(MakeConditionWithConstantValue) + " can only make conditions with a constant value.");
+			throw new InvalidOperationException(nameof(MakeConditionOnConst) + " can only make conditions with a constant value.");
 		}
 
 		var constValue = cond.IsOnParam ? paramValue : cond.Value;
-		var name = GetDBSideFieldPath(cond.FieldDeclaringType, cond.Field);
+		var name = cond.Field.DBSideName;
 
 		switch (cond.Operation & _supportedOperations)
 		{
@@ -120,12 +102,12 @@ internal abstract class QueryBuilder<TDocument, TProjection> : IQueryBuilder<TDo
 				}
 			case ConditionOperations.IsNull:
 				{
-					_ = RenderToBsonValue(cond, constValue, false);
+					_ = RenderToBsonValue(cond, null, false);
 					return MakeEqBsonCondition(useExprFormat, name, BsonNull.Value);
 				}
 			case ConditionOperations.IsNotNull:
 				{
-					_ = RenderToBsonValue(cond, constValue, false);
+					//_ = RenderToBsonValue(cond, constValue, false);
 					return MakeBsonCondition(useExprFormat, "$ne", name, BsonNull.Value);
 				}
 			case ConditionOperations.In:
@@ -162,6 +144,44 @@ internal abstract class QueryBuilder<TDocument, TProjection> : IQueryBuilder<TDo
 			case ConditionOperations.NotBetween:
 			default:
 				throw new NotSupportedException();
+		}
+	}
+
+	protected static BsonDocument MakeConditionOnField(BuilderCondition cond)
+	{
+		if (!cond.IsOnField)
+		{
+			throw new InvalidOperationException(nameof(MakeConditionOnField) + " can only make conditions with fields.");
+		}
+		if (cond.Operation.HasFlag(ConditionOperations.CaseInsensitive))
+		{
+			throw new InvalidOperationException("Conditions on fields cannot be case sensitive or insensitive.");
+		}
+
+		var fieldName = cond.Field.DBSideName;
+		var letVarName = cond.RefField!.DBSideName.ToUnderScoresCase()!.Replace('.', '_');
+
+		switch (cond.Operation & _supportedOperations)
+		{
+			case ConditionOperations.Equal: return MakeBsonCondition("$eq", fieldName, letVarName);
+			case ConditionOperations.NotEqual: return MakeBsonCondition("$ne", fieldName, letVarName);
+			case ConditionOperations.Greater: return MakeBsonCondition("$gt", fieldName, letVarName);
+			case ConditionOperations.GreaterOrEqual: return MakeBsonCondition("$gte", fieldName, letVarName);
+			case ConditionOperations.Less: return MakeBsonCondition("$lt", fieldName, letVarName);
+			case ConditionOperations.LessOrEqual: return MakeBsonCondition("$lte", fieldName, letVarName);
+			case ConditionOperations.In: return MakeBsonCondition("$in", fieldName, letVarName);
+			case ConditionOperations.NotIn: return MakeBsonCondition("$nin", fieldName, letVarName);
+			case ConditionOperations.BitsAnd: return MakeBsonCondition("$bitsAllSet", fieldName, letVarName);
+			case ConditionOperations.BitsOr: return MakeBsonCondition("$bitsAnySet", fieldName, letVarName);
+
+			case ConditionOperations.IsNull:
+			case ConditionOperations.IsNotNull:
+			case ConditionOperations.Like:
+			case ConditionOperations.NotLike:
+			case ConditionOperations.Between:
+			case ConditionOperations.NotBetween:
+			default:
+				throw new InvalidOperationException($"An operation such as '{cond.Operation.ToString()}' is not supported for conditions on fields.");
 		}
 	}
 
@@ -315,6 +335,14 @@ internal abstract class QueryBuilder<TDocument, TProjection> : IQueryBuilder<TDo
 		return array;
 	}
 
+	private static BsonDocument MakeBsonCondition(string command, string fieldName, string letVarName)
+	{
+		var bsonValue = new BsonArray();
+		bsonValue.Add("$" + fieldName);
+		bsonValue.Add("$$" + letVarName);
+
+		return new BsonDocument { { command, bsonValue } };
+	}
 	private static BsonDocument MakeBsonCondition(bool useExprFormat, string command, string name, BsonValue value)
 	{
 		if (useExprFormat)
@@ -359,277 +387,5 @@ internal abstract class QueryBuilder<TDocument, TProjection> : IQueryBuilder<TDo
 			toValue = null!;
 		}
 		return false;
-	}
-
-	//!!! don't forget to remove this
-	protected static BsonDocument MakeConditionWithConstantValue<TLocal>(BuilderCondition cond, object? paramValue = null)
-	{
-		if (!cond.IsOnParam && !cond.IsOnConst)
-		{
-			throw new InvalidOperationException(nameof(MakeConditionWithConstantValue) + " can only make conditions with a constant value.");
-		}
-
-		FilterDefinition<TLocal> filterDefinition;
-		object? constValue = cond.IsOnParam ? paramValue : cond.Value;
-
-		switch (cond.Operation & _supportedOperations)
-		{
-			case ConditionOperations.Equal:
-				{
-					if (constValue == null)
-					{
-						if (!cond.IsFieldNullable)
-							throw new ArgumentNullException($"Field {cond.Name}.{cond.FieldPath} does not support null values.");
-					}
-					else if (constValue.GetType() != cond.FieldType && constValue.GetType() != cond.FieldUnderlyingType)
-					{
-						if (!TryConvertIntegerToOtherInteger(constValue, cond.FieldUnderlyingType, out constValue))
-							throw new ArgumentException($"Field {cond.Name}.{cond.FieldPath} has type {cond.FieldType.ToPretty()} not {constValue.GetType().ToPretty()}.");
-					}
-					if (cond.Operation.HasFlag(ConditionOperations.CaseInsensitive))
-					{
-						throw new NotImplementedException();
-					}
-					filterDefinition = Builders<TLocal>.Filter.Eq(cond.FieldPath, constValue);
-					break;
-				}
-			case ConditionOperations.NotEqual:
-				{
-					if (constValue == null)
-					{
-						if (!cond.IsFieldNullable)
-							throw new ArgumentNullException($"Field {cond.Name}.{cond.FieldPath} does not support null values.");
-					}
-					else if (constValue.GetType() != cond.FieldType && constValue.GetType() != cond.FieldUnderlyingType)
-					{
-						if (!TryConvertIntegerToOtherInteger(constValue, cond.FieldUnderlyingType, out constValue))
-							throw new ArgumentException($"Field {cond.Name}.{cond.FieldPath} has type {cond.FieldType.ToPretty()} not {constValue.GetType().ToPretty()}.");
-					}
-					if (cond.Operation.HasFlag(ConditionOperations.CaseInsensitive))
-					{
-						throw new NotImplementedException();
-					}
-					filterDefinition = Builders<TLocal>.Filter.Ne(cond.FieldPath, constValue);
-					break;
-				}
-			case ConditionOperations.Greater:
-				{
-					if (constValue == null)
-					{
-						if (!cond.IsFieldNullable)
-							throw new ArgumentNullException($"Field {cond.Name}.{cond.FieldPath} does not support null values.");
-					}
-					else if (constValue.GetType() != cond.FieldType && constValue.GetType() != cond.FieldUnderlyingType)
-					{
-						if (!TryConvertIntegerToOtherInteger(constValue, cond.FieldUnderlyingType, out constValue))
-							throw new ArgumentException($"Field {cond.Name}.{cond.FieldPath} has type {cond.FieldType.ToPretty()} not {constValue.GetType().ToPretty()}.");
-					}
-					if (cond.Operation.HasFlag(ConditionOperations.CaseInsensitive))
-					{
-						throw new NotSupportedException($"The {nameof(ConditionOperations.Greater)} operator cannot be case insensitive.");
-					}
-					filterDefinition = Builders<TLocal>.Filter.Gt(cond.FieldPath, constValue);
-					break;
-				}
-			case ConditionOperations.GreaterOrEqual:
-				{
-					if (constValue == null)
-					{
-						if (!cond.IsFieldNullable)
-							throw new ArgumentNullException($"Field {cond.Name}.{cond.FieldPath} does not support null values.");
-					}
-					else if (constValue.GetType() != cond.FieldType && constValue.GetType() != cond.FieldUnderlyingType)
-					{
-						if (!TryConvertIntegerToOtherInteger(constValue, cond.FieldUnderlyingType, out constValue))
-							throw new ArgumentException($"Field {cond.Name}.{cond.FieldPath} has type {cond.FieldType.ToPretty()} not {constValue.GetType().ToPretty()}.");
-					}
-					if (cond.Operation.HasFlag(ConditionOperations.CaseInsensitive))
-					{
-						throw new NotSupportedException($"The {nameof(ConditionOperations.GreaterOrEqual)} operator cannot be case insensitive.");
-					}
-					filterDefinition = Builders<TLocal>.Filter.Gte(cond.FieldPath, constValue);
-					break;
-				}
-			case ConditionOperations.Less:
-				{
-					if (constValue == null)
-					{
-						if (!cond.IsFieldNullable)
-							throw new ArgumentNullException($"Field {cond.Name}.{cond.FieldPath} does not support null values.");
-					}
-					else if (constValue.GetType() != cond.FieldType && constValue.GetType() != cond.FieldUnderlyingType)
-					{
-						if (!TryConvertIntegerToOtherInteger(constValue, cond.FieldUnderlyingType, out constValue))
-							throw new ArgumentException($"Field {cond.Name}.{cond.FieldPath} has type {cond.FieldType.ToPretty()} not {constValue.GetType().ToPretty()}.");
-					}
-					if (cond.Operation.HasFlag(ConditionOperations.CaseInsensitive))
-					{
-						throw new NotSupportedException($"The {nameof(ConditionOperations.Less)} operator cannot be case insensitive.");
-					}
-					filterDefinition = Builders<TLocal>.Filter.Lt(cond.FieldPath, constValue);
-					break;
-				}
-			case ConditionOperations.LessOrEqual:
-				{
-					if (constValue == null)
-					{
-						if (!cond.IsFieldNullable)
-							throw new ArgumentNullException($"Field {cond.Name}.{cond.FieldPath} does not support null values.");
-					}
-					else if (constValue.GetType() != cond.FieldType && constValue.GetType() != cond.FieldUnderlyingType)
-					{
-						if (!TryConvertIntegerToOtherInteger(constValue, cond.FieldUnderlyingType, out constValue))
-							throw new ArgumentException($"Field {cond.Name}.{cond.FieldPath} has type {cond.FieldType.ToPretty()} not {constValue.GetType().ToPretty()}.");
-					}
-					if (cond.Operation.HasFlag(ConditionOperations.CaseInsensitive))
-					{
-						throw new NotSupportedException($"The {nameof(ConditionOperations.LessOrEqual)} operator cannot be case insensitive.");
-					}
-					filterDefinition = Builders<TLocal>.Filter.Lt(cond.FieldPath, constValue);
-					break;
-				}
-			case ConditionOperations.IsNull:
-				{
-					if (constValue == null)
-					{
-						if (!cond.IsFieldNullable)
-							throw new ArgumentNullException($"Field {cond.Name}.{cond.FieldPath} does not support null values.");
-					}
-					else if (constValue.GetType() != cond.FieldType && constValue.GetType() != cond.FieldUnderlyingType)
-					{
-						if (!TryConvertIntegerToOtherInteger(constValue, cond.FieldUnderlyingType, out constValue))
-							throw new ArgumentException($"Field {cond.Name}.{cond.FieldPath} has type {cond.FieldType.ToPretty()} not {constValue.GetType().ToPretty()}.");
-					}
-					if (cond.Operation.HasFlag(ConditionOperations.CaseInsensitive))
-					{
-						throw new NotSupportedException($"The {nameof(ConditionOperations.IsNull)} operator cannot be case insensitive.");
-					}
-					filterDefinition = Builders<TLocal>.Filter.Eq(cond.FieldPath, (object?)null);
-					break;
-				}
-			case ConditionOperations.IsNotNull:
-				{
-					if (constValue == null)
-					{
-						if (!cond.IsFieldNullable)
-							throw new ArgumentNullException($"Field {cond.Name}.{cond.FieldPath} does not support null values.");
-					}
-					else if (constValue.GetType() != cond.FieldType && constValue.GetType() != cond.FieldUnderlyingType)
-					{
-						if (!TryConvertIntegerToOtherInteger(constValue, cond.FieldUnderlyingType, out constValue))
-							throw new ArgumentException($"Field {cond.Name}.{cond.FieldPath} has type {cond.FieldType.ToPretty()} not {constValue.GetType().ToPretty()}.");
-					}
-					if (cond.Operation.HasFlag(ConditionOperations.CaseInsensitive))
-					{
-						throw new NotSupportedException($"The {nameof(ConditionOperations.IsNotNull)} operator cannot be case insensitive.");
-					}
-					filterDefinition = Builders<TLocal>.Filter.Lt(cond.FieldPath, constValue);
-					break;
-				}
-			case ConditionOperations.In:
-				{
-					if (cond.Operation.HasFlag(ConditionOperations.CaseInsensitive))
-					{
-						throw new NotSupportedException($"The {nameof(ConditionOperations.In)} operator cannot be case insensitive.");
-					}
-					filterDefinition = Builders<TLocal>.Filter.In(cond.FieldPath, constValue as IEnumerable<object?>);
-					break;
-				}
-			case ConditionOperations.NotIn:
-				{
-					if (cond.Operation.HasFlag(ConditionOperations.CaseInsensitive))
-					{
-						throw new NotSupportedException($"The {nameof(ConditionOperations.NotIn)} operator cannot be case insensitive.");
-					}
-					filterDefinition = Builders<TLocal>.Filter.Nin(cond.FieldPath, constValue as IEnumerable<object?>);
-					break;
-				}
-			case ConditionOperations.Like:
-				{
-					var stringValue = constValue as string;
-
-					if (stringValue == null)
-					{
-						filterDefinition = Builders<TLocal>.Filter.Eq(cond.FieldPath, (string?)null);
-					}
-					else 
-					{
-						if (cond.Operation.HasFlag(ConditionOperations.CaseInsensitive))
-						{
-							stringValue = stringValue.ToLower();
-						}
-						stringValue = Regex.Escape(stringValue);
-
-						filterDefinition = Builders<TLocal>.Filter.Eq(cond.FieldPath, new BsonRegularExpression(stringValue, "i"));
-					}
-					break;
-				}
-			case ConditionOperations.NotLike:
-				{
-					var stringValue = constValue as string;
-
-					if (stringValue == null)
-					{
-						filterDefinition = Builders<TLocal>.Filter.Ne(cond.FieldPath, (string?)null);
-					}
-					else 
-					{
-						if (cond.Operation.HasFlag(ConditionOperations.CaseInsensitive))
-						{
-							stringValue = stringValue.ToLower();
-						}
-						stringValue = Regex.Escape(stringValue);
-
-						filterDefinition = Builders<TLocal>.Filter.Ne(cond.FieldPath, new BsonRegularExpression(stringValue, "i"));
-					}
-					break;
-				}
-			case ConditionOperations.BitsAnd:
-				{
-					if (constValue == null)
-					{
-						throw new ArgumentNullException($"{cond.Name}.{cond.FieldPath}", $"Operator {nameof(ConditionOperations.BitsAnd)} does not support null values.");
-					}
-					else if (constValue.GetType() != cond.FieldType && constValue.GetType() != cond.FieldUnderlyingType)
-					{
-						if (!TryConvertIntegerToOtherInteger(constValue, cond.FieldUnderlyingType, out constValue))
-							throw new ArgumentException($"Field {cond.Name}.{cond.FieldPath} has type {cond.FieldType.ToPretty()} not {constValue.GetType().ToPretty()}.");
-					}
-					if (cond.Operation.HasFlag(ConditionOperations.CaseInsensitive))
-					{
-						throw new NotSupportedException($"The {nameof(ConditionOperations.BitsAnd)} operator cannot be case insensitive.");
-					}
-					var longValue = unchecked((long)constValue);
-
-					filterDefinition = Builders<TLocal>.Filter.BitsAllSet(cond.FieldPath, longValue);
-					break;
-				}
-			case ConditionOperations.BitsOr:
-				{
-					if (constValue == null)
-					{
-						throw new ArgumentNullException($"{cond.Name}.{cond.FieldPath}", $"Operator {nameof(ConditionOperations.BitsOr)} does not support null values.");
-					}
-					else if (constValue.GetType() != cond.FieldType && constValue.GetType() != cond.FieldUnderlyingType)
-					{
-						if (!TryConvertIntegerToOtherInteger(constValue, cond.FieldUnderlyingType, out constValue))
-							throw new ArgumentException($"Field {cond.Name}.{cond.FieldPath} has type {cond.FieldType.ToPretty()} not {constValue.GetType().ToPretty()}.");
-					}
-					if (cond.Operation.HasFlag(ConditionOperations.CaseInsensitive))
-					{
-						throw new NotSupportedException($"The {nameof(ConditionOperations.BitsOr)} operator cannot be case insensitive.");
-					}
-					var longValue = unchecked((long)constValue);
-
-					filterDefinition = Builders<TLocal>.Filter.BitsAnySet(cond.FieldPath, longValue);
-					break;
-				}
-			case ConditionOperations.Between:
-			case ConditionOperations.NotBetween:
-			default:
-				throw new NotSupportedException();
-		}
-
-		return filterDefinition.Render(BsonSerializer.SerializerRegistry.GetSerializer<TLocal>(), BsonSerializer.SerializerRegistry);
 	}
 }

@@ -1,4 +1,5 @@
 using System.Linq.Expressions;
+using System.Reflection;
 using QBCore.Extensions.Linq;
 using QBCore.Extensions.Linq.Expressions;
 
@@ -52,7 +53,7 @@ internal class QBBuilder<TDoc, TDto> :
 	{
 		if (_isByOr != null || _parentheses > 0)
 		{
-			throw new InvalidOperationException($"Incorrect definition of select query builder condition '{typeof(TDto).ToPretty()}'.");
+			throw new InvalidOperationException($"Incorrect condition definition of select query builder '{typeof(TDto).ToPretty()}'.");
 		}
 
 		var containers = _containers ?? _emptyContainers;
@@ -180,22 +181,21 @@ internal class QBBuilder<TDoc, TDto> :
 		string name,
 		string container,
 		BuilderContainerTypes containerType,
-		BuilderContainerOperations containerOperation,
-		string? connectTemplate = null)
+		BuilderContainerOperations containerOperation)
 	{
 		if (_isByOr != null || _parentheses > 0)
 		{
-			throw new InvalidOperationException($"Incorrect definition of select query builder condition '{typeof(TDto).ToPretty()}'.");
+			throw new InvalidOperationException($"Incorrect condition definition of select query builder '{typeof(TDto).ToPretty()}'.");
 		}
 
-		if ((containerOperation & BuilderContainerOperations.MainMask) != BuilderContainerOperations.None)
+		if ((containerOperation & BuilderContainerOperations.MainMask) != BuilderContainerOperations.None &&
+			Containers.Any(x => x.ContainerOperation.HasFlag(BuilderContainerOperations.MainMask)))
 		{
-			if (Containers.Any(x => x.ContainerOperation.HasFlag(BuilderContainerOperations.MainMask) || x.Name == name))
-				throw new InvalidOperationException($"QB: '{name}' has already been added or another initial container has been added before.");
+			throw new InvalidOperationException($"Incorrect definition of select query builder '{typeof(TDto).ToPretty()}': another initial container has already been added before.");
 		}
-		else if (Containers.Any(x => x.Name == name))
+		if (Containers.Any(x => x.Name == name))
 		{
-			throw new InvalidOperationException($"QB: '{name}' has been added before.");
+			throw new InvalidOperationException($"Incorrect definition of select query builder '{typeof(TDto).ToPretty()}': initial container '{name}' has already been added before.");
 		}
 
 		Containers.Add(new BuilderContainer(
@@ -203,8 +203,7 @@ internal class QBBuilder<TDoc, TDto> :
 			Name: name,
 			DBSideName: container,
 			ContainerType: containerType,
-			ContainerOperation: containerOperation,
-			ConnectTemplate: connectTemplate
+			ContainerOperation: containerOperation
 		));
 
 		return this;
@@ -222,7 +221,7 @@ internal class QBBuilder<TDoc, TDto> :
 	{
 		if (_isByOr != null && (flags.HasFlag(BuilderConditionFlags.IsConnect) || (Conditions.Count <= 0 || Conditions[Conditions.Count - 1].IsConnect)))
 		{
-			throw new InvalidOperationException($"Incorrect definition of select query builder condition '{typeof(TDto).ToPretty()}'.");
+			throw new InvalidOperationException($"Incorrect condition definition of select query builder '{typeof(TDto).ToPretty()}'.");
 		}
 
 		var trueContainerType = typeof(TLocal) == typeof(TDto) ? typeof(TDoc) : typeof(TLocal);
@@ -232,7 +231,7 @@ internal class QBBuilder<TDoc, TDto> :
 		}
 		else if (!Containers.Any(x => x.Name == name && x.DocumentType == trueContainerType))
 		{
-			throw new InvalidOperationException($"QB: '{name}' for document '{trueContainerType.ToPretty()}' has not been added yet.");
+			throw new InvalidOperationException($"Incorrect condition definition of select query builder '{typeof(TDto).ToPretty()}': referenced container '{name}' of  document '{trueContainerType.ToPretty()}' has not been added yet.");
 		}
 
 		if (field == null)
@@ -249,7 +248,7 @@ internal class QBBuilder<TDoc, TDto> :
 			}
 			else if (!Containers.Any(x => x.Name == refName && x.DocumentType == typeof(TRef)))
 			{
-				throw new InvalidOperationException($"QB: '{refName}' for document '{typeof(TRef).ToPretty()}' has not been added yet.");
+				throw new InvalidOperationException($"Incorrect condition definition of select query builder '{typeof(TDto).ToPretty()}': referenced container '{refName}' of  document '{typeof(TRef).ToPretty()}' has not been added yet.");
 			}
 
 			if (refField == null)
@@ -271,14 +270,14 @@ internal class QBBuilder<TDoc, TDto> :
 		}
 
 		Conditions.Add(new BuilderCondition(
-			Flags: flags,
-			Parentheses: _parentheses,
-			Name: name,
-			Field: field,
-			RefName: refName,
-			RefField: refField,
-			Value: onWhat == BuilderConditionFlags.OnParam ? paramName : onWhat == BuilderConditionFlags.OnConst ? constValue : null,
-			Operation: operation
+			flags: flags,
+			parentheses: _parentheses,
+			name: name,
+			field: field,
+			refName: refName,
+			refField: refField,
+			value: onWhat == BuilderConditionFlags.OnParam ? paramName : onWhat == BuilderConditionFlags.OnConst ? constValue : null,
+			operation: operation
 		));
 
 		_isByOr = null;
@@ -287,68 +286,88 @@ internal class QBBuilder<TDoc, TDto> :
 		return this;
 	}
 
-	private QBBuilder<TDoc, TDto> AddInclude<TOther>(string? otherName, Expression<Func<TOther, object?>> docNavPath, Expression<Func<TDto, object?>>? dtoNavPath)
+	private QBBuilder<TDoc, TDto> AddInclude<TRef>(bool includeOrExclude, Expression<Func<TDto, object?>> field, string? refName, Expression<Func<TRef, object?>>? refField)
 	{
 		if (_isByOr != null || _parentheses > 0)
 		{
-			throw new InvalidOperationException($"Incorrect definition of select query builder condition '{typeof(TDto).ToPretty()}'.");
+			throw new InvalidOperationException($"Incorrect condition definition of select query builder '{typeof(TDto).ToPretty()}'.");
+		}
+		if (field == null)
+		{
+			throw new ArgumentNullException(nameof(field));
 		}
 
-		if (otherName == null)
+		if (refName == null)
 		{
-			otherName = Containers.Single(x => x.DocumentType == typeof(TOther)).Name;
+			refName = Containers.Single(x => x.DocumentType == typeof(TRef)).Name;
 		}
-		else if (!Containers.Any(x => x.Name == otherName && x.DocumentType == typeof(TOther)))
+		else if (!Containers.Any(x => x.Name == refName && x.DocumentType == typeof(TRef)))
 		{
-			throw new InvalidOperationException($"QB: '{otherName}' for document '{typeof(TOther).ToPretty()}' has not been added yet.");
+			throw new InvalidOperationException($"Incorrect field definition of select query builder '{typeof(TDto).ToPretty()}': referenced container '{refName}' of  document '{typeof(TRef).ToPretty()}' has not been added yet.");
 		}
 
-		if (docNavPath == null)
+		if (refField == null)
 		{
-			throw new ArgumentNullException(nameof(docNavPath));
+			var propertyOrFieldName = field.GetPropertyOrFieldName(true);
+			if (propertyOrFieldName.Length == 0)
+			{
+				throw new InvalidOperationException($"Incorrect field definition of select query builder '{typeof(TDto).ToPretty()}'.");
+			}
+
+			var memberInfo = typeof(TRef).GetMember(propertyOrFieldName);
+			if (!memberInfo.Any(x => x.MemberType == MemberTypes.Property || x.MemberType == MemberTypes.Field))
+			{
+				throw new InvalidOperationException($"Incorrect field definition of select query builder '{typeof(TDto).ToPretty()}': the document class does not have a property or field '{propertyOrFieldName}'.");
+			}
 		}
 
 		Fields.Add(new BuilderField(
-			Name: otherName,
-			DocNavPath: docNavPath.GetPropertyOrFieldPath(),
-			DtoNavPath: dtoNavPath?.GetPropertyOrFieldPath()!
+			IncludeOrExclude: includeOrExclude,
+			Field: new FieldPath(field, false),
+			RefName: refName,
+			RefField: refField != null ? new FieldPath(refField, true) : null
 		));
 
 		return this;
 	}
 
-	public IQBMongoSelectBuilder<TDoc, TDto> Include(Expression<Func<TDoc, object?>> docNavPath)
-		=> AddInclude<TDoc>(null, docNavPath, null);
-	public IQBMongoSelectBuilder<TDoc, TDto> Include(Expression<Func<TDoc, object?>> docNavPath, Expression<Func<TDto, object?>> dtoNavPath)
-		=> AddInclude<TDoc>(null, docNavPath, dtoNavPath);
-	public IQBMongoSelectBuilder<TDoc, TDto> Include<TOther>(Expression<Func<TOther, object?>> docNavPath)
-		=> AddInclude<TOther>(null, docNavPath, null);
-	public IQBMongoSelectBuilder<TDoc, TDto> Include<TOther>(string otherName, Expression<Func<TOther, object?>> docNavPath)
-		=> AddInclude<TOther>(otherName, docNavPath, null);
-	public IQBMongoSelectBuilder<TDoc, TDto> Include<TOther>(Expression<Func<TOther, object?>> docNavPath, Expression<Func<TDto, object?>> dtoNavPath)
-		=> AddInclude<TOther>(null, docNavPath, dtoNavPath);
-	public IQBMongoSelectBuilder<TDoc, TDto> Include<TOther>(string otherName, Expression<Func<TOther, object?>> docNavPath, Expression<Func<TDto, object?>> dtoNavPath)
-		=> AddInclude<TOther>(otherName, docNavPath, dtoNavPath);
+	public IQBMongoSelectBuilder<TDoc, TDto> Include(Expression<Func<TDto, object?>> field)
+		=> AddInclude<TDoc>(true, field, null, null);
+	public IQBMongoSelectBuilder<TDoc, TDto> Include(Expression<Func<TDto, object?>> field, Expression<Func<TDoc, object?>> refField)
+		=> AddInclude<TDoc>(true, field, null, refField);
+	public IQBMongoSelectBuilder<TDoc, TDto> Include<TRef>(Expression<Func<TDto, object?>> field, Expression<Func<TRef, object?>> refField)
+		=> AddInclude<TRef>(true, field, null, refField);
+	public IQBMongoSelectBuilder<TDoc, TDto> Include<TRef>(Expression<Func<TDto, object?>> field, string refName, Expression<Func<TRef, object?>> refField)
+		=> AddInclude<TRef>(true, field, refName, refField);
+
+	public IQBMongoSelectBuilder<TDoc, TDto> Exclude(Expression<Func<TDto, object?>> field)
+		=> AddInclude<TDoc>(false, field, null, null);
+	public IQBMongoSelectBuilder<TDoc, TDto> Exclude(Expression<Func<TDto, object?>> field, Expression<Func<TDoc, object?>> refField)
+		=> AddInclude<TDoc>(false, field, null, refField);
+	public IQBMongoSelectBuilder<TDoc, TDto> Exclude<TRef>(Expression<Func<TDto, object?>> field, Expression<Func<TRef, object?>> refField)
+		=> AddInclude<TRef>(false, field, null, refField);
+	public IQBMongoSelectBuilder<TDoc, TDto> Exclude<TRef>(Expression<Func<TDto, object?>> field, string refName, Expression<Func<TRef, object?>> refField)
+		=> AddInclude<TRef>(false, field, refName, refField);
 
 	public IQBMongoSelectBuilder<TDoc, TDto> SelectFromTable(string tableName)
 		=> AddContainer(typeof(TDoc), tableName, tableName, BuilderContainerTypes.Table, BuilderContainerOperations.Select);
-	public IQBMongoSelectBuilder<TDoc, TDto> SelectFromTable(string name, string tableName, string? conditionTemplate = null)
-		=> AddContainer(typeof(TDoc), name, tableName, BuilderContainerTypes.Table, BuilderContainerOperations.Select, conditionTemplate);
+	public IQBMongoSelectBuilder<TDoc, TDto> SelectFromTable(string name, string tableName)
+		=> AddContainer(typeof(TDoc), name, tableName, BuilderContainerTypes.Table, BuilderContainerOperations.Select);
 
-	public IQBMongoSelectBuilder<TDoc, TDto> LeftJoinTable<TOther>(string tableName)
-		=> AddContainer(typeof(TOther), tableName, tableName, BuilderContainerTypes.Table, BuilderContainerOperations.LeftJoin);
-	public IQBMongoSelectBuilder<TDoc, TDto> LeftJoinTable<TOther>(string name, string tableName)
-		=> AddContainer(typeof(TOther), name, tableName, BuilderContainerTypes.Table, BuilderContainerOperations.LeftJoin);
+	public IQBMongoSelectBuilder<TDoc, TDto> LeftJoinTable<TRef>(string tableName)
+		=> AddContainer(typeof(TRef), tableName, tableName, BuilderContainerTypes.Table, BuilderContainerOperations.LeftJoin);
+	public IQBMongoSelectBuilder<TDoc, TDto> LeftJoinTable<TRef>(string name, string tableName)
+		=> AddContainer(typeof(TRef), name, tableName, BuilderContainerTypes.Table, BuilderContainerOperations.LeftJoin);
 
-	public IQBMongoSelectBuilder<TDoc, TDto> JoinTable<TOther>(string tableName)
-		=> AddContainer(typeof(TOther), tableName, tableName, BuilderContainerTypes.Table, BuilderContainerOperations.Join);
-	public IQBMongoSelectBuilder<TDoc, TDto> JoinTable<TOther>(string name, string tableName)
-		=> AddContainer(typeof(TOther), name, tableName, BuilderContainerTypes.Table, BuilderContainerOperations.Join);
+	public IQBMongoSelectBuilder<TDoc, TDto> JoinTable<TRef>(string tableName)
+		=> AddContainer(typeof(TRef), tableName, tableName, BuilderContainerTypes.Table, BuilderContainerOperations.Join);
+	public IQBMongoSelectBuilder<TDoc, TDto> JoinTable<TRef>(string name, string tableName)
+		=> AddContainer(typeof(TRef), name, tableName, BuilderContainerTypes.Table, BuilderContainerOperations.Join);
 
-	public IQBMongoSelectBuilder<TDoc, TDto> CrossJoinTable<TOther>(string tableName)
-		=> AddContainer(typeof(TOther), tableName, tableName, BuilderContainerTypes.Table, BuilderContainerOperations.CrossJoin);
-	public IQBMongoSelectBuilder<TDoc, TDto> CrossJoinTable<TOther>(string name, string tableName)
-		=> AddContainer(typeof(TOther), name, tableName, BuilderContainerTypes.Table, BuilderContainerOperations.CrossJoin);
+	public IQBMongoSelectBuilder<TDoc, TDto> CrossJoinTable<TRef>(string tableName)
+		=> AddContainer(typeof(TRef), tableName, tableName, BuilderContainerTypes.Table, BuilderContainerOperations.CrossJoin);
+	public IQBMongoSelectBuilder<TDoc, TDto> CrossJoinTable<TRef>(string name, string tableName)
+		=> AddContainer(typeof(TRef), name, tableName, BuilderContainerTypes.Table, BuilderContainerOperations.CrossJoin);
 
 	public IQBMongoSelectBuilder<TDoc, TDto> Connect<TLocal, TRef>(Expression<Func<TLocal, object?>> field, Expression<Func<TRef, object?>> refField, ConditionOperations operation)
 		=> AddCondition<TLocal, TRef>(BuilderConditionFlags.IsConnect | BuilderConditionFlags.OnField, null, field, null, refField, null, null, operation);
@@ -402,13 +421,13 @@ internal class QBBuilder<TDoc, TDto> :
 		var lastIndex = Conditions.Count - 1;
 		if (lastIndex < 0 || _parentheses > 0)
 		{
-			throw new InvalidOperationException($"Incorrect definition of select query builder condition '{typeof(TDto).ToPretty()}'.");
+			throw new InvalidOperationException($"Incorrect condition definition of select query builder '{typeof(TDto).ToPretty()}'.");
 		}
 
 		var lastCond = Conditions[lastIndex];
 		if (lastCond.IsConnect)
 		{
-			throw new InvalidOperationException($"Incorrect definition of select query builder condition '{typeof(TDto).ToPretty()}'.");
+			throw new InvalidOperationException($"Incorrect condition definition of select query builder '{typeof(TDto).ToPretty()}'.");
 		}
 
 		Conditions[lastIndex] = lastCond with { Parentheses = lastCond.Parentheses - 1 };
@@ -420,19 +439,19 @@ internal class QBBuilder<TDoc, TDto> :
 	{
 		if (_isByOr != null)
 		{
-			throw new InvalidOperationException($"Incorrect definition of select query builder condition '{typeof(TDto).ToPretty()}'.");
+			throw new InvalidOperationException($"Incorrect condition definition of select query builder '{typeof(TDto).ToPretty()}'.");
 		}
 
 		var lastIndex = Conditions.Count - 1;
 		if (lastIndex < 0)
 		{
-			throw new InvalidOperationException($"Incorrect definition of select query builder condition '{typeof(TDto).ToPretty()}'.");
+			throw new InvalidOperationException($"Incorrect condition definition of select query builder '{typeof(TDto).ToPretty()}'.");
 		}
 
 		var lastCond = Conditions[lastIndex];
 		if (lastCond.IsConnect)
 		{
-			throw new InvalidOperationException($"Incorrect definition of select query builder condition '{typeof(TDto).ToPretty()}'.");
+			throw new InvalidOperationException($"Incorrect condition definition of select query builder '{typeof(TDto).ToPretty()}'.");
 		}
 
 		_isByOr = false;
@@ -443,19 +462,19 @@ internal class QBBuilder<TDoc, TDto> :
 	{
 		if (_isByOr != null)
 		{
-			throw new InvalidOperationException($"Incorrect definition of select query builder condition '{typeof(TDto).ToPretty()}'.");
+			throw new InvalidOperationException($"Incorrect condition definition of select query builder '{typeof(TDto).ToPretty()}'.");
 		}
 
 		var lastIndex = Conditions.Count - 1;
 		if (lastIndex < 0)
 		{
-			throw new InvalidOperationException($"Incorrect definition of select query builder condition '{typeof(TDto).ToPretty()}'.");
+			throw new InvalidOperationException($"Incorrect condition definition of select query builder '{typeof(TDto).ToPretty()}'.");
 		}
 
 		var lastCond = Conditions[lastIndex];
 		if (lastCond.IsConnect)
 		{
-			throw new InvalidOperationException($"Incorrect definition of select query builder condition '{typeof(TDto).ToPretty()}'.");
+			throw new InvalidOperationException($"Incorrect condition definition of select query builder '{typeof(TDto).ToPretty()}'.");
 		}
 
 		_isByOr = true;

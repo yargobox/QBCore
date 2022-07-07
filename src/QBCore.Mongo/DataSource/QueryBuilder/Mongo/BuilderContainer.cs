@@ -6,6 +6,5 @@ internal record BuilderContainer
 	string Name,
 	string DBSideName,
 	BuilderContainerTypes ContainerType,
-	BuilderContainerOperations ContainerOperation,
-	string? ConnectTemplate
+	BuilderContainerOperations ContainerOperation
 );

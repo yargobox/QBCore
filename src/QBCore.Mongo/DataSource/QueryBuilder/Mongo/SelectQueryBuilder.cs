@@ -1,13 +1,9 @@
-using System.Collections;
-using System.Reflection;
 using System.Runtime.CompilerServices;
-using System.Text.RegularExpressions;
 using MongoDB.Bson;
-using MongoDB.Bson.Serialization;
 using MongoDB.Driver;
 using QBCore.DataSource.Options;
 using QBCore.Extensions.Collections.Generic;
-using QBCore.Extensions.Linq;
+using QBCore.Extensions.Text;
 using QBCore.ObjectFactory;
 
 namespace QBCore.DataSource.QueryBuilder.Mongo;
@@ -17,6 +13,8 @@ internal sealed class SelectQueryBuilder<TDocument, TSelect> : QueryBuilder<TDoc
 	public override QueryBuilderTypes QueryBuilderType => QueryBuilderTypes.Select;
 
 	public override Origin Source => new Origin(this.GetType());
+
+	private IReadOnlyDictionary<string, object?>? _arguments;
 
 	public SelectQueryBuilder(QBBuilder<TDocument, TSelect> building)
 		: base(building)
@@ -49,7 +47,6 @@ internal sealed class SelectQueryBuilder<TDocument, TSelect> : QueryBuilder<TDoc
 	}
 	IMongoCollection<TDocument>? _collection;
 
-
 	public IQueryable<TDocument> AsQueryable(DataSourceQueryableOptions? options = null)
 	{
 		if (options?.NativeOptions != null && options.NativeOptions is not AggregateOptions)
@@ -66,7 +63,7 @@ internal sealed class SelectQueryBuilder<TDocument, TSelect> : QueryBuilder<TDoc
 
 	public async Task<long> CountAsync(
 		IReadOnlyCollection<QBCondition>? conditions = null,
-		IReadOnlyCollection<QBParameter>? parameters = null,
+		IReadOnlyDictionary<string, object?>? arguments = null,
 		DataSourceSelectOptions? options = null,
 		CancellationToken cancellationToken = default)
 	{
@@ -81,6 +78,7 @@ internal sealed class SelectQueryBuilder<TDocument, TSelect> : QueryBuilder<TDoc
 		var aggrOptions = (AggregateOptions?)options?.NativeOptions;
 		var clientSessionHandle = (IClientSessionHandle?)options?.NativeClientSession;
 		_ = Collection;
+		_arguments = arguments;
 		var query = BuildSelectQuery();
 
 		await Task.CompletedTask;
@@ -90,7 +88,7 @@ internal sealed class SelectQueryBuilder<TDocument, TSelect> : QueryBuilder<TDoc
 
 	public async IAsyncEnumerable<TSelect> SelectAsync(
 		IReadOnlyCollection<QBCondition>? conditions = null,
-		IReadOnlyCollection<QBParameter>? parameters = null,
+		IReadOnlyDictionary<string, object?>? arguments = null,
 		IReadOnlyCollection<QBSortOrder>? sortOrders = null,
 		long? skip = null,
 		int? take = null,
@@ -108,7 +106,10 @@ internal sealed class SelectQueryBuilder<TDocument, TSelect> : QueryBuilder<TDoc
 		var aggrOptions = (AggregateOptions?)options?.NativeOptions;
 		var clientSessionHandle = (IClientSessionHandle?)options?.NativeClientSession;
 		_ = Collection;
+		_arguments = arguments;
 		var query = BuildSelectQuery();
+
+		Console.WriteLine(new BsonDocument { { "aggregate", new BsonArray(query) } }.ToString());//!!!
 
 		using (var cursor = clientSessionHandle == null
 			? await Collection.AggregateAsync<TSelect>(query, aggrOptions, cancellationToken)
@@ -133,11 +134,8 @@ internal sealed class SelectQueryBuilder<TDocument, TSelect> : QueryBuilder<TDoc
 
 		// Add pipeline stages for each container
 		//
-		var stages = new OrderedDictionary<string, List<List<BuilderCondition>>>((containers.Count + 1) << 1);
-		foreach (var c in containers)
-		{
-			stages.Add(c.Name, new List<List<BuilderCondition>>());
-		}
+		var stages = new OrderedDictionary<string, List<List<BuilderCondition>>>(
+			containers.Select(x => KeyValuePair.Create(x.Name, new List<List<BuilderCondition>>())));
 
 		// Fill the connect conditions
 		//
@@ -154,50 +152,110 @@ internal sealed class SelectQueryBuilder<TDocument, TSelect> : QueryBuilder<TDoc
 		// Propagate the slices to the pipeline stages using the dependencies of each condition in the slice.
 		// The goal is to place the slice in the first possible stage.
 		//
-		int firstPossibleStage;
-		foreach (var slice in slices)
 		{
-			firstPossibleStage = 0;
-
-			foreach (var cond in slice)
+			int firstPossibleStage;
+			foreach (var slice in slices)
 			{
-				firstPossibleStage = Math.Max(firstPossibleStage, stages.IndexOf(cond.Name));
+				firstPossibleStage = 0;
 
-				if (cond.IsOnField)
+				foreach (var cond in slice)
 				{
-					firstPossibleStage = Math.Max(firstPossibleStage, stages.IndexOf(cond.RefName!));
-				}
-			}
+					firstPossibleStage = Math.Max(firstPossibleStage, stages.IndexOf(cond.Name));
 
-			stages.List[firstPossibleStage].Value.Add(slice);
+					if (cond.IsOnField)
+					{
+						firstPossibleStage = Math.Max(firstPossibleStage, stages.IndexOf(cond.RefName!));
+					}
+				}
+
+				stages.List[firstPossibleStage].Value.Add(slice);
+			}
 		}
 
 		// Initial $match
 		//
- 		if (stages.List[0].Value.Count > 0)
 		{
-			var pl = stages.First().Value;
-
-			var fc = BuildConditionTree(pl[0]);
-			foreach (var x in pl.Skip(1))
+			BuiltCondition? filter = null;
+			foreach (var conds in stages.List[0].Value)
 			{
-				fc!.AppendByAnd(BuildConditionTree(x)!);
+				filter = filter?.AppendByAnd(BuildConditionTree(conds)!) ?? BuildConditionTree(conds);
 			}
-
-			result.Add(new BsonDocument(true)
+			if (filter != null)
 			{
-				{
-					"$match", fc!.BsonDocument
-				},
-				{
-					"$match", BuildFilterDefinition(pl[0])!.Render(BsonSerializer.SerializerRegistry.GetSerializer<TDocument>(), BsonSerializer.SerializerRegistry)
-				}
-			});
+				result.Add(new BsonDocument { { "$match", filter.BsonDocument } });
+			}
 		}
 
-		for (int i = 0; i < stages.Count; i++)
+		// Lookup stages
+		//
 		{
+			BuilderCondition? connect;
+			BsonDocument lookup;
+			BuiltCondition? filter;
+			BsonDocument? let;
+			string s;
+			for (int i = 1; i < stages.Count; i++)
+			{
+				lookup = new BsonDocument { { "from", containers[i].DBSideName } };
 
+				// First connect condition
+				connect = stages.List[i].Value.FirstOrDefault()?.FirstOrDefault(x => x.IsConnectOnField);
+				if (connect != null)
+				{
+					lookup["localField"] = connect.RefField!.DBSideName;
+					lookup["foreignField"] = connect.Field.DBSideName;
+				}
+
+				filter = null;
+				let = null;
+				foreach (var conds in stages.List[i].Value)
+				{
+					if (filter != null)
+					{
+						foreach (var cond in conds.Where(x => x.IsOnField))
+						{
+							s = cond.Field.DBSideName;
+							(let ?? (let = new BsonDocument()))[s.ToUnderScoresCase()!.Replace('.', '_')] = "$" + s;
+						}
+						filter.AppendByAnd(BuildConditionTree(conds)!);
+					}
+					else
+					{
+						foreach (var cond in conds.Where(x => x.IsOnField && x != connect))
+						{
+							s = cond.Field.DBSideName;
+							(let ?? (let = new BsonDocument()))[s.ToUnderScoresCase()!.Replace('.', '_')] = "$" + s;
+						}
+						filter = BuildConditionTree(conds.Where(x => x != connect));
+					}
+				}
+				
+				if (let != null)
+				{
+					lookup["let"] = let;
+				}
+
+				if (filter != null)
+				{
+					lookup["pipeline"] = new BsonArray() { new BsonDocument { { "$match", filter.BsonDocument } } };
+				}
+				else if (connect == null/* containers[i].ContainerOperation == BuilderContainerOperations.CrossJoin */)
+				{
+					lookup["pipeline"] = new BsonArray();
+				}
+
+				lookup["as"] = "___" + containers[i].Name;//!!!
+
+				result.Add(new BsonDocument { { "$lookup", lookup } });
+
+				var leftJoinOrCrossJoin = containers[i].ContainerOperation != BuilderContainerOperations.Join;
+				result.Add(new BsonDocument {
+					{ "$unwind", new BsonDocument {
+						{ "path", lookup["as"] },
+						{ "preserveNullAndEmptyArrays", leftJoinOrCrossJoin }
+					}}
+				});
+			}
 		}
 
 		return result;
@@ -326,9 +384,6 @@ internal sealed class SelectQueryBuilder<TDocument, TSelect> : QueryBuilder<TDoc
 
 	#region Build filter conditions
 
-	private static MethodInfo _buildCondition = typeof(SelectQueryBuilder<TDocument, TSelect>).GetMethod(nameof(BuildCondition), BindingFlags.Static | BindingFlags.NonPublic)
-		?? throw new NotImplementedException("Failed to find method " + nameof(BuildCondition));
-
 	private BuiltCondition? BuildConditionTree(IEnumerable<BuilderCondition> conditions)
 	{
 		BuiltCondition? filter = null;
@@ -346,7 +401,7 @@ internal sealed class SelectQueryBuilder<TDocument, TSelect> : QueryBuilder<TDoc
 					}
 					else
 					{
-						filter = new BuiltCondition(BuildCondition(e.Current, Builder));
+						filter = new BuiltCondition(BuildCondition(e.Current.IsOnField, e.Current, Builder, _arguments), e.Current.IsOnField);
 					}
 				}
 				else if (e.Current.IsByOr)
@@ -357,7 +412,7 @@ internal sealed class SelectQueryBuilder<TDocument, TSelect> : QueryBuilder<TDoc
 					}
 					else
 					{
-						filter.AppendByOr(new BuiltCondition(BuildCondition(e.Current, Builder)));
+						filter.AppendByOr(new BuiltCondition(BuildCondition(e.Current.IsOnField, e.Current, Builder, _arguments), e.Current.IsOnField));
 					}
 				}
 				else
@@ -368,7 +423,7 @@ internal sealed class SelectQueryBuilder<TDocument, TSelect> : QueryBuilder<TDoc
 					}
 					else
 					{
-						filter.AppendByAnd(new BuiltCondition(BuildCondition(e.Current, Builder)));
+						filter.AppendByAnd(new BuiltCondition(BuildCondition(e.Current.IsOnField, e.Current, Builder, _arguments), e.Current.IsOnField));
 					}
 				}
 			}
@@ -391,7 +446,7 @@ internal sealed class SelectQueryBuilder<TDocument, TSelect> : QueryBuilder<TDoc
 		}
 		else
 		{
-			filter = new BuiltCondition(BuildCondition(e.Current, Builder));
+			filter = new BuiltCondition(BuildCondition(e.Current.IsOnField, e.Current, Builder, _arguments), e.Current.IsOnField);
 		}
 
 		while (moveNext && (moveNext = e.MoveNext()))
@@ -409,7 +464,7 @@ internal sealed class SelectQueryBuilder<TDocument, TSelect> : QueryBuilder<TDoc
 				}
 				else
 				{
-					filter.AppendByOr(new BuiltCondition(BuildCondition(e.Current, Builder)));
+					filter.AppendByOr(new BuiltCondition(BuildCondition(e.Current.IsOnField, e.Current, Builder, _arguments), e.Current.IsOnField));
 					if (e.Current.Parentheses < 0)
 					{
 						return (filter, e.Current.Parentheses + 1);
@@ -429,7 +484,7 @@ internal sealed class SelectQueryBuilder<TDocument, TSelect> : QueryBuilder<TDoc
 				}
 				else
 				{
-					filter.AppendByAnd(new BuiltCondition(BuildCondition(e.Current, Builder)));
+					filter.AppendByAnd(new BuiltCondition(BuildCondition(e.Current.IsOnField, e.Current, Builder, _arguments), e.Current.IsOnField));
 					if (e.Current.Parentheses < 0)
 					{
 						return (filter, e.Current.Parentheses + 1);
@@ -441,162 +496,31 @@ internal sealed class SelectQueryBuilder<TDocument, TSelect> : QueryBuilder<TDoc
 		return (filter, 0);
 	}
 
-	public static BsonDocument BuildCondition<TContainer, TProjection>(BuilderCondition cond, QBBuilder<TContainer, TProjection> builder)
-	{
-		var pfn = _buildCondition.MakeGenericMethod(cond.FieldDeclaringType, cond.RefFieldDeclaringType ?? typeof(NotSupported), typeof(TContainer), typeof(TProjection));
-		return (BsonDocument) pfn.Invoke(null, new object?[] { false, cond, builder, null })!;//!!!
-	}
-	private static BsonDocument BuildCondition<TLocal, TRef, TContainer, TProjection>(bool useExprFormat, BuilderCondition cond, QBBuilder<TContainer, TProjection> builder, IReadOnlyDictionary<string, object?> arguments)
+	private static BsonDocument BuildCondition(bool useExprFormat, BuilderCondition cond, QBBuilder<TDocument, TSelect> builder, IReadOnlyDictionary<string, object?>? arguments)
 	{
 		if (cond.IsOnField)
 		{
-			throw new NotImplementedException();
+			return MakeConditionOnField(cond);
 		}
 		else if (cond.IsOnParam)
 		{
 			var paramName = (string)cond.Value!;
 			var param = builder.Parameters.First(x => x.Name == paramName);
-			//!!!
-			var value = arguments[paramName];
+			object? value;
+			if (arguments == null || !arguments.TryGetValue(paramName, out value))
+			{
+				throw new InvalidOperationException($"Query builder parameter {paramName} is not set.");
+			}
 
-			return MakeConditionWithConstantValue(useExprFormat, cond, value);
+			return MakeConditionOnConst(useExprFormat, cond, value);
 		}
 		else if (cond.IsOnConst)
 		{
-			return MakeConditionWithConstantValue(useExprFormat, cond);
+			return MakeConditionOnConst(useExprFormat, cond);
 		}
 		else
 		{
 			throw new NotSupportedException();
-		}
-	}
-
-	#endregion
-
-	#region  Build filter definition (Mongo FilterDefinition<>)
-	private FilterDefinition<TDocument>? BuildFilterDefinition(IEnumerable<BuilderCondition> conditions)
-	{
-		FilterDefinition<TDocument>? filter = null;
-		bool moveNext = true;
-
-		using (var e = conditions.GetEnumerator())
-		{
-			while (moveNext && (moveNext = e.MoveNext()))
-			{
-				if (filter == null)
-				{
-					if (e.Current.Parentheses > 0)
-					{
-						filter = BuildFilterDefinition(e, ref moveNext, e.Current.Parentheses - 1).filter;
-					}
-					else
-					{
-						filter = BuildFilterDefinition(e.Current);
-					}
-				}
-				else if (e.Current.IsByOr)
-				{
-					if (e.Current.Parentheses > 0)
-					{
-						filter |= BuildFilterDefinition(e, ref moveNext, e.Current.Parentheses - 1).filter;
-					}
-					else
-					{
-						filter |= BuildFilterDefinition(e.Current);
-					}
-				}
-				else
-				{
-					if (e.Current.Parentheses > 0)
-					{
-						filter &= BuildFilterDefinition(e, ref moveNext, e.Current.Parentheses - 1).filter;
-					}
-					else
-					{
-						filter &= BuildFilterDefinition(e.Current);
-					}
-				}
-			}
-
-			return filter;
-		}
-	}
-	private (FilterDefinition<TDocument> filter, int level) BuildFilterDefinition(IEnumerator<BuilderCondition> e, ref bool moveNext, int parentheses)
-	{
-		FilterDefinition<TDocument> filter;
-
-		if (parentheses > 0)
-		{
-			var result = BuildFilterDefinition(e, ref moveNext, parentheses - 1);
-			filter = result.filter;
-			if (result.level < 0)
-			{
-				return (filter, result.level + 1);
-			}
-		}
-		else
-		{
-			filter = BuildFilterDefinition(e.Current);
-		}
-
-		while (moveNext && (moveNext = e.MoveNext()))
-		{
-			if (e.Current.IsByOr)
-			{
-				if (e.Current.Parentheses > 0)
-				{
-					var result = BuildFilterDefinition(e, ref moveNext, e.Current.Parentheses - 1);
-					filter |= result.filter;
-					if (result.level < 0)
-					{
-						return (filter, result.level + 1);
-					}
-				}
-				else
-				{
-					filter |= BuildFilterDefinition(e.Current);
-					if (e.Current.Parentheses < 0)
-					{
-						return (filter, e.Current.Parentheses + 1);
-					}
-				}
-			}
-			else
-			{
-				if (e.Current.Parentheses > 0)
-				{
-					var result = BuildFilterDefinition(e, ref moveNext, e.Current.Parentheses - 1);
-					filter &= result.filter;
-					if (result.level < 0)
-					{
-						return (filter, result.level + 1);
-					}
-				}
-				else
-				{
-					filter &= BuildFilterDefinition(e.Current);
-					if (e.Current.Parentheses < 0)
-					{
-						return (filter, e.Current.Parentheses + 1);
-					}
-				}
-			}
-		}
-
-		return (filter, 0);
-	}
-	private static FilterDefinition<TDocument> BuildFilterDefinition(BuilderCondition cond)
-	{
-		switch (cond.Operation)
-		{
-			case ConditionOperations.Equal:
-				return Builders<TDocument>.Filter.Eq(cond.FieldPath, cond.Value);
-			case ConditionOperations.NotEqual:
-				return Builders<TDocument>.Filter.Ne(cond.FieldPath, cond.Value);
-			case ConditionOperations.IsNull:
-				return Builders<TDocument>.Filter.Eq(cond.FieldPath, (object?)null);
-			default:
-				throw new NotImplementedException();
 		}
 	}
 

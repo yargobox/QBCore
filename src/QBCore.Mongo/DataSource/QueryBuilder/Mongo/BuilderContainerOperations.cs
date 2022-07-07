@@ -14,5 +14,5 @@ internal enum BuilderContainerOperations
 	CrossJoin = 0x80,
 
 	MainMask = BuilderContainerOperations.Insert | BuilderContainerOperations.Select | BuilderContainerOperations.Update | BuilderContainerOperations.Delete | BuilderContainerOperations.Exec,
-	SlaveMask = BuilderContainerOperations.Join | BuilderContainerOperations.LeftJoin
+	SlaveMask = BuilderContainerOperations.Join | BuilderContainerOperations.LeftJoin | BuilderContainerOperations.CrossJoin
 }

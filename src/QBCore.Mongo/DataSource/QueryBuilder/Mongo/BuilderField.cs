@@ -1,3 +1,11 @@
+using System.Linq.Expressions;
+
 namespace QBCore.DataSource.QueryBuilder.Mongo;
 
-internal record BuilderField(string Name, string DocNavPath, string DtoNavPath);
+internal record BuilderField
+(
+	bool IncludeOrExclude,
+	FieldPath Field,
+	string RefName,
+	FieldPath? RefField
+);

@@ -34,7 +34,7 @@ public static class ExtensionsForExpressions
 		}
 	}
 
-	public static string GetPropertyOrFieldName(this LambdaExpression memberSelector)
+	public static string GetPropertyOrFieldName(this LambdaExpression memberSelector, bool allowEmptyName = false)
 	{
 		var currentExpression = memberSelector.Body;
 
@@ -42,6 +42,8 @@ public static class ExtensionsForExpressions
 		{
 			switch (currentExpression.NodeType)
 			{
+				case ExpressionType.Parameter when allowEmptyName:
+					return string.Empty;
 				case ExpressionType.MemberAccess:
 					return ((MemberExpression)currentExpression).Member.Name;
 				case ExpressionType.Convert:
@@ -57,7 +59,7 @@ public static class ExtensionsForExpressions
 		}
 	}
 
-	public static T GetPropertyOrFieldInfo<T>(this LambdaExpression memberSelector, Func<PropertyInfo?, FieldInfo?, T> infoSelector)
+	public static T? GetPropertyOrFieldInfo<T>(this LambdaExpression memberSelector, Func<PropertyInfo?, FieldInfo?, T> infoSelector, bool allowEmptyInfo = false)
 	{
 		var currentExpression = memberSelector.Body;
 
@@ -65,6 +67,8 @@ public static class ExtensionsForExpressions
 		{
 			switch (currentExpression.NodeType)
 			{
+				case ExpressionType.Parameter when allowEmptyInfo:
+					return default(T);
 				case ExpressionType.MemberAccess:
 					var member = ((MemberExpression)currentExpression).Member;
 					if (member is PropertyInfo propertyInfo)
@@ -89,13 +93,13 @@ public static class ExtensionsForExpressions
 		}
 	}
 
-	public static string GetPropertyOrFieldPath(this LambdaExpression memberSelector)
-		=> string.Join(".", GetPropertyOrFieldPath<string>(memberSelector, x => x.Member.Name));
+	public static string GetPropertyOrFieldPath(this LambdaExpression memberSelector, bool allowEmptyPath = false)
+		=> string.Join(".", GetPropertyOrFieldPath<string>(memberSelector, x => x.Member.Name, allowEmptyPath));
 
-	public static string[] GetPropertyOrFieldPathAsArray(this LambdaExpression memberSelector)
-		=> GetPropertyOrFieldPath<string>(memberSelector, x => x.Member.Name);
+	public static string[] GetPropertyOrFieldPathAsArray(this LambdaExpression memberSelector, bool allowEmptyPath = false)
+		=> GetPropertyOrFieldPath<string>(memberSelector, x => x.Member.Name, allowEmptyPath);
 
-	public static T[] GetPropertyOrFieldPath<T>(this LambdaExpression memberSelector, Func<MemberExpression, T> infoSelector)
+	public static T[] GetPropertyOrFieldPath<T>(this LambdaExpression memberSelector, Func<MemberExpression, T> infoSelector, bool allowEmptyPath = false)
 	{
 		var list = new List<T>();
 		var currentExpression = memberSelector.Body;
@@ -104,7 +108,7 @@ public static class ExtensionsForExpressions
 		{
 			switch (currentExpression.NodeType)
 			{
-				case ExpressionType.Parameter:
+				case ExpressionType.Parameter when allowEmptyPath:
 					goto L_EXIT_WHILE;
 				case ExpressionType.MemberAccess:
 					{
@@ -135,7 +139,7 @@ public static class ExtensionsForExpressions
 			}
 		}
 L_EXIT_WHILE:
-		if (list.Count == 0)
+		if (!allowEmptyPath && list.Count == 0)
 		{
 			throw new ArgumentException("Wrong member selector: " + memberSelector.ToString());
 		}

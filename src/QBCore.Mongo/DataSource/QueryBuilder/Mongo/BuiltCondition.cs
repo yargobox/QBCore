@@ -6,13 +6,15 @@ internal sealed class BuiltCondition
 {
 	public BsonDocument BsonDocument { get; private set; }
 
-	public BuiltCondition(BsonDocument builtCondition)
+	public BuiltCondition(BsonDocument builtCondition, bool isExpression)
 	{
-		BsonDocument = new BsonDocument();
-		BsonDocument.AddRange(builtCondition);
+		if (isExpression)
+			BsonDocument = new BsonDocument { { "$expr", builtCondition } };
+		else
+			BsonDocument = new BsonDocument(builtCondition);
 	}
 
-	public void AppendByAnd(BuiltCondition other)
+	public BuiltCondition AppendByAnd(BuiltCondition other)
 	{
 		BsonElement elem;
 		if (BsonDocument.ElementCount == 1 && BsonDocument.TryGetElement("$and", out elem))
@@ -28,9 +30,10 @@ internal sealed class BuiltCondition
 		{
 			BsonDocument.AddRange(other.BsonDocument);
 		}
+		return this;
 	}
 
-	public void AppendByOr(BuiltCondition other)
+	public BuiltCondition AppendByOr(BuiltCondition other)
 	{
 		BsonElement elem;
 		if (BsonDocument.ElementCount == 1 && BsonDocument.TryGetElement("$or", out elem))
@@ -42,5 +45,6 @@ internal sealed class BuiltCondition
 			var array = new BsonArray { BsonDocument, other.BsonDocument };
 			BsonDocument = new BsonDocument() { { "$or", array } };
 		}
+		return this;
 	}
 }

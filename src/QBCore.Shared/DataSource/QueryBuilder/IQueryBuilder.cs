@@ -22,7 +22,7 @@ public interface IInsertQueryBuilder<TDocument, TCreate> : IQueryBuilder<TDocume
 {
 	Task<TCreate> InsertAsync(
 		TCreate document,
-		IReadOnlyCollection<QBParameter>? parameters = null,
+		IReadOnlyCollection<QBArgument>? parameters = null,
 		DataSourceInsertOptions? options = null,
 		CancellationToken cancellationToken = default(CancellationToken)
 	);
@@ -34,14 +34,14 @@ public interface ISelectQueryBuilder<TDocument, TSelect> : IQueryBuilder<TDocume
 
 	Task<long> CountAsync(
 		IReadOnlyCollection<QBCondition>? conditions = null,
-		IReadOnlyCollection<QBParameter>? parameters = null,
+		IReadOnlyDictionary<string, object?>? arguments = null,
 		DataSourceSelectOptions? options = null,
 		CancellationToken cancellationToken = default(CancellationToken)
 	);
 
 	IAsyncEnumerable<TSelect> SelectAsync(
 		IReadOnlyCollection<QBCondition>? conditions = null,
-		IReadOnlyCollection<QBParameter>? parameters = null,
+		IReadOnlyDictionary<string, object?>? arguments = null,
 		IReadOnlyCollection<QBSortOrder>? sortOrders = null,
 		long? skip = null,
 		int? take = null,
@@ -56,7 +56,7 @@ public interface IUpdateQueryBuilder<TDocument, TUpdate> : IQueryBuilder<TDocume
 		TUpdate document,
 		IReadOnlyCollection<QBCondition> conditions,
 		IReadOnlyCollection<string>? modifiedFieldNames = null,
-		IReadOnlyCollection<QBParameter>? parameters = null,
+		IReadOnlyCollection<QBArgument>? parameters = null,
 		DataSourceUpdateOptions? options = null,
 		CancellationToken cancellationToken = default(CancellationToken)
 	);

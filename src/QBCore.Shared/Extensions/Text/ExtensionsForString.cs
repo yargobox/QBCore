@@ -35,9 +35,13 @@ public static class ExtensionsForString
 	[return: NotNullIfNotNull("@this")]
 	public static string? ToNamingConvention(this string? @this, NamingConventions conv)
 	{
-		if (@this == null || @this.Length < 2)
+		if (@this == null)
 		{
 			return @this;
+		}
+		if (@this.Length < 2)
+		{
+			if (conv == NamingConventions.UnderScores || conv == NamingConventions.CamelCase) return @this.ToLower();
 		}
 
 		if (conv == NamingConventions.CamelCase)
