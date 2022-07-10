@@ -1,11 +1,12 @@
+using System.Diagnostics;
 using System.Linq.Expressions;
 using System.Reflection;
 using MongoDB.Bson.Serialization;
 using QBCore.Extensions.Linq.Expressions;
-using QBCore.Extensions.Reflection;
 
 namespace QBCore.DataSource.QueryBuilder.Mongo;
 
+[DebuggerDisplay("{FullName}")]
 internal sealed class FieldPath
 {
 	public sealed class Element
@@ -14,6 +15,8 @@ internal sealed class FieldPath
 		public readonly Type ElementType;
 		public readonly bool IsNullable;
 		public readonly Type DeclaringType;
+
+		public string DBSideName => BsonClassMap.LookupClassMap(DeclaringType).GetMemberMap(Name).ElementName;
 
 		public Element(string name, Type elementType, bool isNullable, Type declaringType)
 		{
@@ -26,10 +29,11 @@ internal sealed class FieldPath
 
 	private readonly Element[]? _path;
 	private readonly Element _last;
-	private readonly string _name;
+	private readonly string _fullName;
 	private string? _dbSideName;
 
-	public string Name => _name;
+	public string Name => _last.Name;
+	public string FullName => _fullName;
 	public Type FieldType => _last.ElementType;
 	public bool IsNullable => _last.IsNullable;
 	public Type DeclaringType => _last.DeclaringType;
@@ -42,18 +46,18 @@ internal sealed class FieldPath
 			{
 				if (_path == null)
 				{
-					_dbSideName = BsonClassMap.LookupClassMap(_last.DeclaringType).GetMemberMap(_last.Name).ElementName;
+					_dbSideName = _last.DBSideName;
 				}
 				else
 				{
-					_dbSideName = string.Join(".", _path.Select(x => BsonClassMap.LookupClassMap(x.DeclaringType).GetMemberMap(x.Name).ElementName));
+					_dbSideName = string.Join(".", _path.Select(x => x.DBSideName));
 				}
 			}
 			return _dbSideName;
 		}
 	}
 
-	public int PartCount => _path?.Length ?? 1;
+	public int ElementCount => _path?.Length ?? 1;
 
 	public IEnumerable<Element> Elements
 	{
@@ -80,7 +84,7 @@ internal sealed class FieldPath
 			{
 				_path = Array.Empty<Element>();
 				_last = new Element(string.Empty, param.Type, false, param.Type);
-				_name = string.Empty;
+				_fullName = string.Empty;
 				_dbSideName = string.Empty;
 			}
 			else
@@ -103,7 +107,7 @@ internal sealed class FieldPath
 				throw new ArgumentException(nameof(propertyOrFieldSelector));
 			}
 
-			_name = _last.Name;
+			_fullName = _last.Name;
 		}
 		else
 		{
@@ -122,7 +126,7 @@ internal sealed class FieldPath
 			}
 
 			_last = _path[_path.Length - 1];
-			_name = string.Join(".", _path.Select(x => x.Name));
+			_fullName = string.Join(".", _path.Select(x => x.Name));
 		}
 	}
 }

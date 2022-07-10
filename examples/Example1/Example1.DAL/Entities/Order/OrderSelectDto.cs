@@ -30,23 +30,28 @@ public class OrderSelectDto
 	{
 		builder
 			.SelectFromTable("orders")
-			.LeftJoinTable<Store>("stores")
-				.Connect<Store, Order>(store => store.Id, order => order.StoreId, ConditionOperations.Equal)
-			.LeftJoinTable<Store>("stores2", "stores")
-				.Connect<Store, Order>("stores2", store => store.Id, order => order.StoreId, ConditionOperations.Equal)
-			.LeftJoinTable<Store>("stores3", "stores")
-				.Connect<Store, Order>("stores3", store => store.Id, order => order.StoreId, ConditionOperations.Equal)
+				.Condition(x => x.Id, 999, ConditionOperations.Equal)
 
-			.Include(sel => sel.Id, doc => doc.Id)
-			.Include(sel => sel.Name, doc => doc.Name)
-			.Include(sel => sel.StoreId, doc => doc.StoreId)
-			.Include(sel => sel.OrderPositions)
-			.Include(sel => sel.Total)
-			.Include(sel => sel.Created)
-			.Include(sel => sel.Updated)
-			.Include(sel => sel.Deleted)
+ 			.LeftJoinTable<Store>("stores")
+				.Connect<Store, Order>(store => store.Id, order => order.StoreId, ConditionOperations.Equal)
+
+			.LeftJoinTable<Store>("stores2", "stores")
+				.Connect<Store, Order>("stores2", store => store.Id, "orders", order => order.StoreId, ConditionOperations.Equal)
+				.Condition<Store>("stores2", store => store.Deleted, null, ConditionOperations.Equal)
+
+			.LeftJoinTable<Store>("stores3", "stores")
+				.Connect<Store, Store>("stores3", store => store.Id, "stores2", store2 => store2.Id, ConditionOperations.Equal)
+				.Condition<Store, Order>("stores3", store => store.Deleted, "orders", order => order.Deleted, ConditionOperations.Equal)
+
+			//.Optional(sel => sel.Updated)
+
 			.Include<Store>(sel => sel.StoreName, "stores", store => store.Name)
+
 			.Include<Store>(sel => sel.Store, "stores2", store => store)
+
+			//.Exclude(sel => sel.Store!.Created)
+			//.Optional(sel => sel.Store!.Updated)
+
 			.Include<Store>(sel => sel.Store3!.Name, "stores3", store => store.Name)
 		;
 	}

@@ -58,7 +58,7 @@ internal abstract class QueryBuilder<TDocument, TProjection> : IQueryBuilder<TDo
 		_dbContext = null!;
 	}
 
-	protected static BsonDocument MakeConditionOnConst(bool useExprFormat, BuilderCondition cond, object? paramValue = null)
+	protected static BsonDocument MakeConditionOnConst(bool useExprFormat, BuilderCondition cond, Func<string, FieldPath, string> getDBSideName, object? paramValue = null)
 	{
 		if (!cond.IsOnParam && !cond.IsOnConst)
 		{
@@ -66,7 +66,7 @@ internal abstract class QueryBuilder<TDocument, TProjection> : IQueryBuilder<TDo
 		}
 
 		var constValue = cond.IsOnParam ? paramValue : cond.Value;
-		var name = cond.Field.DBSideName;
+		var name = getDBSideName(cond.Name, cond.Field);
 
 		switch (cond.Operation & _supportedOperations)
 		{
@@ -147,7 +147,7 @@ internal abstract class QueryBuilder<TDocument, TProjection> : IQueryBuilder<TDo
 		}
 	}
 
-	protected static BsonDocument MakeConditionOnField(BuilderCondition cond)
+	protected static BsonDocument MakeConditionOnField(BuilderCondition cond, Func<string, FieldPath, string> getDBSideName)
 	{
 		if (!cond.IsOnField)
 		{
@@ -158,8 +158,8 @@ internal abstract class QueryBuilder<TDocument, TProjection> : IQueryBuilder<TDo
 			throw new InvalidOperationException("Conditions on fields cannot be case sensitive or insensitive.");
 		}
 
-		var fieldName = cond.Field.DBSideName;
-		var letVarName = cond.RefField!.DBSideName.ToUnderScoresCase()!.Replace('.', '_');
+		var fieldName = getDBSideName(cond.Name, cond.Field);
+		var letVarName = MakeVariableName(getDBSideName(cond.RefName!, cond.RefField!));
 
 		switch (cond.Operation & _supportedOperations)
 		{
@@ -373,6 +373,8 @@ internal abstract class QueryBuilder<TDocument, TProjection> : IQueryBuilder<TDo
 			return new BsonDocument { { name, value } };
 		}
 	}
+
+	internal static string MakeVariableName(string name) => name?.ToUnderScoresCase()!.Replace('.', '_')!;
 
 	private static bool TryConvertIntegerToOtherInteger(object fromValue, Type toType, out object toValue)
 	{

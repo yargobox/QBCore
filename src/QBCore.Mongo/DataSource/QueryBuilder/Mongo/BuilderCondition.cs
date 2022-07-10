@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Linq.Expressions;
 
 namespace QBCore.DataSource.QueryBuilder.Mongo;
@@ -13,6 +14,7 @@ internal enum BuilderConditionFlags
 	IsConnect = 0x80
 }
 
+[DebuggerDisplay("{DebuggerDisplay,nq}")]
 internal record BuilderCondition
 {
 	public readonly BuilderConditionFlags Flags;
@@ -71,12 +73,41 @@ internal record BuilderCondition
 	public bool IsFieldNullable => Field.IsNullable;
 	public bool? IsRefFieldNullable => RefField?.IsNullable;
 
-	public string FieldPath => Field.Name;
-	public string? RefFieldPath => RefField?.Name;
+	public string FieldPath => Field.FullName;
+	public string? RefFieldPath => RefField?.FullName;
 
 	public Type FieldType => Field.FieldType;
 	public Type? RefFieldType => RefField?.FieldType;
 
 	public Type FieldDeclaringType => Field.DeclaringType;
 	public Type? RefFieldDeclaringType => RefField?.DeclaringType;
+
+	private string DebuggerDisplay
+	{
+		get
+		{
+			var s = RefName != null
+				? string.Format("{0}:{1} {2} {3}:{4}", Name, Field.FullName, Operation.ToString(), RefName, RefField?.FullName)
+				: string.Format("{0}:{1} {2} {3}", Name, Field.FullName, Operation.ToString(), Value?.ToString());
+
+			if (IsByOr)
+			{
+				if (Parentheses > 0)
+					return string.Concat("OR ", new string('(', Parentheses), s);
+				else if (Parentheses == 0)
+					return string.Concat("OR ", s);
+				else
+					return string.Concat("OR ", s, new string(')', Parentheses));
+			}
+			else
+			{
+				if (Parentheses > 0)
+					return string.Concat("AND ", new string('(', Parentheses), s);
+				else if (Parentheses == 0)
+					return string.Concat("AND ", s);
+				else
+					return string.Concat("AND ", s, new string(')', Parentheses));
+			}
+		}
+	}
 }

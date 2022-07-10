@@ -65,94 +65,92 @@ internal class QBBuilder<TDoc, TDto> :
 			throw new InvalidOperationException($"Incompatible configuration of select query builder '{typeof(TDto).ToPretty()}'.");
 		}
 
-		if (containers.All(x => x.ContainerType == BuilderContainerTypes.Table || x.ContainerType == BuilderContainerTypes.View))
-		{
-			BuilderContainer? top, bottom, temp;
-
-			// Move a root container to the beginning
-			//
-			top = containers[rootIndex];
-			if (rootIndex != 0)
-			{
-				containers.RemoveAt(rootIndex);
-				containers.Insert(0, top);
-			}
-
-			// The root container cannot have connect conditions (depends on others)
-			//
-			if (conditions.Any(x => x.IsOnField && x.Name == top.Name))
-			{
-				throw new InvalidOperationException($"Incorrect definition of select query builder '{typeof(TDto).ToPretty()}'.");
-			}
-
-			// Check for connect conditions.
-			// Move all containers that do not have connect conditions down (cross joins).
-			// If some of them are referenced by others, then the next sort will raise them to the desired position up.
-			// Respect the initial order of these containers.
-			//
-			for (int i = 1, j = 0; i < containers.Count - j; i++)
-			{
-				temp = containers[i];
-
-				if (temp.ContainerOperation == BuilderContainerOperations.LeftJoin || temp.ContainerOperation == BuilderContainerOperations.Join)
-				{
-					if (!conditions.Any(x => x.IsConnectOnField))
-					{
-						throw new InvalidOperationException($"Incorrect definition of select query builder '{typeof(TDto).ToPretty()}'.");
-					}
-				}
-				else if (temp.ContainerOperation == BuilderContainerOperations.CrossJoin)
-				{
-					if (conditions.Any(x => x.IsConnectOnField))
-					{
-						throw new InvalidOperationException($"Incorrect definition of select query builder '{typeof(TDto).ToPretty()}'.");
-					}
-
-					containers.RemoveAt(i);
-					containers.Add(temp);
-					i--;
-					j++;
-				}
-			}
-
-			// Sort containers in expression tree order, avoid an infinite loop.
-			// Start with the penultimate container and go up to the second one.
-			// This sort does not take into account the "connect" and "non-connect" conditions,
-			// because in MongoDB the conditions for the fields of the joined collections should be
-			// applied in the lookup pipeline, especially if there are no such fields in the result subset.
-			//
-			for (int i = containers.Count - 2; i > 0; i--)
-			{
-				// remember a container at this position
-				temp = containers[i];
-
-			L_RESCAN:
-				top = containers[i];
-				foreach (var topDependOn in conditions
-					.Where(x => x.IsOnField && x.Name == top.Name)
-					.Select(x => x.RefName))
-				{
-					for (int j = i + 1; j < containers.Count; j++)
-					{
-						bottom = containers[j];
-						if (bottom.Name == topDependOn)
-						{
-							// The signal for an infinite loop is the return of the container to its previous position
-							if (bottom == temp)
-							{
-								throw new InvalidOperationException($"Incorrect definition of select query builder '{typeof(TDto).ToPretty()}'.");
-							}
-
-							containers.Swap(i, j);
-							goto L_RESCAN;
-						}
-					}
-				}
-			}
-		}
-		else
+		if (containers.Any(x => x.ContainerType != BuilderContainerTypes.Table && x.ContainerType != BuilderContainerTypes.View))
 		{
 			throw new InvalidOperationException($"Incompatible configuration of select query builder '{typeof(TDto).ToPretty()}'.");
+		}
+
+		BuilderContainer? top, bottom, temp;
+
+		// Move a root container to the beginning
+		//
+		top = containers[rootIndex];
+		if (rootIndex != 0)
+		{
+			containers.RemoveAt(rootIndex);
+			containers.Insert(0, top);
+		}
+
+		// The root container cannot have connect conditions (depends on others)
+		//
+		if (conditions.Any(x => x.IsOnField && x.Name == top.Name))
+		{
+			throw new InvalidOperationException($"Incorrect definition of select query builder '{typeof(TDto).ToPretty()}'.");
+		}
+
+		// Check for connect conditions.
+		// Move all containers that do not have connect conditions down (cross joins).
+		// If some of them are referenced by others, then the next sort will raise them to the desired position up.
+		// Respect the initial order of these containers.
+		//
+		for (int i = 1, j = 0; i < containers.Count - j; i++)
+		{
+			temp = containers[i];
+
+			if (temp.ContainerOperation == BuilderContainerOperations.LeftJoin || temp.ContainerOperation == BuilderContainerOperations.Join)
+			{
+				if (!conditions.Any(x => x.IsConnectOnField))
+				{
+					throw new InvalidOperationException($"Incorrect definition of select query builder '{typeof(TDto).ToPretty()}'.");
+				}
+			}
+			else if (temp.ContainerOperation == BuilderContainerOperations.CrossJoin)
+			{
+				if (conditions.Any(x => x.IsConnectOnField))
+				{
+					throw new InvalidOperationException($"Incorrect definition of select query builder '{typeof(TDto).ToPretty()}'.");
+				}
+
+				containers.RemoveAt(i);
+				containers.Add(temp);
+				i--;
+				j++;
+			}
+		}
+
+		// Sort containers in expression tree order, avoid an infinite loop.
+		// Start with the penultimate container and go up to the second one.
+		// This sort does not take into account the "connect" and "non-connect" conditions,
+		// because in MongoDB the conditions for the fields of the joined collections should be
+		// applied in the lookup pipeline, especially if there are no such fields in the result subset.
+		//
+		for (int i = containers.Count - 2; i > 0; i--)
+		{
+			// remember a container at this position
+			temp = containers[i];
+
+		L_RESCAN:
+			top = containers[i];
+			foreach (var topDependOn in conditions
+				.Where(x => x.IsOnField && x.Name == top.Name)
+				.Select(x => x.RefName))
+			{
+				for (int j = i + 1; j < containers.Count; j++)
+				{
+					bottom = containers[j];
+					if (bottom.Name == topDependOn)
+					{
+						// The signal for an infinite loop is the return of the container to its previous position
+						if (bottom == temp)
+						{
+							throw new InvalidOperationException($"Incorrect definition of select query builder '{typeof(TDto).ToPretty()}'.");
+						}
+
+						containers.Swap(i, j);
+						goto L_RESCAN;
+					}
+				}
+			}
 		}
 
 		// Verify parentheses in conditions
@@ -178,8 +176,8 @@ internal class QBBuilder<TDoc, TDto> :
 
 	private QBBuilder<TDoc, TDto> AddContainer(
 		Type documentType,
-		string name,
-		string container,
+		string containerName,
+		string dbSideName,
 		BuilderContainerTypes containerType,
 		BuilderContainerOperations containerOperation)
 	{
@@ -193,15 +191,15 @@ internal class QBBuilder<TDoc, TDto> :
 		{
 			throw new InvalidOperationException($"Incorrect definition of select query builder '{typeof(TDto).ToPretty()}': another initial container has already been added before.");
 		}
-		if (Containers.Any(x => x.Name == name))
+		if (Containers.Any(x => x.Name == containerName))
 		{
-			throw new InvalidOperationException($"Incorrect definition of select query builder '{typeof(TDto).ToPretty()}': initial container '{name}' has already been added before.");
+			throw new InvalidOperationException($"Incorrect definition of select query builder '{typeof(TDto).ToPretty()}': initial container '{containerName}' has already been added before.");
 		}
 
 		Containers.Add(new BuilderContainer(
 			DocumentType: documentType,
-			Name: name,
-			DBSideName: container,
+			Name: containerName,
+			DBSideName: dbSideName,
 			ContainerType: containerType,
 			ContainerOperation: containerOperation
 		));
@@ -286,7 +284,7 @@ internal class QBBuilder<TDoc, TDto> :
 		return this;
 	}
 
-	private QBBuilder<TDoc, TDto> AddInclude<TRef>(bool includeOrExclude, Expression<Func<TDto, object?>> field, string? refName, Expression<Func<TRef, object?>>? refField)
+	private QBBuilder<TDoc, TDto> AddInclude<TRef>(Expression<Func<TDto, object?>> field, string? refName, Expression<Func<TRef, object?>> refField)
 	{
 		if (_isByOr != null || _parentheses > 0)
 		{
@@ -295,6 +293,10 @@ internal class QBBuilder<TDoc, TDto> :
 		if (field == null)
 		{
 			throw new ArgumentNullException(nameof(field));
+		}
+		if (refField == null)
+		{
+			throw new ArgumentNullException(nameof(refField));
 		}
 
 		if (refName == null)
@@ -306,110 +308,123 @@ internal class QBBuilder<TDoc, TDto> :
 			throw new InvalidOperationException($"Incorrect field definition of select query builder '{typeof(TDto).ToPretty()}': referenced container '{refName}' of  document '{typeof(TRef).ToPretty()}' has not been added yet.");
 		}
 
-		if (refField == null)
+		var fieldPath = new FieldPath(field, false);
+		if (Fields.Any(x => x.Field.FullName == fieldPath.FullName))
 		{
-			var propertyOrFieldName = field.GetPropertyOrFieldName(true);
-			if (propertyOrFieldName.Length == 0)
-			{
-				throw new InvalidOperationException($"Incorrect field definition of select query builder '{typeof(TDto).ToPretty()}'.");
-			}
+			throw new InvalidOperationException($"Incorrect field definition of select query builder '{typeof(TDto).ToPretty()}': field {fieldPath.FullName} has already been included/excluded before.");
+		}
 
-			var memberInfo = typeof(TRef).GetMember(propertyOrFieldName);
-			if (!memberInfo.Any(x => x.MemberType == MemberTypes.Property || x.MemberType == MemberTypes.Field))
-			{
-				throw new InvalidOperationException($"Incorrect field definition of select query builder '{typeof(TDto).ToPretty()}': the document class does not have a property or field '{propertyOrFieldName}'.");
-			}
+		var refFieldPath = new FieldPath(refField, true);
+
+		Fields.Add(new BuilderField(
+			Field: fieldPath,
+			RefName: refName,
+			RefField: refFieldPath,
+			OptionalExclusion: false
+		));
+
+		return this;
+	}
+	
+	private QBBuilder<TDoc, TDto> AddExclude(Expression<Func<TDto, object?>> field, bool optional)
+	{
+		if (_isByOr != null || _parentheses > 0)
+		{
+			throw new InvalidOperationException($"Incorrect condition definition of select query builder '{typeof(TDto).ToPretty()}'.");
+		}
+		if (field == null)
+		{
+			throw new ArgumentNullException(nameof(field));
+		}
+
+		var fieldPath = new FieldPath(field, false);
+		if (Fields.Any(x => x.Field.FullName == fieldPath.FullName))
+		{
+			throw new InvalidOperationException($"Incorrect field definition of select query builder '{typeof(TDto).ToPretty()}': field '{fieldPath.FullName}' has already been included/excluded before.");
 		}
 
 		Fields.Add(new BuilderField(
-			IncludeOrExclude: includeOrExclude,
-			Field: new FieldPath(field, false),
-			RefName: refName,
-			RefField: refField != null ? new FieldPath(refField, true) : null
+			Field: fieldPath,
+			RefName: null,
+			RefField: null,
+			OptionalExclusion: optional
 		));
 
 		return this;
 	}
 
-	public IQBMongoSelectBuilder<TDoc, TDto> Include(Expression<Func<TDto, object?>> field)
-		=> AddInclude<TDoc>(true, field, null, null);
-	public IQBMongoSelectBuilder<TDoc, TDto> Include(Expression<Func<TDto, object?>> field, Expression<Func<TDoc, object?>> refField)
-		=> AddInclude<TDoc>(true, field, null, refField);
 	public IQBMongoSelectBuilder<TDoc, TDto> Include<TRef>(Expression<Func<TDto, object?>> field, Expression<Func<TRef, object?>> refField)
-		=> AddInclude<TRef>(true, field, null, refField);
-	public IQBMongoSelectBuilder<TDoc, TDto> Include<TRef>(Expression<Func<TDto, object?>> field, string refName, Expression<Func<TRef, object?>> refField)
-		=> AddInclude<TRef>(true, field, refName, refField);
+		=> AddInclude<TRef>(field, null, refField);
+	public IQBMongoSelectBuilder<TDoc, TDto> Include<TRef>(Expression<Func<TDto, object?>> field, string refAlias, Expression<Func<TRef, object?>> refField)
+		=> AddInclude<TRef>(field, refAlias, refField);
 
 	public IQBMongoSelectBuilder<TDoc, TDto> Exclude(Expression<Func<TDto, object?>> field)
-		=> AddInclude<TDoc>(false, field, null, null);
-	public IQBMongoSelectBuilder<TDoc, TDto> Exclude(Expression<Func<TDto, object?>> field, Expression<Func<TDoc, object?>> refField)
-		=> AddInclude<TDoc>(false, field, null, refField);
-	public IQBMongoSelectBuilder<TDoc, TDto> Exclude<TRef>(Expression<Func<TDto, object?>> field, Expression<Func<TRef, object?>> refField)
-		=> AddInclude<TRef>(false, field, null, refField);
-	public IQBMongoSelectBuilder<TDoc, TDto> Exclude<TRef>(Expression<Func<TDto, object?>> field, string refName, Expression<Func<TRef, object?>> refField)
-		=> AddInclude<TRef>(false, field, refName, refField);
+		=> AddExclude(field, false);
+
+	public IQBMongoSelectBuilder<TDoc, TDto> Optional(Expression<Func<TDto, object?>> field)
+		=> AddExclude(field, true);
 
 	public IQBMongoSelectBuilder<TDoc, TDto> SelectFromTable(string tableName)
 		=> AddContainer(typeof(TDoc), tableName, tableName, BuilderContainerTypes.Table, BuilderContainerOperations.Select);
-	public IQBMongoSelectBuilder<TDoc, TDto> SelectFromTable(string name, string tableName)
-		=> AddContainer(typeof(TDoc), name, tableName, BuilderContainerTypes.Table, BuilderContainerOperations.Select);
+	public IQBMongoSelectBuilder<TDoc, TDto> SelectFromTable(string alias, string tableName)
+		=> AddContainer(typeof(TDoc), alias, tableName, BuilderContainerTypes.Table, BuilderContainerOperations.Select);
 
 	public IQBMongoSelectBuilder<TDoc, TDto> LeftJoinTable<TRef>(string tableName)
 		=> AddContainer(typeof(TRef), tableName, tableName, BuilderContainerTypes.Table, BuilderContainerOperations.LeftJoin);
-	public IQBMongoSelectBuilder<TDoc, TDto> LeftJoinTable<TRef>(string name, string tableName)
-		=> AddContainer(typeof(TRef), name, tableName, BuilderContainerTypes.Table, BuilderContainerOperations.LeftJoin);
+	public IQBMongoSelectBuilder<TDoc, TDto> LeftJoinTable<TRef>(string alias, string tableName)
+		=> AddContainer(typeof(TRef), alias, tableName, BuilderContainerTypes.Table, BuilderContainerOperations.LeftJoin);
 
 	public IQBMongoSelectBuilder<TDoc, TDto> JoinTable<TRef>(string tableName)
 		=> AddContainer(typeof(TRef), tableName, tableName, BuilderContainerTypes.Table, BuilderContainerOperations.Join);
-	public IQBMongoSelectBuilder<TDoc, TDto> JoinTable<TRef>(string name, string tableName)
-		=> AddContainer(typeof(TRef), name, tableName, BuilderContainerTypes.Table, BuilderContainerOperations.Join);
+	public IQBMongoSelectBuilder<TDoc, TDto> JoinTable<TRef>(string alias, string tableName)
+		=> AddContainer(typeof(TRef), alias, tableName, BuilderContainerTypes.Table, BuilderContainerOperations.Join);
 
 	public IQBMongoSelectBuilder<TDoc, TDto> CrossJoinTable<TRef>(string tableName)
 		=> AddContainer(typeof(TRef), tableName, tableName, BuilderContainerTypes.Table, BuilderContainerOperations.CrossJoin);
-	public IQBMongoSelectBuilder<TDoc, TDto> CrossJoinTable<TRef>(string name, string tableName)
-		=> AddContainer(typeof(TRef), name, tableName, BuilderContainerTypes.Table, BuilderContainerOperations.CrossJoin);
+	public IQBMongoSelectBuilder<TDoc, TDto> CrossJoinTable<TRef>(string alias, string tableName)
+		=> AddContainer(typeof(TRef), alias, tableName, BuilderContainerTypes.Table, BuilderContainerOperations.CrossJoin);
 
 	public IQBMongoSelectBuilder<TDoc, TDto> Connect<TLocal, TRef>(Expression<Func<TLocal, object?>> field, Expression<Func<TRef, object?>> refField, ConditionOperations operation)
 		=> AddCondition<TLocal, TRef>(BuilderConditionFlags.IsConnect | BuilderConditionFlags.OnField, null, field, null, refField, null, null, operation);
-	public IQBMongoSelectBuilder<TDoc, TDto> Connect<TLocal, TRef>(Expression<Func<TLocal, object?>> field, string refName, Expression<Func<TRef, object?>> refField, ConditionOperations operation)
-		=> AddCondition<TLocal, TRef>(BuilderConditionFlags.IsConnect | BuilderConditionFlags.OnField, null, field, refName, refField, null, null, operation);
-	public IQBMongoSelectBuilder<TDoc, TDto> Connect<TLocal, TRef>(string name, Expression<Func<TLocal, object?>> field, Expression<Func<TRef, object?>> refField, ConditionOperations operation)
-		=> AddCondition<TLocal, TRef>(BuilderConditionFlags.IsConnect | BuilderConditionFlags.OnField, name, field, null, refField, null, null, operation);
-	public IQBMongoSelectBuilder<TDoc, TDto> Connect<TLocal, TRef>(string name, Expression<Func<TLocal, object?>> field, string refName, Expression<Func<TRef, object?>> refField, ConditionOperations operation)
-		=> AddCondition<TLocal, TRef>(BuilderConditionFlags.IsConnect | BuilderConditionFlags.OnField, name, field, refName, refField, null, null, operation);
+	public IQBMongoSelectBuilder<TDoc, TDto> Connect<TLocal, TRef>(Expression<Func<TLocal, object?>> field, string refAlias, Expression<Func<TRef, object?>> refField, ConditionOperations operation)
+		=> AddCondition<TLocal, TRef>(BuilderConditionFlags.IsConnect | BuilderConditionFlags.OnField, null, field, refAlias, refField, null, null, operation);
+	public IQBMongoSelectBuilder<TDoc, TDto> Connect<TLocal, TRef>(string alias, Expression<Func<TLocal, object?>> field, Expression<Func<TRef, object?>> refField, ConditionOperations operation)
+		=> AddCondition<TLocal, TRef>(BuilderConditionFlags.IsConnect | BuilderConditionFlags.OnField, alias, field, null, refField, null, null, operation);
+	public IQBMongoSelectBuilder<TDoc, TDto> Connect<TLocal, TRef>(string alias, Expression<Func<TLocal, object?>> field, string refAlias, Expression<Func<TRef, object?>> refField, ConditionOperations operation)
+		=> AddCondition<TLocal, TRef>(BuilderConditionFlags.IsConnect | BuilderConditionFlags.OnField, alias, field, refAlias, refField, null, null, operation);
 	public IQBMongoSelectBuilder<TDoc, TDto> Connect<TLocal>(Expression<Func<TLocal, object?>> field, object? constValue, ConditionOperations operation)
 		=> AddCondition<TLocal, NotSupported>(BuilderConditionFlags.IsConnect | BuilderConditionFlags.OnConst, null, field, null, null, constValue, null, operation);
-	public IQBMongoSelectBuilder<TDoc, TDto> Connect<TLocal>(string name, Expression<Func<TLocal, object?>> field, object? constValue, ConditionOperations operation)
-		=> AddCondition<TLocal, NotSupported>(BuilderConditionFlags.IsConnect | BuilderConditionFlags.OnConst, name, field, null, null, constValue, null, operation);
+	public IQBMongoSelectBuilder<TDoc, TDto> Connect<TLocal>(string alias, Expression<Func<TLocal, object?>> field, object? constValue, ConditionOperations operation)
+		=> AddCondition<TLocal, NotSupported>(BuilderConditionFlags.IsConnect | BuilderConditionFlags.OnConst, alias, field, null, null, constValue, null, operation);
 	public IQBMongoSelectBuilder<TDoc, TDto> Connect<TLocal>(Expression<Func<TLocal, object?>> field, ConditionOperations operation, string paramName)
 		=> AddCondition<TLocal, NotSupported>(BuilderConditionFlags.IsConnect | BuilderConditionFlags.OnParam, null, field, null, null, null, paramName, operation);
-	public IQBMongoSelectBuilder<TDoc, TDto> Connect<TLocal>(string name, Expression<Func<TLocal, object?>> field, ConditionOperations operation, string paramName)
-		=> AddCondition<TLocal, NotSupported>(BuilderConditionFlags.IsConnect | BuilderConditionFlags.OnParam, name, field, null, null, null, paramName, operation);
+	public IQBMongoSelectBuilder<TDoc, TDto> Connect<TLocal>(string alias, Expression<Func<TLocal, object?>> field, ConditionOperations operation, string paramName)
+		=> AddCondition<TLocal, NotSupported>(BuilderConditionFlags.IsConnect | BuilderConditionFlags.OnParam, alias, field, null, null, null, paramName, operation);
 
 	public IQBMongoSelectBuilder<TDoc, TDto> Condition<TLocal, TRef>(Expression<Func<TLocal, object?>> field, Expression<Func<TRef, object?>> refField, ConditionOperations operation)
 		=> AddCondition<TLocal, TRef>(BuilderConditionFlags.OnField, null, field, null, refField, null, null, operation);
-	public IQBMongoSelectBuilder<TDoc, TDto> Condition<TLocal, TRef>(Expression<Func<TLocal, object?>> field, string refName, Expression<Func<TRef, object?>> refField, ConditionOperations operation)
-		=> AddCondition<TLocal, TRef>(BuilderConditionFlags.OnField, null, field, refName, refField, null, null, operation);
-	public IQBMongoSelectBuilder<TDoc, TDto> Condition<TLocal, TRef>(string name, Expression<Func<TLocal, object?>> field, Expression<Func<TRef, object?>> refField, ConditionOperations operation)
-		=> AddCondition<TLocal, TRef>(BuilderConditionFlags.OnField, name, field, null, refField, null, null, operation);
-	public IQBMongoSelectBuilder<TDoc, TDto> Condition<TLocal, TRef>(string name, Expression<Func<TLocal, object?>> field, string refName, Expression<Func<TRef, object?>> refField, ConditionOperations operation)
-		=> AddCondition<TLocal, TRef>(BuilderConditionFlags.OnField, name, field, refName, refField, null, null, operation);
+	public IQBMongoSelectBuilder<TDoc, TDto> Condition<TLocal, TRef>(Expression<Func<TLocal, object?>> field, string refAlias, Expression<Func<TRef, object?>> refField, ConditionOperations operation)
+		=> AddCondition<TLocal, TRef>(BuilderConditionFlags.OnField, null, field, refAlias, refField, null, null, operation);
+	public IQBMongoSelectBuilder<TDoc, TDto> Condition<TLocal, TRef>(string alias, Expression<Func<TLocal, object?>> field, Expression<Func<TRef, object?>> refField, ConditionOperations operation)
+		=> AddCondition<TLocal, TRef>(BuilderConditionFlags.OnField, alias, field, null, refField, null, null, operation);
+	public IQBMongoSelectBuilder<TDoc, TDto> Condition<TLocal, TRef>(string alias, Expression<Func<TLocal, object?>> field, string refAlias, Expression<Func<TRef, object?>> refField, ConditionOperations operation)
+		=> AddCondition<TLocal, TRef>(BuilderConditionFlags.OnField, alias, field, refAlias, refField, null, null, operation);
 	public IQBMongoSelectBuilder<TDoc, TDto> Condition<TLocal>(Expression<Func<TLocal, object?>> field, object? constValue, ConditionOperations operation)
 		=> AddCondition<TLocal, NotSupported>(BuilderConditionFlags.OnConst, null, field, null, null, constValue, null, operation);
-	public IQBMongoSelectBuilder<TDoc, TDto> Condition<TLocal>(string name, Expression<Func<TLocal, object?>> field, object? constValue, ConditionOperations operation)
-		=> AddCondition<TLocal, NotSupported>(BuilderConditionFlags.OnConst, name, field, null, null, constValue, null, operation);
+	public IQBMongoSelectBuilder<TDoc, TDto> Condition<TLocal>(string alias, Expression<Func<TLocal, object?>> field, object? constValue, ConditionOperations operation)
+		=> AddCondition<TLocal, NotSupported>(BuilderConditionFlags.OnConst, alias, field, null, null, constValue, null, operation);
 	public IQBMongoSelectBuilder<TDoc, TDto> Condition<TLocal>(Expression<Func<TLocal, object?>> field, ConditionOperations operation, string paramName)
 		=> AddCondition<TLocal, NotSupported>(BuilderConditionFlags.OnParam, null, field, null, null, null, paramName, operation);
-	public IQBMongoSelectBuilder<TDoc, TDto> Condition<TLocal>(string name, Expression<Func<TLocal, object?>> field, ConditionOperations operation, string paramName)
-		=> AddCondition<TLocal, NotSupported>(BuilderConditionFlags.OnParam, name, field, null, null, null, paramName, operation);
+	public IQBMongoSelectBuilder<TDoc, TDto> Condition<TLocal>(string alias, Expression<Func<TLocal, object?>> field, ConditionOperations operation, string paramName)
+		=> AddCondition<TLocal, NotSupported>(BuilderConditionFlags.OnParam, alias, field, null, null, null, paramName, operation);
 	public IQBMongoSelectBuilder<TDoc, TDto> Condition(Expression<Func<TDoc, object?>> field, object? constValue, ConditionOperations operation)
 		=> AddCondition<TDoc, NotSupported>(BuilderConditionFlags.OnConst, null, field, null, null, constValue, null, operation);
-	public IQBMongoSelectBuilder<TDoc, TDto> Condition(string name, Expression<Func<TDoc, object?>> field, object? constValue, ConditionOperations operation)
-		=> AddCondition<TDoc, NotSupported>(BuilderConditionFlags.OnConst, name, field, null, null, constValue, null, operation);
+	public IQBMongoSelectBuilder<TDoc, TDto> Condition(string alias, Expression<Func<TDoc, object?>> field, object? constValue, ConditionOperations operation)
+		=> AddCondition<TDoc, NotSupported>(BuilderConditionFlags.OnConst, alias, field, null, null, constValue, null, operation);
 	public IQBMongoSelectBuilder<TDoc, TDto> Condition(Expression<Func<TDoc, object?>> field, ConditionOperations operation, string paramName)
 		=> AddCondition<TDoc, NotSupported>(BuilderConditionFlags.OnParam, null, field, null, null, null, paramName, operation);
-	public IQBMongoSelectBuilder<TDoc, TDto> Condition(string name, Expression<Func<TDoc, object?>> field, ConditionOperations operation, string paramName)
-		=> AddCondition<TDoc, NotSupported>(BuilderConditionFlags.OnParam, name, field, null, null, null, paramName, operation);
+	public IQBMongoSelectBuilder<TDoc, TDto> Condition(string alias, Expression<Func<TDoc, object?>> field, ConditionOperations operation, string paramName)
+		=> AddCondition<TDoc, NotSupported>(BuilderConditionFlags.OnParam, alias, field, null, null, null, paramName, operation);
 
 	public IQBMongoSelectBuilder<TDoc, TDto> Begin()
 	{
