@@ -129,14 +129,16 @@ internal sealed class SelectQueryBuilder<TDocument, TSelect> : QueryBuilder<TDoc
 
 	private sealed class StageInfo
 	{
+		public readonly string Alias;
 		public string LookupAs;
-		public List<List<BuilderCondition>> ConditionMap;
-		public List<(string fromPath, string? toPath, BuilderField? builderField)> ProjectBefore;
-		public List<(string fromPath, string? toPath, BuilderField? builderField)> ProjectAfter;
+		public readonly List<List<BuilderCondition>> ConditionMap;
+		public readonly List<(string fromPath, string? toPath, BuilderField? builderField)> ProjectBefore;
+		public readonly List<(string fromPath, string? toPath, BuilderField? builderField)> ProjectAfter;
 
-		public StageInfo()
+		public StageInfo(string alias)
 		{
-			LookupAs = string.Empty;
+			Alias = alias;
+			LookupAs = "___" + alias;
 			ConditionMap = new List<List<BuilderCondition>>();
 			ProjectBefore = new List<(string fromPath, string? toPath, BuilderField? builderField)>();
 			ProjectAfter = new List<(string fromPath, string? toPath, BuilderField? builderField)>();
@@ -151,32 +153,20 @@ internal sealed class SelectQueryBuilder<TDocument, TSelect> : QueryBuilder<TDoc
 		var top = containers[0];
 		var result = new List<BsonDocument>();
 
-		// Add pipeline stages for each container
+		// Add pipeline stages for each container and clear the first stage's LookupAs (it musn't be used)
 		//
-		var stages = new OrderedDictionary<string, StageInfo>(containers.Select(x => KeyValuePair.Create(x.Name, new StageInfo() { LookupAs = "___" + x.Name })));
-		stages.List[0].Value.LookupAs = string.Empty;
+		var stages = new List<StageInfo>(containers.Select(x => new StageInfo(x.Name)));
+		stages[0].LookupAs = string.Empty;
 
-		// Fill the connect conditions
+		// Fill the pipeline stages with connect conditions.
+		// Connect conditions are always AND conditions (OR connect conditions are not supported by us).
+		// In a pipeline stage condition map, connect conditions between fields come first.
+		// Then follow the connect conditions on constant values.
+		// And only after them, the regular conditions that can be given as expressions.
 		//
-		{
-			List<BuilderCondition> builderConditions;
-			foreach (var name in conditions.Where(x => x.IsConnect).Select(x => x.Name).Distinct())
-			{
-				builderConditions = conditions.Where(x => x.IsConnect && x.IsOnField && x.Name == name).ToList();
-				if (builderConditions.Count > 0)
-				{
-					stages[name].ConditionMap.Add(builderConditions);
-				}
+		FillPipelineStagesWithConnectConditions(stages, conditions);
 
-				builderConditions = conditions.Where(x => x.IsConnect && !x.IsOnField && x.Name == name).ToList();
-				if (builderConditions.Count > 0)
-				{
-					stages[name].ConditionMap.Add(builderConditions);
-				}
-			}
-		}
-
-		// Slice the conditions to the smallest possible parts
+		// Slice the regular conditions to the smallest possible parts
 		//
 		var slices = SliceConditions(conditions.Where(x => !x.IsConnect));
 
@@ -191,15 +181,15 @@ internal sealed class SelectQueryBuilder<TDocument, TSelect> : QueryBuilder<TDoc
 
 				foreach (var cond in slice)
 				{
-					firstPossibleStage = Math.Max(firstPossibleStage, stages.IndexOf(cond.Name));
+					firstPossibleStage = Math.Max(firstPossibleStage, stages.FindIndex(x => x.Alias == cond.Name));
 
 					if (cond.IsOnField)
 					{
-						firstPossibleStage = Math.Max(firstPossibleStage, stages.IndexOf(cond.RefName!));
+						firstPossibleStage = Math.Max(firstPossibleStage, stages.FindIndex(x => x.Alias == cond.RefName!));
 					}
 				}
 
-				stages.List[firstPossibleStage].Value.ConditionMap.Add(slice);
+				stages[firstPossibleStage].ConditionMap.Add(slice);
 			}
 		}
 
@@ -215,12 +205,12 @@ internal sealed class SelectQueryBuilder<TDocument, TSelect> : QueryBuilder<TDoc
 				if (field.RefField?.ElementCount == 0)
 				{
 					// project the joined document as the result field
-					stages[field.RefName!].LookupAs = field.Field.DBSideName;
+					stages.First(x => x.Alias == field.RefName!).LookupAs = field.Field.DBSideName;
 				}
 				else
 				{
 					path = string.Concat(
-						stages[field.RefName!].LookupAs, ".",
+						stages.First(x => x.Alias == field.RefName!).LookupAs, ".",
 						field.RefField!.DBSideName
 					);
 
@@ -228,17 +218,17 @@ internal sealed class SelectQueryBuilder<TDocument, TSelect> : QueryBuilder<TDoc
 					// The goal is to place the include in the first possible stage.
 					// Important: any inclusion clears all other fields, so we insert it only after any mention of the entire document.
 					//
-					stageIndex = stages.IndexOf(field.RefName!);
+					stageIndex = stages.FindIndex(x => x.Alias == field.RefName!);
 					for (int i = stageIndex + 1; i < stages.Count; i++)
 					{
-						map = stages.List[i].Value.ConditionMap;
+						map = stages[i].ConditionMap;
 
 						if (map.Any(x => x.Any(xx => xx.Field.Name == field.RefName || (xx.RefField != null && xx.RefField.Name == field.RefName))))
 						{
 							stageIndex = i;
 						}
 					}
-					stages.List[stageIndex].Value.ProjectAfter.Add((path, field.Field.DBSideName, field));
+					stages[stageIndex].ProjectAfter.Add((path, field.Field.DBSideName, field));
 				}
 			}
 
@@ -264,7 +254,7 @@ internal sealed class SelectQueryBuilder<TDocument, TSelect> : QueryBuilder<TDoc
 					stageIndex = -1;
 					for (int i = 0; i < stages.Count; i++)
 					{
-						map = stages.List[i].Value.ConditionMap;
+						map = stages[i].ConditionMap;
 
 						if (map.Any(x => x.Any(xx => xx.Field.FullName == field.Field.FullName)))
 						{
@@ -273,25 +263,25 @@ internal sealed class SelectQueryBuilder<TDocument, TSelect> : QueryBuilder<TDoc
 					}
 					if (stageIndex == -1)
 					{
-						stages.List[0].Value.ProjectBefore.Add((path, null, field));
+						stages[0].ProjectBefore.Add((path, null, field));
 					}
 					else
 					{
-						stages.List[stageIndex].Value.ProjectAfter.Add((path, null, field));
+						stages[stageIndex].ProjectAfter.Add((path, null, field));
 					}
 				}
 				else
 				{
-					path = string.Concat(stages[joinedDoc.RefName!].LookupAs, ".",
+					path = string.Concat(stages.First(x => x.Alias == joinedDoc.RefName!).LookupAs, ".",
 						string.Join(".", field.Field.Elements.Skip(joinedDoc.Field.ElementCount).Select(x => x.DBSideName)));
 
 					// Propagate the exclude
 					//
 					var trueFullName = string.Join(".", field.Field.Elements.Skip(joinedDoc.Field.ElementCount).Select(x => x.Name));
-					stageIndex = stages.IndexOf(joinedDoc.RefName!);
+					stageIndex = stages.FindIndex(x => x.Alias == joinedDoc.RefName!);
 					for (int i = stageIndex + 1; i < stages.Count; i++)
 					{
-						map = stages.List[i].Value.ConditionMap;
+						map = stages[i].ConditionMap;
 
 						if (map.Any(x => x.Any(xx =>
 								(xx.Name == joinedDoc.RefName && xx.Field.FullName == trueFullName) ||
@@ -300,7 +290,7 @@ internal sealed class SelectQueryBuilder<TDocument, TSelect> : QueryBuilder<TDoc
 							stageIndex = i;
 						}
 					}
-					stages.List[stageIndex].Value.ProjectAfter.Add((path, null, field));
+					stages[stageIndex].ProjectAfter.Add((path, null, field));
 				}
 			}
 
@@ -313,15 +303,15 @@ internal sealed class SelectQueryBuilder<TDocument, TSelect> : QueryBuilder<TDoc
 				foreach (var elem in docMap.AllMemberMaps.ExceptBy(selMap.AllMemberMaps.Select(x => x.MemberName), x => x.MemberName))
 				{
 					// this exclude has not been added before?
-					if (!stages.Any(x => x.Value.ProjectBefore.Any(xx => xx.toPath == null && xx.fromPath == elem.ElementName) ||
-											x.Value.ProjectAfter.Any(xx => xx.toPath == null && xx.fromPath == elem.ElementName)))
+					if (!stages.Any(x => x.ProjectBefore.Any(xx => xx.toPath == null && xx.fromPath == elem.ElementName) ||
+											x.ProjectAfter.Any(xx => xx.toPath == null && xx.fromPath == elem.ElementName)))
 					{
 						path = elem.ElementName;
 
 						stageIndex = -1;
 						for (int i = 0; i < stages.Count; i++)
 						{
-							map = stages.List[i].Value.ConditionMap;
+							map = stages[i].ConditionMap;
 
 							if (map.Any(x => x.Any(xx =>
 									(xx.Name == top.Name && xx.Field.FullName == path) ||
@@ -332,138 +322,149 @@ internal sealed class SelectQueryBuilder<TDocument, TSelect> : QueryBuilder<TDoc
 						}
 						if (stageIndex == -1)
 						{
-							stages.List[0].Value.ProjectBefore.Add((path, null, null));
+							stages[0].ProjectBefore.Add((path, null, null));
 						}
 						else
 						{
-							stages.List[stageIndex].Value.ProjectAfter.Add((path, null, null));
+							stages[stageIndex].ProjectAfter.Add((path, null, null));
 						}
 					}
 				}
 			}
 
 			// Exclude joined conteiners not projected to documents
-			// !!!
-		}
-
-		// Func to get true field name
-		//
-		var getDBSideName = string (string alias, FieldPath fieldPath) =>
-		{
-			return fieldPath.DBSideName;
-		};
-
-		// Initial projection
-		//
-		OutputProjections(result, stages, 0, true);
-
-		// Initial $match
-		//
-		{
-			BuiltCondition? filter = null;
-			foreach (var conds in stages.List[0].Value.ConditionMap)
+			StageInfo stage;
+			for (int i = 1; i < stages.Count; i++)
 			{
-				filter = filter?.AppendByAnd(BuildConditionTree(conds, getDBSideName)!) ?? BuildConditionTree(conds, getDBSideName);
-			}
-			if (filter != null)
-			{
-				result.Add(new BsonDocument { { "$match", filter.BsonDocument } });
+				stage = stages[i];
+				if (!stage.LookupAs.StartsWith("___")) continue;
+
+				stageIndex = i;
+				for (int j = i + 1; j < stages.Count; j++)
+				{
+					map = stages[i].ConditionMap;
+
+					if (map.Any(x => x.Any(xx => xx.Name == stage.Alias || xx.RefName == stage.Alias)))
+					{
+						stageIndex = i;
+					}
+				}
+				stages[stageIndex].ProjectAfter.Add((stages[i].LookupAs, null, null));
 			}
 		}
 
-		// Initial projection after match
-		//
-		OutputProjections(result, stages, 0, false);
-
-		// Lookup stages
+		// Pipeline
 		//
 		{
-			BuilderCondition? connect;
+			BuilderCondition? firstConnect;
 			BsonDocument lookup;
 			BuiltCondition? filter;
 			BsonDocument? let;
 			string s;
-			for (int i = 1; i < stages.Count; i++)
+			bool isExpr;
+			int i = 0;
+			var getDBSideNameBefore = string (string alias, FieldPath fieldPath) =>
 			{
-				getDBSideName = string (string alias, FieldPath fieldPath) =>
+				var trueAlias = stages.Take(i).FirstOrDefault(x => x.Alias == alias)?.LookupAs;
+
+				return string.IsNullOrEmpty(trueAlias)
+					? fieldPath.DBSideName
+					: string.Concat(trueAlias, ".", fieldPath.DBSideName);
+			};
+			var getDBSideNameAfter = string (string alias, FieldPath fieldPath) =>
+			{
+				var trueAlias = stages.Take(i + 1).FirstOrDefault(x => x.Alias == alias)?.LookupAs;
+
+				return string.IsNullOrEmpty(trueAlias)
+					? fieldPath.DBSideName
+					: string.Concat(trueAlias, ".", fieldPath.DBSideName);
+			};
+
+			for ( ; i < stages.Count; i++)
+			{
+				OutputProjections(result, stages, i, true);
+
+				// $lookup
+				if (i > 0)
 				{
-					var trueAlias = containers.Take(i).Any(x => x.Name == alias)
-						? stages[alias].LookupAs
-						: null;
+					// Joining container
+					lookup = new BsonDocument { { "from", containers[i].DBSideName } };
 
-					return string.IsNullOrEmpty(trueAlias)
-						? fieldPath.DBSideName
-						: string.Concat(trueAlias, ".", fieldPath.DBSideName);
-				};
-
-				// Joining container
-				lookup = new BsonDocument { { "from", containers[i].DBSideName } };
-
-				// First connect condition to localField and foreignField
-				connect = stages.List[i].Value.ConditionMap.FirstOrDefault()?.FirstOrDefault(x => x.IsConnectOnField);
-				if (connect != null)
-				{
-					lookup["foreignField"] = connect.Field.DBSideName;
-					lookup["localField"] = getDBSideName(connect.RefName!, connect.RefField!);
-				}
-
-				// other conditions except the first connect one
-				filter = null;
-				let = null;
-				foreach (var conds in stages.List[i].Value.ConditionMap)
-				{
-					if (filter != null)
+					// First connect condition to foreignField and localField
+					if (containers[i].ContainerOperation == BuilderContainerOperations.LeftJoin || containers[i].ContainerOperation == BuilderContainerOperations.Join)
 					{
-						foreach (var cond in conds.Where(x => x.IsOnField))
-						{
-							if (let == null) let = new BsonDocument();
+						firstConnect = stages[i].ConditionMap.First().First(x => x.IsConnectOnField);
 
-							s = getDBSideName(cond.Name, cond.Field);
-							let[MakeVariableName(s)] = "$" + s;
-						}
-						filter.AppendByAnd(BuildConditionTree(conds, getDBSideName)!);
+						lookup["foreignField"] = firstConnect.Field.DBSideName;
+						lookup["localField"] = getDBSideNameBefore(firstConnect.RefName!, firstConnect.RefField!);
 					}
 					else
 					{
-						foreach (var cond in conds.Where(x => x.IsOnField && x != connect))
+						firstConnect = null;
+					}
+
+					// other connect conditions except firstConnect
+					filter = null;
+					let = null;
+					foreach (var conds in stages[i].ConditionMap.Where(x => x.Any(xx => xx.IsConnect && xx != firstConnect)))
+					{
+						isExpr = false;
+						foreach (var cond in conds.Where(x => x.IsOnField && x != firstConnect))
 						{
 							if (let == null) let = new BsonDocument();
 
-							s = getDBSideName(cond.Name, cond.Field);
+							s = getDBSideNameBefore(cond.RefName!, cond.RefField!);
 							let[MakeVariableName(s)] = "$" + s;
+
+							isExpr = true;
 						}
-						filter = BuildConditionTree(conds.Where(x => x != connect), getDBSideName);
+
+						filter = filter?.AppendByAnd(BuildConditionTree(isExpr, conds.Where(x => x != firstConnect), getDBSideNameBefore, _arguments)!)
+									?? BuildConditionTree(isExpr, conds.Where(x => x != firstConnect), getDBSideNameBefore, _arguments);
+					}
+					if (let != null)
+					{
+						lookup["let"] = let;
+					}
+					if (filter != null)
+					{
+						lookup["pipeline"] = new BsonArray() { new BsonDocument { { "$match", filter.BsonDocument } } };
+					}
+					else if (firstConnect == null/* containers[i].ContainerOperation == BuilderContainerOperations.CrossJoin */)
+					{
+						lookup["pipeline"] = new BsonArray();
+					}
+
+					lookup["as"] = stages[i].LookupAs;
+
+					result.Add(new BsonDocument { { "$lookup", lookup } });
+
+					// $unwind
+					{
+						var leftJoinOrCrossJoin = containers[i].ContainerOperation != BuilderContainerOperations.Join;
+						result.Add(new BsonDocument {
+							{ "$unwind", new BsonDocument {
+								{ "path", lookup["as"] },
+								{ "preserveNullAndEmptyArrays", leftJoinOrCrossJoin }
+							}}
+						});
 					}
 				}
 
-				if (let != null)
+				// $match
 				{
-					lookup["let"] = let;
+					filter = null;
+					foreach (var conds in stages[i].ConditionMap.Where(x => !x.Any(xx => xx.IsConnect)))
+					{
+						isExpr = conds.Any(x => x.IsOnField);
+						filter = filter?.AppendByAnd(BuildConditionTree(isExpr, conds, getDBSideNameAfter, _arguments)!)
+									?? BuildConditionTree(isExpr, conds, getDBSideNameAfter, _arguments);
+					}
+					if (filter != null)
+					{
+						result.Add(new BsonDocument { { "$match", filter.BsonDocument } });
+					}
 				}
-
-				if (filter != null)
-				{
-					lookup["pipeline"] = new BsonArray() { new BsonDocument { { "$match", filter.BsonDocument } } };
-				}
-				else if (connect == null/* containers[i].ContainerOperation == BuilderContainerOperations.CrossJoin */)
-				{
-					lookup["pipeline"] = new BsonArray();
-				}
-
-				lookup["as"] = stages.List[i].Value.LookupAs;
-
-
-				OutputProjections(result, stages, i, true);
-
-				result.Add(new BsonDocument { { "$lookup", lookup } });
-
-				var leftJoinOrCrossJoin = containers[i].ContainerOperation != BuilderContainerOperations.Join;
-				result.Add(new BsonDocument {
-					{ "$unwind", new BsonDocument {
-						{ "path", lookup["as"] },
-						{ "preserveNullAndEmptyArrays", leftJoinOrCrossJoin }
-					}}
-				});
 
 				OutputProjections(result, stages, i, false);
 			}
@@ -472,10 +473,31 @@ internal sealed class SelectQueryBuilder<TDocument, TSelect> : QueryBuilder<TDoc
 		return result;
 	}
 
-	
-	private static void OutputProjections(List<BsonDocument> result, OrderedDictionary<string, StageInfo> stages, int stageIndex, bool beforeOrAfter)
+	/// <summary>
+	/// Fill the pipeline stages with connect conditions.
+	/// </summary>
+	private static void FillPipelineStagesWithConnectConditions(List<StageInfo> stages, List<BuilderCondition> conditions)
 	{
-		var projectInfo = beforeOrAfter ? stages.List[stageIndex].Value.ProjectBefore : stages.List[stageIndex].Value.ProjectAfter;
+		List<BuilderCondition> builderConditions;
+		foreach (var name in conditions.Where(x => x.IsConnect).Select(x => x.Name).Distinct())
+		{
+			builderConditions = conditions.Where(x => x.IsConnect && x.IsOnField && x.Name == name).ToList();
+			if (builderConditions.Count > 0)
+			{
+				stages.First(x => x.Alias == name).ConditionMap.Add(builderConditions);
+			}
+
+			builderConditions = conditions.Where(x => x.IsConnect && !x.IsOnField && x.Name == name).ToList();
+			if (builderConditions.Count > 0)
+			{
+				stages.First(x => x.Alias == name).ConditionMap.Add(builderConditions);
+			}
+		}
+	}
+
+	private static void OutputProjections(List<BsonDocument> result, List<StageInfo> stages, int stageIndex, bool beforeOrAfter)
+	{
+		var projectInfo = beforeOrAfter ? stages[stageIndex].ProjectBefore : stages[stageIndex].ProjectAfter;
 
 		BsonDocument? projection = null;
 		foreach (var projField in projectInfo.Where(x => x.toPath == null && x.builderField?.OptionalExclusion == true))
@@ -532,269 +554,4 @@ internal sealed class SelectQueryBuilder<TDocument, TSelect> : QueryBuilder<TDoc
 			result.Add(new BsonDocument { { "$project", projection } });
 		}
 	}
-
-	private List<List<BuilderCondition>> SliceConditions(IEnumerable<BuilderCondition> conditions)
-	{
-		var conds = conditions.ToList();
-		var list = new List<List<BuilderCondition>>();
-
-		// Slice the condition to the smalest possible parts (that connected by AND)
-		//
-		// a                                => a
-		// a AND b                          => a, b
-		// a OR b                           => a OR b
-		// (a OR b) AND c                   => a OR b, c
-		// ((a OR b) AND c) AND e           => a OR b, c, e
-		// ((a OR b) AND c) OR e            => ((a OR b) AND c) OR e
-		//
-
-		var count = conds.Count;
-		while (count > 0)
-		{
-			TrimParentheses(conds);
-
-			for (int i = 1, j = conds[0].Parentheses; i < conds.Count; i++)
-			{
-				// j == 0 means that this is the end of condition part, such as '(a OR b)' for '(a OR b) AND c'
-				j += conds[i].Parentheses;
-				if (j <= 0 && (i + 1 >= conds.Count || conds[i + 1].IsByOr == false))
-				{
-					list.Add(new List<BuilderCondition>(conds.Take(i + 1)));
-					conds.RemoveRange(0, i + 1);
-					break;
-				}
-			}
-
-			if (count > conds.Count)
-			{
-				count = conds.Count;
-				continue;
-			}
-			else
-			{
-				list.Add(new List<BuilderCondition>(conds));
-				conds.Clear();
-				break;
-			}
-		}
-
-		for (int last = 0; last < list.Count; )
-		{
-			conds = list[last];
-
-			TrimParentheses(conds);
-
-			count = conds.Count;
-
-			for (int i = 1, j = conds[0].Parentheses; i < conds.Count; i++)
-			{
-				// j == 0 means that this is the end of condition part, such as '(a OR b)' for '(a OR b) AND c'
-				j += conds[i].Parentheses;
-				if (j <= 0 && (i + 1 >= conds.Count || conds[i + 1].IsByOr == false))
-				{
-					if (i + 1 < conds.Count)
-					{
-						list.Insert(last, new List<BuilderCondition>(conds.Take(i + 1)));
-						conds.RemoveRange(0, i + 1);
-					}
-					break;
-				}
-			}
-
-			if (count == conds.Count)
-			{
-				last++;
-			}
-		}
-
-		return list;
-	}
-	private BuilderCondition EnsureByAndCondition(BuilderCondition cond)
-	{
-		return cond.IsByOr ? (cond with { IsByOr = false }) : cond;
-	}
-	private static void TrimParentheses(List<BuilderCondition> conds)
-	{
-		if (conds.Count == 0) return;
-		if (conds.Count == 1)
-		{
-			System.Diagnostics.Debug.Assert(conds[0].Parentheses == 0);
-			if (conds[0].Parentheses != 0)
-			{
-				conds[0] = conds[0] with { Parentheses = 0 };
-			}
-			return;
-		}
-
-		var first = conds[0].Parentheses;
-		System.Diagnostics.Debug.Assert(first >= 0);
-		if (first <= 0) return;
-
-		var last = conds.Last().Parentheses;
-		System.Diagnostics.Debug.Assert(last <= 0);
-		if (last >= 0) return;
-
-		int sum = 0, min = 0;
-		for (int i = 1; i < conds.Count - 1; i++)
-		{
-			sum += conds[i].Parentheses;
-			System.Diagnostics.Debug.Assert(sum + first >= 0);
-			if (sum + first <= 0) return;
-			if (sum < min) min = sum;
-		}
-		// (((  (a || b) && c                        )))		4 -1(-1) -3
-		// (    (a || b) && (b || c)                 )			2  0(-1) -2
-		//      (a || b) && (b || c)
-		//      ((a || b) && (b || c)) || (d && e)
-		// (    ((a || b) && (b || c)) || (d && e)   )			3 -1(-2) -2
-
-		System.Diagnostics.Debug.Assert(first + sum + last == 0);
-
-		conds[0] = conds[0] with { Parentheses =  first + min };
-		conds[conds.Count - 1] = conds[conds.Count - 1] with { Parentheses = last + (first + min) };
-	}
-
-	#region Build filter conditions
-
-	private BuiltCondition? BuildConditionTree(IEnumerable<BuilderCondition> conditions, Func<string, FieldPath, string> getDBSideName)
-	{
-		BuiltCondition? filter = null;
-		bool moveNext = true;
-
-		using (var e = conditions.GetEnumerator())
-		{
-			while (moveNext && (moveNext = e.MoveNext()))
-			{
-				if (filter == null)
-				{
-					if (e.Current.Parentheses > 0)
-					{
-						filter = BuildConditionTree(e, ref moveNext, e.Current.Parentheses - 1, getDBSideName).filter;
-					}
-					else
-					{
-						filter = new BuiltCondition(BuildCondition(e.Current.IsOnField, e.Current, getDBSideName, Builder, _arguments), e.Current.IsOnField);
-					}
-				}
-				else if (e.Current.IsByOr)
-				{
-					if (e.Current.Parentheses > 0)
-					{
-						filter.AppendByOr(BuildConditionTree(e, ref moveNext, e.Current.Parentheses - 1, getDBSideName).filter);
-					}
-					else
-					{
-						filter.AppendByOr(new BuiltCondition(BuildCondition(e.Current.IsOnField, e.Current, getDBSideName, Builder, _arguments), e.Current.IsOnField));
-					}
-				}
-				else
-				{
-					if (e.Current.Parentheses > 0)
-					{
-						filter.AppendByAnd(BuildConditionTree(e, ref moveNext, e.Current.Parentheses - 1, getDBSideName).filter);
-					}
-					else
-					{
-						filter.AppendByAnd(new BuiltCondition(BuildCondition(e.Current.IsOnField, e.Current, getDBSideName, Builder, _arguments), e.Current.IsOnField));
-					}
-				}
-			}
-
-			return filter;
-		}
-	}
-	private (BuiltCondition filter, int level) BuildConditionTree(IEnumerator<BuilderCondition> e, ref bool moveNext, int parentheses, Func<string, FieldPath, string> getDBSideName)
-	{
-		BuiltCondition filter;
-
-		if (parentheses > 0)
-		{
-			var result = BuildConditionTree(e, ref moveNext, parentheses - 1, getDBSideName);
-			filter = result.filter;
-			if (result.level < 0)
-			{
-				return (filter, result.level + 1);
-			}
-		}
-		else
-		{
-			filter = new BuiltCondition(BuildCondition(e.Current.IsOnField, e.Current, getDBSideName, Builder, _arguments), e.Current.IsOnField);
-		}
-
-		while (moveNext && (moveNext = e.MoveNext()))
-		{
-			if (e.Current.IsByOr)
-			{
-				if (e.Current.Parentheses > 0)
-				{
-					var result = BuildConditionTree(e, ref moveNext, e.Current.Parentheses - 1, getDBSideName);
-					filter.AppendByOr(result.filter);
-					if (result.level < 0)
-					{
-						return (filter, result.level + 1);
-					}
-				}
-				else
-				{
-					filter.AppendByOr(new BuiltCondition(BuildCondition(e.Current.IsOnField, e.Current, getDBSideName, Builder, _arguments), e.Current.IsOnField));
-					if (e.Current.Parentheses < 0)
-					{
-						return (filter, e.Current.Parentheses + 1);
-					}
-				}
-			}
-			else
-			{
-				if (e.Current.Parentheses > 0)
-				{
-					var result = BuildConditionTree(e, ref moveNext, e.Current.Parentheses - 1, getDBSideName);
-					filter.AppendByAnd(result.filter);
-					if (result.level < 0)
-					{
-						return (filter, result.level + 1);
-					}
-				}
-				else
-				{
-					filter.AppendByAnd(new BuiltCondition(BuildCondition(e.Current.IsOnField, e.Current, getDBSideName, Builder, _arguments), e.Current.IsOnField));
-					if (e.Current.Parentheses < 0)
-					{
-						return (filter, e.Current.Parentheses + 1);
-					}
-				}
-			}
-		}
-
-		return (filter, 0);
-	}
-
-	private static BsonDocument BuildCondition(bool useExprFormat, BuilderCondition cond, Func<string, FieldPath, string> getDBSideName, QBBuilder<TDocument, TSelect> builder, IReadOnlyDictionary<string, object?>? arguments)
-	{
-		if (cond.IsOnField)
-		{
-			return MakeConditionOnField(cond, getDBSideName);
-		}
-		else if (cond.IsOnParam)
-		{
-			var paramName = (string)cond.Value!;
-			var param = builder.Parameters.First(x => x.Name == paramName);
-			object? value;
-			if (arguments == null || !arguments.TryGetValue(paramName, out value))
-			{
-				throw new InvalidOperationException($"Query builder parameter {paramName} is not set.");
-			}
-
-			return MakeConditionOnConst(useExprFormat, cond, getDBSideName, value);
-		}
-		else if (cond.IsOnConst)
-		{
-			return MakeConditionOnConst(useExprFormat, cond, getDBSideName);
-		}
-		else
-		{
-			throw new NotSupportedException();
-		}
-	}
-
-	#endregion
 }

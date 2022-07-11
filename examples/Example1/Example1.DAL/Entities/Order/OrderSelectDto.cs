@@ -28,29 +28,40 @@ public class OrderSelectDto
 
 	static void Builder(IQBMongoSelectBuilder<Order, OrderSelectDto> builder)
 	{
+		/*
+		SELECT * FROM orders AS orders
+		LEFT JOIN stores AS stores2 ON stores2.Id = orders.StoreId
+		LEFT JOIN stores AS stores3 ON stores3.Id = stores2.Id
+		WHERE stores3.Deleted = orders.Deleted
+		*/
 		builder
 			.SelectFromTable("orders")
-				.Condition(x => x.Id, 999, ConditionOperations.Equal)
 
  			.LeftJoinTable<Store>("stores")
 				.Connect<Store, Order>(store => store.Id, order => order.StoreId, ConditionOperations.Equal)
 
 			.LeftJoinTable<Store>("stores2", "stores")
 				.Connect<Store, Order>("stores2", store => store.Id, "orders", order => order.StoreId, ConditionOperations.Equal)
-				.Condition<Store>("stores2", store => store.Deleted, null, ConditionOperations.Equal)
+				.Connect<Store, Store>("stores2", store => store.Created, "stores", store => store.Deleted, ConditionOperations.NotEqual)
+				.Connect<Store>("stores2", store => store.Updated, null, ConditionOperations.IsNull)
 
 			.LeftJoinTable<Store>("stores3", "stores")
 				.Connect<Store, Store>("stores3", store => store.Id, "stores2", store2 => store2.Id, ConditionOperations.Equal)
-				.Condition<Store, Order>("stores3", store => store.Deleted, "orders", order => order.Deleted, ConditionOperations.Equal)
+			
+			.Condition<Store, Order>("stores3", store => store.Deleted, "orders", order => order.Deleted, ConditionOperations.Equal)
+			.And()
+			.Condition(x => x.Id, 999, ConditionOperations.Equal)
+			.Or()
+			.Condition<Store>("stores2", store => store.Deleted, null, ConditionOperations.Equal)
 
-			//.Optional(sel => sel.Updated)
+			.Optional(sel => sel.Updated)
 
 			.Include<Store>(sel => sel.StoreName, "stores", store => store.Name)
 
 			.Include<Store>(sel => sel.Store, "stores2", store => store)
 
-			//.Exclude(sel => sel.Store!.Created)
-			//.Optional(sel => sel.Store!.Updated)
+			.Exclude(sel => sel.Store!.Created)
+			.Optional(sel => sel.Store!.Updated)
 
 			.Include<Store>(sel => sel.Store3!.Name, "stores3", store => store.Name)
 		;
