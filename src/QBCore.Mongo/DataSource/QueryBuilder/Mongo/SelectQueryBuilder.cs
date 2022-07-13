@@ -148,6 +148,7 @@ internal sealed class SelectQueryBuilder<TDocument, TSelect> : QueryBuilder<TDoc
 	private List<BsonDocument> BuildSelectQuery()
 	{
 		var containers = Builder.Containers;
+		var connects = Builder.Connects;
 		var conditions = Builder.Conditions;
 		var fields = Builder.Fields;
 		var top = containers[0];
@@ -166,7 +167,7 @@ internal sealed class SelectQueryBuilder<TDocument, TSelect> : QueryBuilder<TDoc
 		//
 		FillPipelineStagesWithConnectConditions(stages, conditions);
 
-		// Slice the regular conditions to the smallest possible parts
+		// Slice the regular conditions to the smallest possible parts.The separator is the AND operation.
 		//
 		var slices = SliceConditions(conditions.Where(x => !x.IsConnect));
 
@@ -476,18 +477,18 @@ internal sealed class SelectQueryBuilder<TDocument, TSelect> : QueryBuilder<TDoc
 	/// <summary>
 	/// Fill the pipeline stages with connect conditions.
 	/// </summary>
-	private static void FillPipelineStagesWithConnectConditions(List<StageInfo> stages, List<BuilderCondition> conditions)
+	private static void FillPipelineStagesWithConnectConditions(List<StageInfo> stages, List<BuilderCondition> connects)
 	{
 		List<BuilderCondition> builderConditions;
-		foreach (var name in conditions.Where(x => x.IsConnect).Select(x => x.Name).Distinct())
+		foreach (var name in connects.Where(x => x.IsConnect).Select(x => x.Name).Distinct())
 		{
-			builderConditions = conditions.Where(x => x.IsConnect && x.IsOnField && x.Name == name).ToList();
+			builderConditions = connects.Where(x => x.IsConnect && x.IsOnField && x.Name == name).ToList();
 			if (builderConditions.Count > 0)
 			{
 				stages.First(x => x.Alias == name).ConditionMap.Add(builderConditions);
 			}
 
-			builderConditions = conditions.Where(x => x.IsConnect && !x.IsOnField && x.Name == name).ToList();
+			builderConditions = connects.Where(x => x.IsConnect && !x.IsOnField && x.Name == name).ToList();
 			if (builderConditions.Count > 0)
 			{
 				stages.First(x => x.Alias == name).ConditionMap.Add(builderConditions);

@@ -20,6 +20,7 @@ internal class QBBuilder<TDoc, TDto> :
 		if (other._containers != null) _containers = new List<BuilderContainer>(other._containers);
 		if (other._fields != null) _fields = new List<BuilderField>(other._fields);
 		if (other._parameters != null) _parameters = new List<BuilderParameter>(other._parameters);
+		if (other._connects != null) _connects = new List<BuilderCondition>(other._connects);
 		if (other._conditions != null) _conditions = new List<BuilderCondition>(other._conditions);
 		if (other._sortOrders != null) _sortOrders = new List<BuilderSortOrder>(other._sortOrders);
 		if (other._aggregations != null) _aggregations = new List<BuilderAggregation>(other._aggregations);
@@ -32,6 +33,7 @@ internal class QBBuilder<TDoc, TDto> :
 	public List<BuilderContainer> Containers => _containers ?? (_containers = new List<BuilderContainer>(3));
 	public List<BuilderField> Fields => _fields ?? (_fields = new List<BuilderField>(8));
 	public List<BuilderParameter> Parameters => _parameters ?? (_parameters = new List<BuilderParameter>(3));
+	public List<BuilderCondition> Connects => _connects ?? (_connects = new List<BuilderCondition>(3));
 	public List<BuilderCondition> Conditions => _conditions ?? (_conditions = new List<BuilderCondition>(3));
 	public List<BuilderSortOrder> SortOrders => _sortOrders ?? (_sortOrders = new List<BuilderSortOrder>(3));
 	public List<BuilderAggregation> Aggregations => _aggregations ?? (_aggregations = new List<BuilderAggregation>(3));
@@ -39,11 +41,13 @@ internal class QBBuilder<TDoc, TDto> :
 	private List<BuilderContainer>? _containers;
 	private List<BuilderField>? _fields;
 	private List<BuilderParameter>? _parameters;
+	private List<BuilderCondition>? _connects;
 	private List<BuilderCondition>? _conditions;
 	private List<BuilderSortOrder>? _sortOrders;
 	private List<BuilderAggregation>? _aggregations;
 
 	private int _parentheses;
+	private int _totalParentheses;
 	private bool? _isByOr;
 
 	private static readonly List<BuilderContainer> _emptyContainers = new List<BuilderContainer>();
@@ -217,7 +221,7 @@ internal class QBBuilder<TDoc, TDto> :
 		string? paramName,
 		ConditionOperations operation)
 	{
-		if (_isByOr != null && (flags.HasFlag(BuilderConditionFlags.IsConnect) || (Conditions.Count <= 0 || Conditions[Conditions.Count - 1].IsConnect)))
+		if (flags.HasFlag(BuilderConditionFlags.IsConnect) && (_isByOr != null || _parentheses > 0))
 		{
 			throw new InvalidOperationException($"Incorrect condition definition of select query builder '{typeof(TDto).ToPretty()}'.");
 		}
@@ -262,24 +266,109 @@ internal class QBBuilder<TDoc, TDto> :
 			}
 		}
 
-		if (_isByOr == true)
+		if (flags.HasFlag(BuilderConditionFlags.IsConnect))
 		{
-			flags |= BuilderConditionFlags.IsByOr;
+			Connects.Add(new BuilderCondition(
+				flags: flags,
+				parentheses: 0,
+				name: name,
+				field: field,
+				refName: refName,
+				refField: refField,
+				value: onWhat == BuilderConditionFlags.OnParam ? paramName : onWhat == BuilderConditionFlags.OnConst ? constValue : null,
+				operation: operation
+			));
 		}
+		else
+		{
+			// Automatically add parentheses if needed
+			//
+			if (Conditions.Count > 1 && Conditions[Conditions.Count - 1].Parentheses <= 0)
+			{
+				if (_isByOr == true)
+				{
+					/*
+						a AND b						=> (a AND b) OR ?
+						(a AND b)					=> (a AND b) OR ?
+						a OR b						=> a OR b OR ?
+						(a AND b) OR c				=> (a AND b) OR c OR ?
+						((a AND b)					=> ((a AND b) OR ?
+						((a OR b) AND (c AND d		=> ((a OR b) AND ((c AND d) OR ?
+						((a OR b) AND c				=> (((a OR b) AND c) OR ?
+						(a AND (b OR c				=> (a AND (b OR c OR ?
+						(a OR (b AND c				=> (a OR ((b AND c) OR ?
+						(a OR (b AND c)				=> (a OR (b AND c) OR ?
+						(a AND (b OR c)				=> ((a AND (b OR c)) OR ?
+						z AND (a AND (b OR c)	 	=> z AND ((a AND (b OR c)) OR ?
+						z AND (a AND (b OR c))	 	=> (z AND (a AND (b OR c))) OR ?
+					*/
 
-		Conditions.Add(new BuilderCondition(
-			flags: flags,
-			parentheses: _parentheses,
-			name: name,
-			field: field,
-			refName: refName,
-			refField: refField,
-			value: onWhat == BuilderConditionFlags.OnParam ? paramName : onWhat == BuilderConditionFlags.OnConst ? constValue : null,
-			operation: operation
-		));
+					bool freeToAdd = false;
+					BuilderCondition cond;
+					int lastIndex = Conditions.Count - 1;
+					int sum = 0;
+					for (int i = lastIndex; i >= 0; i--)
+					{
+						cond = Conditions[i];
 
-		_isByOr = null;
-		_parentheses = 0;
+						sum += cond.Parentheses;
+						if (sum == 0)
+						{
+							if (cond.IsByOr)
+							{
+								freeToAdd = true;
+								break;
+							}
+						}
+						else if (sum > 0)
+						{
+							Conditions[i] = cond with { Parentheses = cond.Parentheses + 1 };
+							cond = Conditions[lastIndex];
+							Conditions[lastIndex] = cond with { Parentheses = cond.Parentheses - 1 };
+
+							freeToAdd = true;
+							break;
+						}
+					}
+					if (!freeToAdd && GetParenthesizedCount(Conditions) <= 0)
+					{
+						cond = Conditions[0];
+						Conditions[0] = cond with { Parentheses = cond.Parentheses + 1 };
+						cond = Conditions[lastIndex];
+						Conditions[lastIndex] = cond with { Parentheses = cond.Parentheses - 1 };
+					}
+				}
+				else
+				{
+					/*
+						a				=> a AND
+						a AND b			=> a AND b AND
+						(a AND b)		=> (a AND b) AND
+						a OR b			=> a OR (b AND
+						(a AND b) OR c	=> (a AND b) OR (c AND
+					*/
+				}
+			}
+
+			if (_isByOr == true)
+			{
+				flags |= BuilderConditionFlags.IsByOr;
+			}
+
+			Conditions.Add(new BuilderCondition(
+				flags: flags,
+				parentheses: _parentheses,
+				name: name,
+				field: field,
+				refName: refName,
+				refField: refField,
+				value: onWhat == BuilderConditionFlags.OnParam ? paramName : onWhat == BuilderConditionFlags.OnConst ? constValue : null,
+				operation: operation
+			));
+
+			_isByOr = null;
+			_parentheses = 0;
+		}
 
 		return this;
 	}
@@ -429,18 +518,24 @@ internal class QBBuilder<TDoc, TDto> :
 	public IQBMongoSelectBuilder<TDoc, TDto> Begin()
 	{
 		_parentheses++;
+		_totalParentheses++;
 		return this;
 	}
 	public IQBMongoSelectBuilder<TDoc, TDto> End()
 	{
-		var lastIndex = Conditions.Count - 1;
-		if (lastIndex < 0 || _parentheses > 0)
+		if (_isByOr != null || _parentheses > 0 || Conditions.Count == 0)
 		{
 			throw new InvalidOperationException($"Incorrect condition definition of select query builder '{typeof(TDto).ToPretty()}'.");
 		}
 
+		var lastIndex = Conditions.Count - 1;
 		var lastCond = Conditions[lastIndex];
-		if (lastCond.IsConnect)
+		if (lastCond.Parentheses > 0)
+		{
+			throw new InvalidOperationException($"Incorrect condition definition of select query builder '{typeof(TDto).ToPretty()}'.");
+		}
+
+		if (--_totalParentheses < 0)
 		{
 			throw new InvalidOperationException($"Incorrect condition definition of select query builder '{typeof(TDto).ToPretty()}'.");
 		}
@@ -452,19 +547,7 @@ internal class QBBuilder<TDoc, TDto> :
 
 	public IQBMongoSelectBuilder<TDoc, TDto> And()
 	{
-		if (_isByOr != null)
-		{
-			throw new InvalidOperationException($"Incorrect condition definition of select query builder '{typeof(TDto).ToPretty()}'.");
-		}
-
-		var lastIndex = Conditions.Count - 1;
-		if (lastIndex < 0)
-		{
-			throw new InvalidOperationException($"Incorrect condition definition of select query builder '{typeof(TDto).ToPretty()}'.");
-		}
-
-		var lastCond = Conditions[lastIndex];
-		if (lastCond.IsConnect)
+		if (_isByOr != null || _parentheses > 0 || Conditions.Count == 0)
 		{
 			throw new InvalidOperationException($"Incorrect condition definition of select query builder '{typeof(TDto).ToPretty()}'.");
 		}
@@ -475,19 +558,7 @@ internal class QBBuilder<TDoc, TDto> :
 	}
 	public IQBMongoSelectBuilder<TDoc, TDto> Or()
 	{
-		if (_isByOr != null)
-		{
-			throw new InvalidOperationException($"Incorrect condition definition of select query builder '{typeof(TDto).ToPretty()}'.");
-		}
-
-		var lastIndex = Conditions.Count - 1;
-		if (lastIndex < 0)
-		{
-			throw new InvalidOperationException($"Incorrect condition definition of select query builder '{typeof(TDto).ToPretty()}'.");
-		}
-
-		var lastCond = Conditions[lastIndex];
-		if (lastCond.IsConnect)
+		if (_isByOr != null || _parentheses > 0 || Conditions.Count == 0)
 		{
 			throw new InvalidOperationException($"Incorrect condition definition of select query builder '{typeof(TDto).ToPretty()}'.");
 		}
@@ -495,5 +566,104 @@ internal class QBBuilder<TDoc, TDto> :
 		_isByOr = true;
 
 		return this;
+	}
+
+	/// <summary>
+	/// Trim parentheses around specified expression
+	/// </summary>
+	/// <param name="conds">Expression</param>
+	public static void TrimParentheses(List<BuilderCondition> conds)
+	{
+		if (conds.Count == 0) return;
+		if (conds.Count == 1)
+		{
+			System.Diagnostics.Debug.Assert(conds[0].Parentheses == 0);
+			return;
+		}
+
+		var first = conds[0].Parentheses;
+		System.Diagnostics.Debug.Assert(first >= 0);
+		if (first <= 0) return;
+
+		var last = conds[conds.Count - 1].Parentheses;
+		System.Diagnostics.Debug.Assert(last <= 0);
+		if (last >= 0) return;
+
+		int sum = 0, min = 0;
+		for (int i = 1; i < conds.Count - 1; i++)
+		{
+			sum += conds[i].Parentheses;
+			System.Diagnostics.Debug.Assert(sum + first >= 0);
+			if (sum + first <= 0) return;
+			if (sum < min) min = sum;
+		}
+		// (((  (a || b) && c                        )))		4 -1(-1) -3
+		// (    (a || b) && (b || c)                 )			2  0(-1) -2
+		//      (a || b) && (b || c)
+		//      ((a || b) && (b || c)) || (d && e)
+		// (    ((a || b) && (b || c)) || (d && e)   )			3 -1(-2) -2
+
+		System.Diagnostics.Debug.Assert(first + sum + last == 0);
+
+		conds[0] = conds[0] with { Parentheses = -min };
+		conds[conds.Count - 1] = conds[conds.Count - 1] with { Parentheses = last + (first + min) };
+
+		System.Diagnostics.Debug.Assert(conds.Sum(x => x.Parentheses) == 0);
+	}
+
+	/// <summary>
+	/// Calc parentheses for specified expression
+	/// </summary>
+	/// <param name="conds">Expression</param>
+	/// <returns>
+	/// -1 when the expression is not completed<para />
+	/// 0 when the expression is not parenthesized<para />
+	/// Number of parentheses around<para />
+	/// </returns>
+	public static int GetParenthesizedCount(List<BuilderCondition> conds)
+	{
+		if (conds.Count == 0)
+		{
+			return 0;
+		}
+		if (conds.Count == 1)
+		{
+			return conds[0].Parentheses == 0 ? 0 : -1;
+		}
+
+		var first = conds[0].Parentheses;
+		if (first <= 0)
+		{
+			return conds.Sum(x => x.Parentheses) == 0 ? 0 : -1;
+		}
+
+		var last = conds[conds.Count - 1].Parentheses;
+		if (last >= 0)
+		{
+			return conds.Sum(x => x.Parentheses) == 0 ? 0 : -1;
+		}
+
+		int sum = 0, min = 0;
+		for (int i = 1; i < conds.Count - 1; i++)
+		{
+			sum += conds[i].Parentheses;
+			
+			if (sum + first <= 0)
+			{
+				for (; i < conds.Count - 1; i++)
+				{
+					sum += conds[i].Parentheses;
+				}
+				sum += first;
+				sum += last;
+				return sum == 0 ? 0 : -1;
+			}
+
+			if (sum < min) min = sum;
+		}
+
+		sum += first;
+		sum += last;
+		return sum == 0 ? first + min : -1;
 	}
 }

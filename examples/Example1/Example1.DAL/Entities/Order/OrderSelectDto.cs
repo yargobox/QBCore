@@ -1,7 +1,9 @@
 using Example1.DAL.Entities.OrderPositions;
 using Example1.DAL.Entities.Stores;
 using MongoDB.Bson;
+using MongoDB.Bson.Serialization;
 using MongoDB.Bson.Serialization.Attributes;
+using MongoDB.Driver;
 using QBCore.DataSource;
 using QBCore.DataSource.QueryBuilder.Mongo;
 
@@ -34,7 +36,7 @@ public class OrderSelectDto
 		LEFT JOIN stores AS stores3 ON stores3.Id = stores2.Id
 		WHERE stores3.Deleted = orders.Deleted
 		*/
-		builder
+		/* builder
 			.SelectFromTable("orders")
 
  			.LeftJoinTable<Store>("stores")
@@ -64,6 +66,31 @@ public class OrderSelectDto
 			.Optional(sel => sel.Store!.Updated)
 
 			.Include<Store>(sel => sel.Store3!.Name, "stores3", store => store.Name)
+		; */
+
+		builder
+			.SelectFromTable("orders")
+
+			.Begin()
+				.Begin()
+					.Begin()
+						.Condition(sel => sel.Id, 1, ConditionOperations.Equal)
+						.Or()
+						.Condition(sel => sel.Id, 2, ConditionOperations.Equal)
+					.End()
+					.Begin()
+						.Condition(sel => sel.Id, 3, ConditionOperations.Equal)
+						.Or()
+						.Condition(sel => sel.Id, 4, ConditionOperations.Equal)
+					.End()
+				.End()
+				.And()
+				.Begin()
+					.Condition(sel => sel.Id, 5, ConditionOperations.Equal)
+					.Or()
+					.Condition(sel => sel.Id, 6, ConditionOperations.Equal)
+				.End()
+			.End()
 		;
 	}
 }

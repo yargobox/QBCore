@@ -18,7 +18,7 @@ internal enum BuilderConditionFlags
 internal record BuilderCondition
 {
 	public readonly BuilderConditionFlags Flags;
-	public int Parentheses { get; init; }
+	public int Parentheses;
 
 	public readonly string Name;
 	public readonly FieldPath Field;
@@ -97,7 +97,7 @@ internal record BuilderCondition
 				else if (Parentheses == 0)
 					return string.Concat("OR ", s);
 				else
-					return string.Concat("OR ", s, new string(')', Parentheses));
+					return string.Concat("OR ", s, new string(')', -Parentheses));
 			}
 			else
 			{
@@ -106,7 +106,7 @@ internal record BuilderCondition
 				else if (Parentheses == 0)
 					return string.Concat("AND ", s);
 				else
-					return string.Concat("AND ", s, new string(')', Parentheses));
+					return string.Concat("AND ", s, new string(')', -Parentheses));
 			}
 		}
 	}

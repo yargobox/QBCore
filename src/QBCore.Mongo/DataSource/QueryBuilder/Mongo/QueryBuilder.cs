@@ -58,127 +58,77 @@ internal abstract class QueryBuilder<TDocument, TProjection> : IQueryBuilder<TDo
 		_dbContext = null!;
 	}
 
+	/// <summary>
+	/// Slice the conditions to the smalest possible parts separated by AND
+	/// </summary>
+	/// <param name="conditions">Regular conditions</param>
+	/// <remarks>
+	/// AND has a higher precedence than OR. To split correctly,
+	/// we must wrap the AND operands in parentheses (or treat them as if they were).<para />
+	///<para />
+	/// a                                => a<para />
+	/// a AND b                          => a, b<para />
+	/// a OR b                           => a OR b<para />
+	/// a AND b OR c                     => (a AND b) OR c<para />
+	/// a AND (b OR c)                   => a, b OR c<para />
+	/// a OR b AND c                     => a OR (b AND c)<para />
+	/// a OR b AND c AND d               => a OR (b AND c AND d)<para />
+	/// a OR b AND c OR d                => a OR (b AND c) OR d<para />
+	/// a OR b AND c AND d OR e          => a OR (b AND c AND d) OR e<para />
+	/// (a OR b) AND c                   => a OR b, c<para />
+	/// ((a OR b) AND c) AND e           => a OR b, c, e<para />
+	/// ((a OR b) AND c) OR e            => ((a OR b) AND c) OR e
+	/// </remarks>
 	protected static List<List<BuilderCondition>> SliceConditions(IEnumerable<BuilderCondition> conditions)
 	{
-		var conds = conditions.ToList();
-		var list = new List<List<BuilderCondition>>();
+		var list = new List<List<BuilderCondition>>() { { conditions.ToList() } };
+		List<BuilderCondition> conds;
+		int first, splitIndex, sum;
 
-		// Slice the condition to the smalest possible parts (that connected by AND)
-		//
-		// a                                => a
-		// a AND b                          => a, b
-		// a OR b                           => a OR b
-		// (a OR b) AND c                   => a OR b, c
-		// ((a OR b) AND c) AND e           => a OR b, c, e
-		// ((a OR b) AND c) OR e            => ((a OR b) AND c) OR e
-		//
-
-		var count = conds.Count;
-		while (count > 0)
+		for (int i = 0, j; i < list.Count;)
 		{
-			TrimParentheses(conds);
-
-			for (int i = 0, j = conds[0].Parentheses; i < conds.Count; i++)
+			conds = list[i];
+			if (conds.Count <= 1)
 			{
-				// j == 0 means that this is the end of condition part, such as '(a OR b)' for '(a OR b) AND c'
-				j += conds[i].Parentheses;
-				if (j <= 0 && (i + 1 >= conds.Count || conds[i + 1].IsByOr == false))
-				{
-					list.Add(new List<BuilderCondition>(conds.Take(i + 1)));
-					conds.RemoveRange(0, i + 1);
-					break;
-				}
-			}
-
-			if (count > conds.Count)
-			{
-				count = conds.Count;
+				i++;
 				continue;
 			}
-			else
+
+			QBBuilder<TDocument, TProjection>.TrimParentheses(conds);
+
+			first = conds[0].Parentheses;
+			splitIndex = -1;
+			sum = 0;
+			for (j = 1; j < conds.Count; j++)
 			{
-				list.Add(new List<BuilderCondition>(conds));
-				conds.Clear();
-				break;
-			}
-		}
-
-		for (int last = 0; last < list.Count; )
-		{
-			conds = list[last];
-			count = conds.Count;
-
-			if (count > 1)
-			{
-				TrimParentheses(conds);
-
-				for (int i = 0, j = conds[0].Parentheses; i < conds.Count; i++)
+				if (sum + first <= 0)
 				{
-					// j == 0 means that this is the end of condition part, such as '(a OR b)' for '(a OR b) AND c'
-					j += conds[i].Parentheses;
-					if (j <= 0 && (i + 1 >= conds.Count || conds[i + 1].IsByOr == false))
+					if (conds[j].IsByOr)
 					{
-						if (i + 1 < conds.Count)
-						{
-							list.Insert(last, new List<BuilderCondition>(conds.Take(i + 1)));
-							conds.RemoveRange(0, i + 1);
-						}
+						splitIndex = -1;
 						break;
+					}
+					else if (splitIndex < 0)
+					{
+						splitIndex = j;
 					}
 				}
 
-				if (count == conds.Count)
-				{
-					last++;
-				}
+				sum += conds[j].Parentheses;
+			}
+
+			if (splitIndex < 0 || splitIndex >= conds.Count - 1)
+			{
+				i++;
 			}
 			else
 			{
-				last++;
+				list.Insert(i + 1, conds.Skip(splitIndex).ToList());
+				conds.RemoveRange(splitIndex, conds.Count - splitIndex);
 			}
 		}
 
 		return list;
-	}
-	private static void TrimParentheses(List<BuilderCondition> conds)
-	{
-		if (conds.Count == 0) return;
-		if (conds.Count == 1)
-		{
-			System.Diagnostics.Debug.Assert(conds[0].Parentheses == 0);
-			if (conds[0].Parentheses != 0)
-			{
-				conds[0] = conds[0] with { Parentheses = 0 };
-			}
-			return;
-		}
-
-		var first = conds[0].Parentheses;
-		System.Diagnostics.Debug.Assert(first >= 0);
-		if (first <= 0) return;
-
-		var last = conds.Last().Parentheses;
-		System.Diagnostics.Debug.Assert(last <= 0);
-		if (last >= 0) return;
-
-		int sum = 0, min = 0;
-		for (int i = 1; i < conds.Count - 1; i++)
-		{
-			sum += conds[i].Parentheses;
-			System.Diagnostics.Debug.Assert(sum + first >= 0);
-			if (sum + first <= 0) return;
-			if (sum < min) min = sum;
-		}
-		// (((  (a || b) && c                        )))		4 -1(-1) -3
-		// (    (a || b) && (b || c)                 )			2  0(-1) -2
-		//      (a || b) && (b || c)
-		//      ((a || b) && (b || c)) || (d && e)
-		// (    ((a || b) && (b || c)) || (d && e)   )			3 -1(-2) -2
-
-		System.Diagnostics.Debug.Assert(first + sum + last == 0);
-
-		conds[0] = conds[0] with { Parentheses =  first + min };
-		conds[conds.Count - 1] = conds[conds.Count - 1] with { Parentheses = last + (first + min) };
 	}
 
 	#region BuildConditionTree
