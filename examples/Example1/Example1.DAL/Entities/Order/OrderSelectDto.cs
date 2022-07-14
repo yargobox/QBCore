@@ -71,26 +71,19 @@ public class OrderSelectDto
 		builder
 			.SelectFromTable("orders")
 
+			//0 | (1 & 2 & (3 | 4)) | 5
+
+			.Condition(sel => sel.Id, 0, ConditionOperations.Equal)
+			.Or()
+			.Condition(sel => sel.Id, 1, ConditionOperations.Equal)
+			.Condition(sel => sel.Id, 2, ConditionOperations.Equal)
 			.Begin()
-				.Begin()
-					.Begin()
-						.Condition(sel => sel.Id, 1, ConditionOperations.Equal)
-						.Or()
-						.Condition(sel => sel.Id, 2, ConditionOperations.Equal)
-					.End()
-					.Begin()
-						.Condition(sel => sel.Id, 3, ConditionOperations.Equal)
-						.Or()
-						.Condition(sel => sel.Id, 4, ConditionOperations.Equal)
-					.End()
-				.End()
-				.And()
-				.Begin()
-					.Condition(sel => sel.Id, 5, ConditionOperations.Equal)
-					.Or()
-					.Condition(sel => sel.Id, 6, ConditionOperations.Equal)
-				.End()
+				.Condition(sel => sel.Id, 3, ConditionOperations.Equal)
+				.Or()
+				.Condition(sel => sel.Id, 4, ConditionOperations.Equal)
 			.End()
+			.Or()
+			.Condition(sel => sel.Id, 5, ConditionOperations.Equal)
 		;
 	}
 }

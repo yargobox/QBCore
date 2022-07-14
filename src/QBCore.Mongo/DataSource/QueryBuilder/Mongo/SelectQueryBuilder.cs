@@ -148,7 +148,6 @@ internal sealed class SelectQueryBuilder<TDocument, TSelect> : QueryBuilder<TDoc
 	private List<BsonDocument> BuildSelectQuery()
 	{
 		var containers = Builder.Containers;
-		var connects = Builder.Connects;
 		var conditions = Builder.Conditions;
 		var fields = Builder.Fields;
 		var top = containers[0];
@@ -477,18 +476,18 @@ internal sealed class SelectQueryBuilder<TDocument, TSelect> : QueryBuilder<TDoc
 	/// <summary>
 	/// Fill the pipeline stages with connect conditions.
 	/// </summary>
-	private static void FillPipelineStagesWithConnectConditions(List<StageInfo> stages, List<BuilderCondition> connects)
+	private static void FillPipelineStagesWithConnectConditions(List<StageInfo> stages, List<BuilderCondition> conditions)
 	{
 		List<BuilderCondition> builderConditions;
-		foreach (var name in connects.Where(x => x.IsConnect).Select(x => x.Name).Distinct())
+		foreach (var name in conditions.Where(x => x.IsConnect).Select(x => x.Name).Distinct())
 		{
-			builderConditions = connects.Where(x => x.IsConnect && x.IsOnField && x.Name == name).ToList();
+			builderConditions = conditions.Where(x => x.IsConnect && x.IsOnField && x.Name == name).ToList();
 			if (builderConditions.Count > 0)
 			{
 				stages.First(x => x.Alias == name).ConditionMap.Add(builderConditions);
 			}
 
-			builderConditions = connects.Where(x => x.IsConnect && !x.IsOnField && x.Name == name).ToList();
+			builderConditions = conditions.Where(x => x.IsConnect && !x.IsOnField && x.Name == name).ToList();
 			if (builderConditions.Count > 0)
 			{
 				stages.First(x => x.Alias == name).ConditionMap.Add(builderConditions);
