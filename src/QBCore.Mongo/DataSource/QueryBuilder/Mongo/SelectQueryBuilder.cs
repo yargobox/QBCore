@@ -148,6 +148,7 @@ internal sealed class SelectQueryBuilder<TDocument, TSelect> : QueryBuilder<TDoc
 	private List<BsonDocument> BuildSelectQuery()
 	{
 		var containers = Builder.Containers;
+		var connects = Builder.Connects;
 		var conditions = Builder.Conditions;
 		var fields = Builder.Fields;
 		var top = containers[0];
@@ -159,16 +160,16 @@ internal sealed class SelectQueryBuilder<TDocument, TSelect> : QueryBuilder<TDoc
 		stages[0].LookupAs = string.Empty;
 
 		// Fill the pipeline stages with connect conditions.
-		// Connect conditions are always AND conditions (OR connect conditions are not supported by us).
+		// Connect conditions are always AND conditions (OR connect conditions and expressions are not supported by us).
 		// In a pipeline stage condition map, connect conditions between fields come first.
 		// Then follow the connect conditions on constant values.
 		// And only after them, the regular conditions that can be given as expressions.
 		//
-		FillPipelineStagesWithConnectConditions(stages, conditions);
+		FillPipelineStagesWithConnectConditions(stages, connects);
 
 		// Slice the regular conditions to the smallest possible parts.The separator is the AND operation.
 		//
-		var slices = SliceConditions(conditions.Where(x => !x.IsConnect));
+		var slices = SliceConditions(conditions);
 
 		// Propagate the slices to the pipeline stages using the dependencies of each condition in the slice.
 		// The goal is to place the slice in the first possible stage.
@@ -476,18 +477,18 @@ internal sealed class SelectQueryBuilder<TDocument, TSelect> : QueryBuilder<TDoc
 	/// <summary>
 	/// Fill the pipeline stages with connect conditions.
 	/// </summary>
-	private static void FillPipelineStagesWithConnectConditions(List<StageInfo> stages, List<BuilderCondition> conditions)
+	private static void FillPipelineStagesWithConnectConditions(List<StageInfo> stages, List<BuilderCondition> connects)
 	{
 		List<BuilderCondition> builderConditions;
-		foreach (var name in conditions.Where(x => x.IsConnect).Select(x => x.Name).Distinct())
+		foreach (var name in connects.Select(x => x.Name).Distinct())
 		{
-			builderConditions = conditions.Where(x => x.IsConnect && x.IsOnField && x.Name == name).ToList();
+			builderConditions = connects.Where(x => x.IsOnField && x.Name == name).ToList();
 			if (builderConditions.Count > 0)
 			{
 				stages.First(x => x.Alias == name).ConditionMap.Add(builderConditions);
 			}
 
-			builderConditions = conditions.Where(x => x.IsConnect && !x.IsOnField && x.Name == name).ToList();
+			builderConditions = connects.Where(x => !x.IsOnField && x.Name == name).ToList();
 			if (builderConditions.Count > 0)
 			{
 				stages.First(x => x.Alias == name).ConditionMap.Add(builderConditions);

@@ -1,7 +1,5 @@
 using System.Linq.Expressions;
-using System.Reflection;
 using QBCore.Extensions.Linq;
-using QBCore.Extensions.Linq.Expressions;
 
 namespace QBCore.DataSource.QueryBuilder.Mongo;
 
@@ -20,6 +18,7 @@ internal class QBBuilder<TDoc, TDto> :
 		if (other._containers != null) _containers = new List<BuilderContainer>(other._containers);
 		if (other._fields != null) _fields = new List<BuilderField>(other._fields);
 		if (other._parameters != null) _parameters = new List<BuilderParameter>(other._parameters);
+		if (other._connects != null) _connects = new List<BuilderCondition>(other._connects);
 		if (other._conditions != null) _conditions = new List<BuilderCondition>(other._conditions);
 		if (other._sortOrders != null) _sortOrders = new List<BuilderSortOrder>(other._sortOrders);
 		if (other._aggregations != null) _aggregations = new List<BuilderAggregation>(other._aggregations);
@@ -32,13 +31,15 @@ internal class QBBuilder<TDoc, TDto> :
 	public List<BuilderContainer> Containers => _containers ?? (_containers = new List<BuilderContainer>(3));
 	public List<BuilderField> Fields => _fields ?? (_fields = new List<BuilderField>(8));
 	public List<BuilderParameter> Parameters => _parameters ?? (_parameters = new List<BuilderParameter>(3));
-	public List<BuilderCondition> Conditions => _conditions ?? (_conditions = new List<BuilderCondition>(3));
+	public List<BuilderCondition> Connects => _connects ?? (_connects = new List<BuilderCondition>(8));
+	public List<BuilderCondition> Conditions => _conditions ?? (_conditions = new List<BuilderCondition>(8));
 	public List<BuilderSortOrder> SortOrders => _sortOrders ?? (_sortOrders = new List<BuilderSortOrder>(3));
 	public List<BuilderAggregation> Aggregations => _aggregations ?? (_aggregations = new List<BuilderAggregation>(3));
 
 	private List<BuilderContainer>? _containers;
 	private List<BuilderField>? _fields;
 	private List<BuilderParameter>? _parameters;
+	private List<BuilderCondition>? _connects;
 	private List<BuilderCondition>? _conditions;
 	private List<BuilderSortOrder>? _sortOrders;
 	private List<BuilderAggregation>? _aggregations;
@@ -65,6 +66,7 @@ internal class QBBuilder<TDoc, TDto> :
 		}
 
 		var containers = _containers ?? _emptyContainers;
+		var connects = _connects ?? _emptyConditions;
 		var conditions = _conditions ?? _emptyConditions;
 
 		var rootIndex = containers.FindIndex(x => x.ContainerOperation == BuilderContainerOperations.Select);
@@ -91,7 +93,7 @@ internal class QBBuilder<TDoc, TDto> :
 
 		// The root container cannot have connect conditions (depends on others)
 		//
-		if (conditions.Any(x => x.IsConnect && x.Name == top.Name))
+		if (connects.Any(x => x.Name == top.Name))
 		{
 			throw new InvalidOperationException($"Incorrect definition of select query builder '{typeof(TDto).ToPretty()}'.");
 		}
@@ -107,14 +109,14 @@ internal class QBBuilder<TDoc, TDto> :
 
 			if (temp.ContainerOperation == BuilderContainerOperations.LeftJoin || temp.ContainerOperation == BuilderContainerOperations.Join)
 			{
-				if (!conditions.Any(x => x.IsConnectOnField))
+				if (!connects.Any(x => x.IsConnectOnField))
 				{
 					throw new InvalidOperationException($"Incorrect definition of select query builder '{typeof(TDto).ToPretty()}'.");
 				}
 			}
 			else if (temp.ContainerOperation == BuilderContainerOperations.CrossJoin)
 			{
-				if (conditions.Any(x => x.IsConnectOnField))
+				if (connects.Any(x => x.IsConnectOnField))
 				{
 					throw new InvalidOperationException($"Incorrect definition of select query builder '{typeof(TDto).ToPretty()}'.");
 				}
@@ -126,11 +128,8 @@ internal class QBBuilder<TDoc, TDto> :
 			}
 		}
 
-		// Sort containers in expression tree order, avoid an infinite loop.
+		// Sort containers based on the connect condition, avoid an infinite loop.
 		// Start with the penultimate container and go up to the second one.
-		// This sort does not take into account the "connect" and "non-connect" conditions,
-		// because in MongoDB the conditions for the fields of the joined collections should be
-		// applied in the lookup pipeline, especially if there are no such fields in the result subset.
 		//
 		for (int i = containers.Count - 2; i > 0; i--)
 		{
@@ -139,7 +138,7 @@ internal class QBBuilder<TDoc, TDto> :
 
 		L_RESCAN:
 			top = containers[i];
-			foreach (var topDependOn in conditions
+			foreach (var topDependOn in connects
 				.Where(x => x.IsOnField && x.Name == top.Name)
 				.Select(x => x.RefName))
 			{
@@ -205,20 +204,6 @@ internal class QBBuilder<TDoc, TDto> :
 		string? paramName,
 		ConditionOperations operation)
 	{
-		if (flags.HasFlag(BuilderConditionFlags.IsConnect))
-		{
-			if (_isByOr != null || _parentheses > 0)
-			{
-				throw new InvalidOperationException($"Incorrect condition definition of select query builder '{typeof(TDto).ToPretty()}'.");
-			}
-
-			CompleteAutoOpenedParentheses();
-			if (_sumParentheses != 0 || _autoOpenedParentheses != 0)
-			{
-				throw new InvalidOperationException($"Incorrect condition definition of select query builder '{typeof(TDto).ToPretty()}'.");
-			}
-		}
-
 		var trueContainerType = typeof(TLocal) == typeof(TDto) ? typeof(TDoc) : typeof(TLocal);
 		if (name == null)
 		{
@@ -259,7 +244,20 @@ internal class QBBuilder<TDoc, TDto> :
 			}
 		}
 
-		if (!flags.HasFlag(BuilderConditionFlags.IsConnect))
+		if (flags.HasFlag(BuilderConditionFlags.IsConnect))
+		{
+			Connects.Add(new BuilderCondition(
+				flags: flags,
+				parentheses: 0,
+				name: name,
+				field: field,
+				refName: refName,
+				refField: refField,
+				value: onWhat == BuilderConditionFlags.OnParam ? paramName : onWhat == BuilderConditionFlags.OnConst ? constValue : null,
+				operation: operation
+			));
+		}
+		else
 		{
 			_isByOr = _isByOr.HasValue && _isByOr.Value;
 
@@ -269,11 +267,10 @@ internal class QBBuilder<TDoc, TDto> :
 			// (a		=> (a OR ?
 			// .. (a	=> .. (a OR ?
 			//
-			var conds = Conditions.Where(x => !x.IsConnect).ToArray();
-			if (conds.Length > 1 && conds[conds.Length - 1].Parentheses <= 0)
+			if (Conditions.Count > 1 && Conditions[Conditions.Count - 1].Parentheses <= 0)
 			{
 				BuilderCondition cond;
-				int startIndex, lastIndex = conds.Length - 1;
+				int startIndex, lastIndex = Conditions.Count - 1;
 
 				if (_isByOr.Value)
 				{
@@ -297,7 +294,7 @@ internal class QBBuilder<TDoc, TDto> :
 					bool needsParentheses = false;
 					for (int i = lastIndex, sum = 0; i >= 0; i--)
 					{
-						cond = conds[i];
+						cond = Conditions[i];
 
 						sum += cond.Parentheses;
 						if (sum == 0)
@@ -317,10 +314,10 @@ internal class QBBuilder<TDoc, TDto> :
 					}
 					if (startIndex >= 0 && needsParentheses)
 					{
-						cond = conds[startIndex];
-						conds[startIndex] = cond with { Parentheses = cond.Parentheses + 1 };
-						cond = conds[lastIndex];
-						conds[lastIndex] = cond with { Parentheses = cond.Parentheses - 1 };
+						cond = Conditions[startIndex];
+						Conditions[startIndex] = cond with { Parentheses = cond.Parentheses + 1 };
+						cond = Conditions[lastIndex];
+						Conditions[lastIndex] = cond with { Parentheses = cond.Parentheses - 1 };
 					}
 				}
 				else
@@ -336,7 +333,7 @@ internal class QBBuilder<TDoc, TDto> :
 					startIndex = -1;
 					for (int i = lastIndex, sum = 0; i >= 0; i--)
 					{
-						cond = conds[i];
+						cond = Conditions[i];
 
 						sum += cond.Parentheses;
 						if (sum == 0)
@@ -351,16 +348,16 @@ internal class QBBuilder<TDoc, TDto> :
 					}
 					if (startIndex >= 0)
 					{
-						cond = conds[startIndex];
+						cond = Conditions[startIndex];
 
 						if (_autoOpenedParentheses != 0 || cond.Parentheses < 0)
 						{
 							throw new InvalidOperationException($"Incorrect condition definition of select query builder '{typeof(TDto).ToPretty()}': messed up with automatically opening parentheses.");
 						}
 
-						conds[startIndex] = cond with { Parentheses = cond.Parentheses + 1 };
+						Conditions[startIndex] = cond with { Parentheses = cond.Parentheses + 1 };
 
-						_autoOpenedParentheses++;
+						_autoOpenedParentheses = Conditions.Skip(startIndex).Sum(x => x.Parentheses) + _parentheses;
 						_sumParentheses++;
 					}
 				}
@@ -370,21 +367,21 @@ internal class QBBuilder<TDoc, TDto> :
 			{
 				flags |= BuilderConditionFlags.IsByOr;
 			}
+
+			Conditions.Add(new BuilderCondition(
+				flags: flags,
+				parentheses: _parentheses,
+				name: name,
+				field: field,
+				refName: refName,
+				refField: refField,
+				value: onWhat == BuilderConditionFlags.OnParam ? paramName : onWhat == BuilderConditionFlags.OnConst ? constValue : null,
+				operation: operation
+			));
+
+			_isByOr = null;
+			_parentheses = 0;
 		}
-
-		Conditions.Add(new BuilderCondition(
-			flags: flags,
-			parentheses: _parentheses,
-			name: name,
-			field: field,
-			refName: refName,
-			refField: refField,
-			value: onWhat == BuilderConditionFlags.OnParam ? paramName : onWhat == BuilderConditionFlags.OnConst ? constValue : null,
-			operation: operation
-		));
-
-		_isByOr = null;
-		_parentheses = 0;
 
 		return this;
 	}
@@ -552,7 +549,7 @@ internal class QBBuilder<TDoc, TDto> :
 		}
 
 		var lastCond = Conditions[lastIndex];
-		if (lastCond.IsConnect || lastCond.Parentheses > 0)
+		if (lastCond.Parentheses > 0)
 		{
 			throw new InvalidOperationException($"Incorrect condition definition of select query builder '{typeof(TDto).ToPretty()}'.");
 		}
@@ -571,7 +568,7 @@ internal class QBBuilder<TDoc, TDto> :
 
 	public IQBMongoSelectBuilder<TDoc, TDto> And()
 	{
-		if (_isByOr != null || _parentheses > 0 || Conditions.Count == 0 || Conditions[Conditions.Count - 1].IsConnect)
+		if (_isByOr != null || _parentheses > 0 || Conditions.Count == 0)
 		{
 			throw new InvalidOperationException($"Incorrect condition definition of select query builder '{typeof(TDto).ToPretty()}'.");
 		}
@@ -582,7 +579,7 @@ internal class QBBuilder<TDoc, TDto> :
 	}
 	public IQBMongoSelectBuilder<TDoc, TDto> Or()
 	{
-		if (_isByOr != null || _parentheses > 0 || Conditions.Count == 0 || Conditions[Conditions.Count - 1].IsConnect)
+		if (_isByOr != null || _parentheses > 0 || Conditions.Count == 0)
 		{
 			throw new InvalidOperationException($"Incorrect condition definition of select query builder '{typeof(TDto).ToPretty()}'.");
 		}

@@ -1,0 +1,166 @@
+using Example1.DAL.Entities.OrderPositions;
+using Example1.DAL.Entities.Stores;
+using MongoDB.Bson;
+using MongoDB.Bson.Serialization;
+using MongoDB.Bson.Serialization.Attributes;
+using MongoDB.Driver;
+using QBCore.DataSource;
+using QBCore.DataSource.QueryBuilder.Mongo;
+
+namespace Example1.DAL.Entities.Orders;
+
+public class OrderSelectDto
+{
+	public int? Id { get; set; }
+	public string? Name { get; set; }
+
+	public int? StoreId { get; set; }
+
+	public string? StoreName { get; set; }
+	public StoreSelectDto? Store { get; set; }
+	public StoreSelectDto? Store3 { get; set; }
+
+	public List<OrderPositionSelectDto>? OrderPositions { get; set; }
+
+	public decimal? Total { get; set; }
+
+	public DateTimeOffset? Created { get; set; }
+	public DateTimeOffset? Updated { get; set; }
+	public DateTimeOffset? Deleted { get; set; }
+
+	static void Builder(IQBMongoSelectBuilder<Order, OrderSelectDto> builder)
+	{
+		builder
+			.SelectFromTable("orders")
+
+			// 0 & 1 | 2 | 3 => (0 & 1) | 2 | 3
+
+/* 			.Condition(sel => sel.Id, 0, ConditionOperations.Equal)
+			.Condition(sel => sel.Id, 1, ConditionOperations.Equal)
+			.Or()
+			.Condition(sel => sel.Id, 2, ConditionOperations.Equal)
+			.Or()
+			.Condition(sel => sel.Id, 3, ConditionOperations.Equal) */
+
+			// 0 | 1 & 2 & 3 | 4 => 0 | (1 & 2 & 3) | 4
+
+/* 			.Condition(sel => sel.Id, 0, ConditionOperations.Equal)
+			.Or()
+			.Condition(sel => sel.Id, 1, ConditionOperations.Equal)
+			.Condition(sel => sel.Id, 2, ConditionOperations.Equal)
+			.Condition(sel => sel.Id, 3, ConditionOperations.Equal)
+			.Or()
+			.Condition(sel => sel.Id, 4, ConditionOperations.Equal) */
+
+			// 0 | 1 & 2 & (3 | 4) | 5 => 0 | (1 & 2 & (3 | 4)) | 5
+
+/* 			.Condition(sel => sel.Id, 0, ConditionOperations.Equal)
+			.Or()
+			.Condition(sel => sel.Id, 1, ConditionOperations.Equal)
+			.Condition(sel => sel.Id, 2, ConditionOperations.Equal)
+			.Begin()
+				.Condition(sel => sel.Id, 3, ConditionOperations.Equal)
+				.Or()
+				.Condition(sel => sel.Id, 4, ConditionOperations.Equal)
+			.End()
+			.Or()
+			.Condition(sel => sel.Id, 5, ConditionOperations.Equal) */
+
+			// (0 | 1 & 2) & 3 => (0 | (1 & 2)) & 3
+
+/* 			.Begin()
+				.Condition(sel => sel.Id, 0, ConditionOperations.Equal)
+				.Or()
+				.Condition(sel => sel.Id, 1, ConditionOperations.Equal)
+				.Condition(sel => sel.Id, 2, ConditionOperations.Equal)
+			.End()
+			.Condition(sel => sel.Id, 3, ConditionOperations.Equal) */
+
+			// (0 & 1 | 2) & 3 | 4 => (((0 & 1) | 2) & 3) | 4
+
+/* 			.Begin()
+				.Condition(sel => sel.Id, 0, ConditionOperations.Equal)
+				.Condition(sel => sel.Id, 1, ConditionOperations.Equal)
+				.Or()
+				.Condition(sel => sel.Id, 2, ConditionOperations.Equal)
+			.End()
+			.Condition(sel => sel.Id, 3, ConditionOperations.Equal)
+			.Or()
+			.Condition(sel => sel.Id, 4, ConditionOperations.Equal) */
+
+			// 0 | 1 & (2 | 3) => 0 | (1 & (2 | 3))
+
+/* 			.Condition(sel => sel.Id, 0, ConditionOperations.Equal)
+			.Or()
+			.Condition(sel => sel.Id, 1, ConditionOperations.Equal)
+			.Begin()
+				.Condition(sel => sel.Id, 2, ConditionOperations.Equal)
+				.Or()
+				.Condition(sel => sel.Id, 3, ConditionOperations.Equal)
+			.End() */
+
+			// 0 | 1 & (2 & 3 | 4) | 5 => 0 | (1 & ((2 & 3) | 4)) | 5
+
+/* 			.Condition(sel => sel.Id, 0, ConditionOperations.Equal)
+			.Or()
+			.Condition(sel => sel.Id, 1, ConditionOperations.Equal)
+			.Begin()
+				.Condition(sel => sel.Id, 2, ConditionOperations.Equal)
+				.Condition(sel => sel.Id, 3, ConditionOperations.Equal)
+				.Or()
+				.Condition(sel => sel.Id, 4, ConditionOperations.Equal)
+			.End()
+			.Or()
+			.Condition(sel => sel.Id, 5, ConditionOperations.Equal) */
+
+			// 0 | 1 & (3 | 4) => 0 | (1 & (3 | 4))
+
+/* 			.Condition(sel => sel.Id, 0, ConditionOperations.Equal)
+			.Or()
+			.Condition(sel => sel.Id, 1, ConditionOperations.Equal)
+			.Begin()
+				//.Condition(sel => sel.Id, 2, ConditionOperations.Equal)
+				.Condition(sel => sel.Id, 3, ConditionOperations.Equal)
+				.Or()
+				.Condition(sel => sel.Id, 4, ConditionOperations.Equal)
+			.End() */
+
+			// 0 | 1 & (2 & 3 | 4) => 0 | (1 & ((2 & 3) | 4))
+
+/* 			.Condition(sel => sel.Id, 0, ConditionOperations.Equal)
+			.Or()
+			.Condition(sel => sel.Id, 1, ConditionOperations.Equal)
+			.Begin()
+				.Condition(sel => sel.Id, 2, ConditionOperations.Equal)
+				.Condition(sel => sel.Id, 3, ConditionOperations.Equal)
+				.Or()
+				.Condition(sel => sel.Id, 4, ConditionOperations.Equal)
+			.End() */
+
+			// (0 | 1 & (2 & 3 | 4) | 5) & (6 & 7) | 8 => ((0 | (1 & ((2 & 3) | 4)) | 5) & (6 & 7)) | 8
+
+/* 			.Begin().Begin()
+				.Begin()
+					.Condition(sel => sel.Id, 0, ConditionOperations.Equal)
+					.Or()
+					.Condition(sel => sel.Id, 1, ConditionOperations.Equal)
+					.Begin()
+						.Condition(sel => sel.Id, 2, ConditionOperations.Equal)
+						.Condition(sel => sel.Id, 3, ConditionOperations.Equal)
+						.Or()
+						.Condition(sel => sel.Id, 4, ConditionOperations.Equal)
+					.End()
+					.Or()
+					.Condition(sel => sel.Id, 5, ConditionOperations.Equal)
+				.End()
+				.Begin()
+					.Condition(sel => sel.Id, 6, ConditionOperations.Equal)
+					.Condition(sel => sel.Id, 7, ConditionOperations.Equal)
+				.End()
+				.Or()
+				.Condition(sel => sel.Id, 8, ConditionOperations.Equal)
+			.End().End() */
+
+		;
+	}
+}
