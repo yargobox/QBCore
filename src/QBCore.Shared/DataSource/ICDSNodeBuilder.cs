@@ -16,8 +16,8 @@ public interface ICDSNodeBuilder
 
 	ICDSNodeBuilder AddNode<TDataSource>() where TDataSource : IDataSource;
 	ICDSNodeBuilder AddNode<TDataSource>(string nodeName) where TDataSource : IDataSource;
-	ICDSNodeBuilder AddCondition<TDocument, TParentDocument>(Expression<Func<TDocument, object?>> field, Expression<Func<TParentDocument, object?>> parentField, ConditionOperations operation = ConditionOperations.Equal, object? defaultValue = null);
-	ICDSNodeBuilder AddCondition<TDocument, TParentDocument>(Expression<Func<TDocument, object?>> field, ICDSNodeBuilder parentNode, Expression<Func<TParentDocument, object?>> parentField, ConditionOperations operation = ConditionOperations.Equal, object? defaultValue = null);
-	ICDSNodeBuilder AddCondition<TDocument>(Expression<Func<TDocument, object?>> field, object? constValue, ConditionOperations operation = ConditionOperations.Equal, object? defaultValue = null);
+	ICDSNodeBuilder AddCondition<TDocument, TParentDocument>(Expression<Func<TDocument, object?>> field, Expression<Func<TParentDocument, object?>> parentField, FO operation = FO.Equal, object? defaultValue = null);
+	ICDSNodeBuilder AddCondition<TDocument, TParentDocument>(Expression<Func<TDocument, object?>> field, ICDSNodeBuilder parentNode, Expression<Func<TParentDocument, object?>> parentField, FO operation = FO.Equal, object? defaultValue = null);
+	ICDSNodeBuilder AddCondition<TDocument>(Expression<Func<TDocument, object?>> field, object? constValue, FO operation = FO.Equal, object? defaultValue = null);
 	ICDSNodeBuilder SetHidden(bool hide = true);
 }

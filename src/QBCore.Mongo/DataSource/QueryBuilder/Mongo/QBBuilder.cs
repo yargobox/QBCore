@@ -202,7 +202,7 @@ internal class QBBuilder<TDoc, TDto> :
 		Expression<Func<TRef, object?>>? refField,
 		object? constValue,
 		string? paramName,
-		ConditionOperations operation)
+		FO operation)
 	{
 		var trueContainerType = typeof(TLocal) == typeof(TDto) ? typeof(TDoc) : typeof(TLocal);
 		if (name == null)
@@ -486,46 +486,46 @@ internal class QBBuilder<TDoc, TDto> :
 	public IQBMongoSelectBuilder<TDoc, TDto> CrossJoinTable<TRef>(string alias, string tableName)
 		=> AddContainer(typeof(TRef), alias, tableName, BuilderContainerTypes.Table, BuilderContainerOperations.CrossJoin);
 
-	public IQBMongoSelectBuilder<TDoc, TDto> Connect<TLocal, TRef>(Expression<Func<TLocal, object?>> field, Expression<Func<TRef, object?>> refField, ConditionOperations operation)
+	public IQBMongoSelectBuilder<TDoc, TDto> Connect<TLocal, TRef>(Expression<Func<TLocal, object?>> field, Expression<Func<TRef, object?>> refField, FO operation)
 		=> AddCondition<TLocal, TRef>(BuilderConditionFlags.IsConnect | BuilderConditionFlags.OnField, null, field, null, refField, null, null, operation);
-	public IQBMongoSelectBuilder<TDoc, TDto> Connect<TLocal, TRef>(Expression<Func<TLocal, object?>> field, string refAlias, Expression<Func<TRef, object?>> refField, ConditionOperations operation)
+	public IQBMongoSelectBuilder<TDoc, TDto> Connect<TLocal, TRef>(Expression<Func<TLocal, object?>> field, string refAlias, Expression<Func<TRef, object?>> refField, FO operation)
 		=> AddCondition<TLocal, TRef>(BuilderConditionFlags.IsConnect | BuilderConditionFlags.OnField, null, field, refAlias, refField, null, null, operation);
-	public IQBMongoSelectBuilder<TDoc, TDto> Connect<TLocal, TRef>(string alias, Expression<Func<TLocal, object?>> field, Expression<Func<TRef, object?>> refField, ConditionOperations operation)
+	public IQBMongoSelectBuilder<TDoc, TDto> Connect<TLocal, TRef>(string alias, Expression<Func<TLocal, object?>> field, Expression<Func<TRef, object?>> refField, FO operation)
 		=> AddCondition<TLocal, TRef>(BuilderConditionFlags.IsConnect | BuilderConditionFlags.OnField, alias, field, null, refField, null, null, operation);
-	public IQBMongoSelectBuilder<TDoc, TDto> Connect<TLocal, TRef>(string alias, Expression<Func<TLocal, object?>> field, string refAlias, Expression<Func<TRef, object?>> refField, ConditionOperations operation)
+	public IQBMongoSelectBuilder<TDoc, TDto> Connect<TLocal, TRef>(string alias, Expression<Func<TLocal, object?>> field, string refAlias, Expression<Func<TRef, object?>> refField, FO operation)
 		=> AddCondition<TLocal, TRef>(BuilderConditionFlags.IsConnect | BuilderConditionFlags.OnField, alias, field, refAlias, refField, null, null, operation);
-	public IQBMongoSelectBuilder<TDoc, TDto> Connect<TLocal>(Expression<Func<TLocal, object?>> field, object? constValue, ConditionOperations operation)
+	public IQBMongoSelectBuilder<TDoc, TDto> Connect<TLocal>(Expression<Func<TLocal, object?>> field, object? constValue, FO operation)
 		=> AddCondition<TLocal, NotSupported>(BuilderConditionFlags.IsConnect | BuilderConditionFlags.OnConst, null, field, null, null, constValue, null, operation);
-	public IQBMongoSelectBuilder<TDoc, TDto> Connect<TLocal>(string alias, Expression<Func<TLocal, object?>> field, object? constValue, ConditionOperations operation)
+	public IQBMongoSelectBuilder<TDoc, TDto> Connect<TLocal>(string alias, Expression<Func<TLocal, object?>> field, object? constValue, FO operation)
 		=> AddCondition<TLocal, NotSupported>(BuilderConditionFlags.IsConnect | BuilderConditionFlags.OnConst, alias, field, null, null, constValue, null, operation);
-	public IQBMongoSelectBuilder<TDoc, TDto> Connect<TLocal>(Expression<Func<TLocal, object?>> field, ConditionOperations operation, string paramName)
+	public IQBMongoSelectBuilder<TDoc, TDto> Connect<TLocal>(Expression<Func<TLocal, object?>> field, FO operation, string paramName)
 		=> AddCondition<TLocal, NotSupported>(BuilderConditionFlags.IsConnect | BuilderConditionFlags.OnParam, null, field, null, null, null, paramName, operation);
-	public IQBMongoSelectBuilder<TDoc, TDto> Connect<TLocal>(string alias, Expression<Func<TLocal, object?>> field, ConditionOperations operation, string paramName)
+	public IQBMongoSelectBuilder<TDoc, TDto> Connect<TLocal>(string alias, Expression<Func<TLocal, object?>> field, FO operation, string paramName)
 		=> AddCondition<TLocal, NotSupported>(BuilderConditionFlags.IsConnect | BuilderConditionFlags.OnParam, alias, field, null, null, null, paramName, operation);
 
-	public IQBMongoSelectBuilder<TDoc, TDto> Condition<TLocal, TRef>(Expression<Func<TLocal, object?>> field, Expression<Func<TRef, object?>> refField, ConditionOperations operation)
+	public IQBMongoSelectBuilder<TDoc, TDto> Condition<TLocal, TRef>(Expression<Func<TLocal, object?>> field, Expression<Func<TRef, object?>> refField, FO operation)
 		=> AddCondition<TLocal, TRef>(BuilderConditionFlags.OnField, null, field, null, refField, null, null, operation);
-	public IQBMongoSelectBuilder<TDoc, TDto> Condition<TLocal, TRef>(Expression<Func<TLocal, object?>> field, string refAlias, Expression<Func<TRef, object?>> refField, ConditionOperations operation)
+	public IQBMongoSelectBuilder<TDoc, TDto> Condition<TLocal, TRef>(Expression<Func<TLocal, object?>> field, string refAlias, Expression<Func<TRef, object?>> refField, FO operation)
 		=> AddCondition<TLocal, TRef>(BuilderConditionFlags.OnField, null, field, refAlias, refField, null, null, operation);
-	public IQBMongoSelectBuilder<TDoc, TDto> Condition<TLocal, TRef>(string alias, Expression<Func<TLocal, object?>> field, Expression<Func<TRef, object?>> refField, ConditionOperations operation)
+	public IQBMongoSelectBuilder<TDoc, TDto> Condition<TLocal, TRef>(string alias, Expression<Func<TLocal, object?>> field, Expression<Func<TRef, object?>> refField, FO operation)
 		=> AddCondition<TLocal, TRef>(BuilderConditionFlags.OnField, alias, field, null, refField, null, null, operation);
-	public IQBMongoSelectBuilder<TDoc, TDto> Condition<TLocal, TRef>(string alias, Expression<Func<TLocal, object?>> field, string refAlias, Expression<Func<TRef, object?>> refField, ConditionOperations operation)
+	public IQBMongoSelectBuilder<TDoc, TDto> Condition<TLocal, TRef>(string alias, Expression<Func<TLocal, object?>> field, string refAlias, Expression<Func<TRef, object?>> refField, FO operation)
 		=> AddCondition<TLocal, TRef>(BuilderConditionFlags.OnField, alias, field, refAlias, refField, null, null, operation);
-	public IQBMongoSelectBuilder<TDoc, TDto> Condition<TLocal>(Expression<Func<TLocal, object?>> field, object? constValue, ConditionOperations operation)
+	public IQBMongoSelectBuilder<TDoc, TDto> Condition<TLocal>(Expression<Func<TLocal, object?>> field, object? constValue, FO operation)
 		=> AddCondition<TLocal, NotSupported>(BuilderConditionFlags.OnConst, null, field, null, null, constValue, null, operation);
-	public IQBMongoSelectBuilder<TDoc, TDto> Condition<TLocal>(string alias, Expression<Func<TLocal, object?>> field, object? constValue, ConditionOperations operation)
+	public IQBMongoSelectBuilder<TDoc, TDto> Condition<TLocal>(string alias, Expression<Func<TLocal, object?>> field, object? constValue, FO operation)
 		=> AddCondition<TLocal, NotSupported>(BuilderConditionFlags.OnConst, alias, field, null, null, constValue, null, operation);
-	public IQBMongoSelectBuilder<TDoc, TDto> Condition<TLocal>(Expression<Func<TLocal, object?>> field, ConditionOperations operation, string paramName)
+	public IQBMongoSelectBuilder<TDoc, TDto> Condition<TLocal>(Expression<Func<TLocal, object?>> field, FO operation, string paramName)
 		=> AddCondition<TLocal, NotSupported>(BuilderConditionFlags.OnParam, null, field, null, null, null, paramName, operation);
-	public IQBMongoSelectBuilder<TDoc, TDto> Condition<TLocal>(string alias, Expression<Func<TLocal, object?>> field, ConditionOperations operation, string paramName)
+	public IQBMongoSelectBuilder<TDoc, TDto> Condition<TLocal>(string alias, Expression<Func<TLocal, object?>> field, FO operation, string paramName)
 		=> AddCondition<TLocal, NotSupported>(BuilderConditionFlags.OnParam, alias, field, null, null, null, paramName, operation);
-	public IQBMongoSelectBuilder<TDoc, TDto> Condition(Expression<Func<TDoc, object?>> field, object? constValue, ConditionOperations operation)
+	public IQBMongoSelectBuilder<TDoc, TDto> Condition(Expression<Func<TDoc, object?>> field, object? constValue, FO operation)
 		=> AddCondition<TDoc, NotSupported>(BuilderConditionFlags.OnConst, null, field, null, null, constValue, null, operation);
-	public IQBMongoSelectBuilder<TDoc, TDto> Condition(string alias, Expression<Func<TDoc, object?>> field, object? constValue, ConditionOperations operation)
+	public IQBMongoSelectBuilder<TDoc, TDto> Condition(string alias, Expression<Func<TDoc, object?>> field, object? constValue, FO operation)
 		=> AddCondition<TDoc, NotSupported>(BuilderConditionFlags.OnConst, alias, field, null, null, constValue, null, operation);
-	public IQBMongoSelectBuilder<TDoc, TDto> Condition(Expression<Func<TDoc, object?>> field, ConditionOperations operation, string paramName)
+	public IQBMongoSelectBuilder<TDoc, TDto> Condition(Expression<Func<TDoc, object?>> field, FO operation, string paramName)
 		=> AddCondition<TDoc, NotSupported>(BuilderConditionFlags.OnParam, null, field, null, null, null, paramName, operation);
-	public IQBMongoSelectBuilder<TDoc, TDto> Condition(string alias, Expression<Func<TDoc, object?>> field, ConditionOperations operation, string paramName)
+	public IQBMongoSelectBuilder<TDoc, TDto> Condition(string alias, Expression<Func<TDoc, object?>> field, FO operation, string paramName)
 		=> AddCondition<TDoc, NotSupported>(BuilderConditionFlags.OnParam, alias, field, null, null, null, paramName, operation);
 
 	public IQBMongoSelectBuilder<TDoc, TDto> Begin()

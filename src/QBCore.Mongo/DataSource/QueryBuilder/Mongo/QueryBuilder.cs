@@ -27,23 +27,23 @@ internal abstract class QueryBuilder<TDocument, TProjection> : IQueryBuilder<TDo
 
 	#region Static ReadOnly & Const Properties
 
-	private const ConditionOperations _supportedOperations =
-		  ConditionOperations.Equal
-		| ConditionOperations.NotEqual
-		| ConditionOperations.Greater
-		| ConditionOperations.GreaterOrEqual
-		| ConditionOperations.Less
-		| ConditionOperations.LessOrEqual
-		| ConditionOperations.IsNull
-		| ConditionOperations.IsNotNull
-		| ConditionOperations.In
-		| ConditionOperations.NotIn
-		| ConditionOperations.Between
-		| ConditionOperations.NotBetween
-		| ConditionOperations.Like
-		| ConditionOperations.NotLike
-		| ConditionOperations.BitsAnd
-		| ConditionOperations.BitsOr;
+	private const FO _supportedOperations =
+		  FO.Equal
+		| FO.NotEqual
+		| FO.Greater
+		| FO.GreaterOrEqual
+		| FO.Less
+		| FO.LessOrEqual
+		| FO.IsNull
+		| FO.IsNotNull
+		| FO.In
+		| FO.NotIn
+		| FO.Between
+		| FO.NotBetween
+		| FO.Like
+		| FO.NotLike
+		| FO.BitsAnd
+		| FO.BitsOr;
 
 	private static readonly HashSet<Type> _integerTypes = new HashSet<Type>()
 	{
@@ -285,78 +285,78 @@ internal abstract class QueryBuilder<TDocument, TProjection> : IQueryBuilder<TDo
 
 		switch (cond.Operation & _supportedOperations)
 		{
-			case ConditionOperations.Equal:
+			case FO.Equal:
 				{
 					var value = RenderToBsonValue(cond, constValue, true);
 					return MakeEqBsonCondition(useExprFormat, leftField, value);
 				}
-			case ConditionOperations.NotEqual:
+			case FO.NotEqual:
 				{
 					var value = RenderToBsonValue(cond, constValue, true);
 					return MakeBsonCondition(useExprFormat, "$ne", leftField, value);
 				}
-			case ConditionOperations.Greater:
+			case FO.Greater:
 				{
 					var value = RenderToBsonValue(cond, constValue, false);
 					return MakeBsonCondition(useExprFormat, "$gt", leftField, value);
 				}
-			case ConditionOperations.GreaterOrEqual:
+			case FO.GreaterOrEqual:
 				{
 					var value = RenderToBsonValue(cond, constValue, false);
 					return MakeBsonCondition(useExprFormat, "$gte", leftField, value);
 				}
-			case ConditionOperations.Less:
+			case FO.Less:
 				{
 					var value = RenderToBsonValue(cond, constValue, false);
 					return MakeBsonCondition(useExprFormat, "$lt", leftField, value);
 				}
-			case ConditionOperations.LessOrEqual:
+			case FO.LessOrEqual:
 				{
 					var value = RenderToBsonValue(cond, constValue, false);
 					return MakeBsonCondition(useExprFormat, "$lte", leftField, value);
 				}
-			case ConditionOperations.IsNull:
+			case FO.IsNull:
 				{
 					_ = RenderToBsonValue(cond, null, false);
 					return MakeEqBsonCondition(useExprFormat, leftField, BsonNull.Value);
 				}
-			case ConditionOperations.IsNotNull:
+			case FO.IsNotNull:
 				{
 					//_ = RenderToBsonValue(cond, constValue, false);
 					return MakeBsonCondition(useExprFormat, "$ne", leftField, BsonNull.Value);
 				}
-			case ConditionOperations.In:
+			case FO.In:
 				{
 					var value = RenderToBsonArray(cond, constValue, true);
 					return MakeBsonCondition(useExprFormat, "$in", leftField, value);
 				}
-			case ConditionOperations.NotIn:
+			case FO.NotIn:
 				{
 					var value = RenderToBsonArray(cond, constValue, true);
 					return MakeBsonCondition(useExprFormat, "$nin", leftField, value);
 				}
-			case ConditionOperations.Like:
+			case FO.Like:
 				{
 					var value = RenderToBsonContainsRegex(cond, constValue);
 					return MakeEqBsonCondition(useExprFormat, leftField, value);
 				}
-			case ConditionOperations.NotLike:
+			case FO.NotLike:
 				{
 					var value = RenderToBsonContainsRegex(cond, constValue);
 					return MakeBsonCondition(useExprFormat, "$ne", leftField, value);
 				}
-			case ConditionOperations.BitsAnd:
+			case FO.BitsAnd:
 				{
 					var value = RenderToBsonLong(cond, constValue);
 					return MakeBsonCondition(useExprFormat, "$bitsAllSet", leftField, value);
 				}
-			case ConditionOperations.BitsOr:
+			case FO.BitsOr:
 				{
 					var value = RenderToBsonLong(cond, constValue);
 					return MakeBsonCondition(useExprFormat, "$bitsAnySet", leftField, value);
 				}
-			case ConditionOperations.Between:
-			case ConditionOperations.NotBetween:
+			case FO.Between:
+			case FO.NotBetween:
 			default:
 				throw new NotSupportedException();
 		}
@@ -368,7 +368,7 @@ internal abstract class QueryBuilder<TDocument, TProjection> : IQueryBuilder<TDo
 		{
 			throw new InvalidOperationException(nameof(MakeConditionOnField) + " can only make conditions between fields.");
 		}
-		if (cond.Operation.HasFlag(ConditionOperations.CaseInsensitive))
+		if (cond.Operation.HasFlag(FO.CaseInsensitive))
 		{
 			throw new InvalidOperationException("Case-sensitive or case-insensitive operations are not supported for conditions between fields.");
 		}
@@ -378,23 +378,23 @@ internal abstract class QueryBuilder<TDocument, TProjection> : IQueryBuilder<TDo
 
 		switch (cond.Operation & _supportedOperations)
 		{
-			case ConditionOperations.Equal: return MakeBsonConditionOnFields(rightIsVar, "$eq", leftField, rightField);
-			case ConditionOperations.NotEqual: return MakeBsonConditionOnFields(rightIsVar, "$ne", leftField, rightField);
-			case ConditionOperations.Greater: return MakeBsonConditionOnFields(rightIsVar, "$gt", leftField, rightField);
-			case ConditionOperations.GreaterOrEqual: return MakeBsonConditionOnFields(rightIsVar, "$gte", leftField, rightField);
-			case ConditionOperations.Less: return MakeBsonConditionOnFields(rightIsVar, "$lt", leftField, rightField);
-			case ConditionOperations.LessOrEqual: return MakeBsonConditionOnFields(rightIsVar, "$lte", leftField, rightField);
-			case ConditionOperations.In: return MakeBsonConditionOnFields(rightIsVar, "$in", leftField, rightField);
-			case ConditionOperations.NotIn: return MakeBsonConditionOnFields(rightIsVar, "$nin", leftField, rightField);
-			case ConditionOperations.BitsAnd: return MakeBsonConditionOnFields(rightIsVar, "$bitsAllSet", leftField, rightField);
-			case ConditionOperations.BitsOr: return MakeBsonConditionOnFields(rightIsVar, "$bitsAnySet", leftField, rightField);
+			case FO.Equal: return MakeBsonConditionOnFields(rightIsVar, "$eq", leftField, rightField);
+			case FO.NotEqual: return MakeBsonConditionOnFields(rightIsVar, "$ne", leftField, rightField);
+			case FO.Greater: return MakeBsonConditionOnFields(rightIsVar, "$gt", leftField, rightField);
+			case FO.GreaterOrEqual: return MakeBsonConditionOnFields(rightIsVar, "$gte", leftField, rightField);
+			case FO.Less: return MakeBsonConditionOnFields(rightIsVar, "$lt", leftField, rightField);
+			case FO.LessOrEqual: return MakeBsonConditionOnFields(rightIsVar, "$lte", leftField, rightField);
+			case FO.In: return MakeBsonConditionOnFields(rightIsVar, "$in", leftField, rightField);
+			case FO.NotIn: return MakeBsonConditionOnFields(rightIsVar, "$nin", leftField, rightField);
+			case FO.BitsAnd: return MakeBsonConditionOnFields(rightIsVar, "$bitsAllSet", leftField, rightField);
+			case FO.BitsOr: return MakeBsonConditionOnFields(rightIsVar, "$bitsAnySet", leftField, rightField);
 
-			case ConditionOperations.IsNull:
-			case ConditionOperations.IsNotNull:
-			case ConditionOperations.Like:
-			case ConditionOperations.NotLike:
-			case ConditionOperations.Between:
-			case ConditionOperations.NotBetween:
+			case FO.IsNull:
+			case FO.IsNotNull:
+			case FO.Like:
+			case FO.NotLike:
+			case FO.Between:
+			case FO.NotBetween:
 			default:
 				throw new InvalidOperationException($"An operation such as '{cond.Operation.ToString()}' is not supported for conditions between fields.");
 		}
@@ -421,7 +421,7 @@ internal abstract class QueryBuilder<TDocument, TProjection> : IQueryBuilder<TDo
 			}
 		}
 		
-		if (cond.Operation.HasFlag(ConditionOperations.CaseInsensitive))
+		if (cond.Operation.HasFlag(FO.CaseInsensitive))
 		{
 			if (!allowCaseInsensitive)
 			{
@@ -453,7 +453,7 @@ internal abstract class QueryBuilder<TDocument, TProjection> : IQueryBuilder<TDo
 		}
 		if (value is string stringValue)
 		{
-			if (cond.Operation.HasFlag(ConditionOperations.CaseInsensitive))
+			if (cond.Operation.HasFlag(FO.CaseInsensitive))
 			{
 				return new BsonRegularExpression(Regex.Escape(stringValue.ToLower()), "i");//!!! localization
 			}
@@ -528,7 +528,7 @@ internal abstract class QueryBuilder<TDocument, TProjection> : IQueryBuilder<TDo
 					throw new ArgumentException($"Field {cond.Name}.{cond.FieldPath} has type {cond.FieldType.ToPretty()} not {obj.GetType().ToPretty()}.", nameof(value));
 				}
 
-				if (cond.Operation.HasFlag(ConditionOperations.CaseInsensitive))
+				if (cond.Operation.HasFlag(FO.CaseInsensitive))
 				{
 					if (!allowCaseInsensitive)
 					{

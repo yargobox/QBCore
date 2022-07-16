@@ -78,7 +78,7 @@ internal sealed class CDSNode : ICDSNode
 
 		return node;
 	}
-	public ICDSNode AddCondition<TDocument, TParentDocument>(Expression<Func<TDocument, object?>> field, Expression<Func<TParentDocument, object?>> parentField, ConditionOperations operation = ConditionOperations.Equal, object? defaultValue = null)
+	public ICDSNode AddCondition<TDocument, TParentDocument>(Expression<Func<TDocument, object?>> field, Expression<Func<TParentDocument, object?>> parentField, FO operation = FO.Equal, object? defaultValue = null)
 	{
 		var parentNodes = Parents
 			.Where(x =>
@@ -97,7 +97,7 @@ internal sealed class CDSNode : ICDSNode
 
 		return AddCondition<TDocument, TParentDocument>(field, parentNodes[0].Value, parentField, operation, null);
 	}
-	public ICDSNode AddCondition<TDocument, TParentDocument>(Expression<Func<TDocument, object?>> field, ICDSNode parentNode, Expression<Func<TParentDocument, object?>> parentField, ConditionOperations operation = ConditionOperations.Equal, object? defaultValue = null)
+	public ICDSNode AddCondition<TDocument, TParentDocument>(Expression<Func<TDocument, object?>> field, ICDSNode parentNode, Expression<Func<TParentDocument, object?>> parentField, FO operation = FO.Equal, object? defaultValue = null)
 	{
 		if (DataSourceType.GetDataSourceTDocument() != typeof(TDocument) && DataSourceType.GetDataSourceTSelect() != typeof(TDocument))
 		{
@@ -122,7 +122,7 @@ internal sealed class CDSNode : ICDSNode
 
 		return this;
 	}
-	public ICDSNode AddCondition<TDocument>(Expression<Func<TDocument, object?>> field, object? constValue, ConditionOperations operation = ConditionOperations.Equal, object? defaultValue = null)
+	public ICDSNode AddCondition<TDocument>(Expression<Func<TDocument, object?>> field, object? constValue, FO operation = FO.Equal, object? defaultValue = null)
 	{
 		if (DataSourceType.GetDataSourceTDocument() != typeof(TDocument) || DataSourceType.GetDataSourceTSelect() != typeof(TDocument))
 		{

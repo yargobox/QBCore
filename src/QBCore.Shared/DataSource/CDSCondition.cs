@@ -5,7 +5,7 @@ public interface ICDSCondition
 	string NodeName { get; }
 	Type DocumentType { get; }
 	string FieldName { get; }
-	ConditionOperations Operation { get; }
+	FO Operation { get; }
 	OperandSourceType OperandSourceType { get; }
 	string? ParentNodeName { get; }
 	Type? ParentDocumentType { get; }
@@ -19,7 +19,7 @@ public sealed record CDSCondition : ICDSCondition
 	public string NodeName { get; set; }
 	public Type DocumentType { get; set; }
 	public string FieldName { get; set; }
-	public ConditionOperations Operation { get; set; }
+	public FO Operation { get; set; }
 	public OperandSourceType OperandSourceType { get; set; }
 	public string? ParentNodeName { get; set; }
 	public Type? ParentDocumentType { get; set; }

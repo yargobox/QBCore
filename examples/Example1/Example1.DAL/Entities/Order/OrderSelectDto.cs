@@ -43,26 +43,26 @@ public class OrderSelectDto
 				//.Optional(sel => sel.Updated)
 
   			.LeftJoinTable<Store>("stores")
-				.Connect<Store, Order>(store => store.Id, order => order.StoreId, ConditionOperations.Equal)
+				.Connect<Store, Order>(store => store.Id, order => order.StoreId, FO.Equal)
 				.Include<Store>(sel => sel.StoreName, "stores", store => store.Name)
 
 			.LeftJoinTable<Store>("stores2", "stores")
-				.Connect<Store, Order>("stores2", store => store.Id, "orders", order => order.StoreId, ConditionOperations.Equal)
-				.Connect<Store, Store>("stores2", store => store.Created, "stores", store => store.Deleted, ConditionOperations.NotEqual)
-				.Connect<Store>("stores2", store => store.Updated, null, ConditionOperations.IsNull)
+				.Connect<Store, Order>("stores2", store => store.Id, "orders", order => order.StoreId, FO.Equal)
+				//.Connect<Store, Store>("stores2", store => store.Created, "stores", store => store.Deleted, ConditionOperations.NotEqual)
+				//.Connect<Store>("stores2", store => store.Updated, null, ConditionOperations.IsNull)
 				.Include<Store>(sel => sel.Store, "stores2", store => store)
 				//.Exclude(sel => sel.Store!.Created)
 				//.Optional(sel => sel.Store!.Updated)
 
-/*			.LeftJoinTable<Store>("stores3", "stores")
-				.Connect<Store, Store>("stores3", store => store.Id, "stores2", store2 => store2.Id, ConditionOperations.Equal)
+			.LeftJoinTable<Store>("stores3", "stores")
+				.Connect<Store, Store>("stores3", store => store.Id, "stores2", store2 => store2.Id, FO.Equal)
 				.Include<Store>(sel => sel.Store3!.Name, "stores3", store => store.Name)
 
-			.Condition<Store, Order>("stores3", store => store.Deleted, "orders", order => order.Deleted, ConditionOperations.Equal)
+			.Condition<Store, Order>("stores3", store => store.Deleted, "orders", order => order.Deleted, FO.Equal)
 			.And()
-			.Condition(x => x.Id, 999, ConditionOperations.Equal)
+			.Condition(x => x.Id, 999, FO.Equal)
 			.Or()
-			.Condition<Store>("stores2", store => store.Deleted, null, ConditionOperations.Equal) */
+			.Condition<Store>("stores2", store => store.Deleted, null, FO.Equal)
 
 		;
 	}

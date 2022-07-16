@@ -16,9 +16,9 @@ public class SalesCDS : ComplexDataSource<SalesCDS>
 			.AddNode<StoreService>("stores")
 
 				.AddNode<OrderService>("orders")
-					.AddCondition<Order, Store>(order => order.StoreId, store => store.Id, ConditionOperations.Equal)
+					.AddCondition<Order, Store>(order => order.StoreId, store => store.Id, FO.Equal)
 
 					.AddNode<OrderPositionService>("positions")
-						.AddCondition<OrderPosition, Order>(position => position.Id, order => order.Id, ConditionOperations.Equal);
+						.AddCondition<OrderPosition, Order>(position => position.Id, order => order.Id, FO.Equal);
 	}
 }

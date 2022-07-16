@@ -11,6 +11,24 @@ namespace QBCore.DataSource.QueryBuilder.Mongo;
 
 internal sealed class SelectQueryBuilder<TDocument, TSelect> : QueryBuilder<TDocument, TSelect>, ISelectQueryBuilder<TDocument, TSelect>
 {
+	private sealed class StageInfo
+	{
+		public readonly BuilderContainer Container;
+		public string LookupAs;
+		public readonly List<List<BuilderCondition>> ConditionMap;
+		public readonly List<(string fromPath, string? toPath, BuilderField? builderField)> ProjectBefore;
+		public readonly List<(string fromPath, string? toPath, BuilderField? builderField)> ProjectAfter;
+
+		public StageInfo(BuilderContainer container)
+		{
+			Container = container;
+			LookupAs = "___" + container.Name;
+			ConditionMap = new List<List<BuilderCondition>>();
+			ProjectBefore = new List<(string fromPath, string? toPath, BuilderField? builderField)>();
+			ProjectAfter = new List<(string fromPath, string? toPath, BuilderField? builderField)>();
+		}
+	}
+
 	public override QueryBuilderTypes QueryBuilderType => QueryBuilderTypes.Select;
 
 	public override Origin Source => new Origin(this.GetType());
@@ -127,348 +145,168 @@ internal sealed class SelectQueryBuilder<TDocument, TSelect> : QueryBuilder<TDoc
 		}
 	}
 
-	private sealed class StageInfo
-	{
-		public readonly string Alias;
-		public string LookupAs;
-		public readonly List<List<BuilderCondition>> ConditionMap;
-		public readonly List<(string fromPath, string? toPath, BuilderField? builderField)> ProjectBefore;
-		public readonly List<(string fromPath, string? toPath, BuilderField? builderField)> ProjectAfter;
-
-		public StageInfo(string alias)
-		{
-			Alias = alias;
-			LookupAs = "___" + alias;
-			ConditionMap = new List<List<BuilderCondition>>();
-			ProjectBefore = new List<(string fromPath, string? toPath, BuilderField? builderField)>();
-			ProjectAfter = new List<(string fromPath, string? toPath, BuilderField? builderField)>();
-		}
-	}
-
 	private List<BsonDocument> BuildSelectQuery()
 	{
-		var containers = Builder.Containers;
-		var connects = Builder.Connects;
-		var conditions = Builder.Conditions;
-		var fields = Builder.Fields;
-		var top = containers[0];
 		var result = new List<BsonDocument>();
 
 		// Add pipeline stages for each container and clear the first stage's LookupAs (it musn't be used)
 		//
-		var stages = new List<StageInfo>(containers.Select(x => new StageInfo(x.Name)));
+		var stages = new List<StageInfo>(Builder.Containers.Select(x => new StageInfo(x)));
 		stages[0].LookupAs = string.Empty;
 
 		// Fill the pipeline stages with connect conditions.
-		// Connect conditions are always AND conditions (OR connect conditions and expressions are not supported by us).
+		// Connect conditions are always AND conditions (OR connect conditions or expressions are not supported by us).
 		// In a pipeline stage condition map, connect conditions between fields come first.
-		// Then follow the connect conditions on constant values.
-		// And only after them, the regular conditions that can be given as expressions.
+		// Then follow the connect conditions on constant values. And only after them, the regular conditions as expressions.
 		//
-		FillPipelineStagesWithConnectConditions(stages, connects);
+		FillPipelineStagesWithConnectConditions(stages, Builder.Connects);
 
-		// Slice the regular conditions to the smallest possible parts.The separator is the AND operation.
+		// Slice the regular conditions to the smallest possible parts. The separator is the AND operation.
 		//
-		var slices = SliceConditions(conditions);
+		var slices = SliceConditions(Builder.Conditions);
 
-		// Propagate the slices to the pipeline stages using the dependencies of each condition in the slice.
+		// Fill the pipeline stages with conditions (condition slices) using the dependencies of each condition in the slice.
 		// The goal is to place the slice in the first possible stage.
 		//
-		{
-			int firstPossibleStage;
-			foreach (var slice in slices)
-			{
-				firstPossibleStage = 0;
+		FillPipelineStagesWithConditionSlices(stages, slices);
 
-				foreach (var cond in slice)
-				{
-					firstPossibleStage = Math.Max(firstPossibleStage, stages.FindIndex(x => x.Alias == cond.Name));
-
-					if (cond.IsOnField)
-					{
-						firstPossibleStage = Math.Max(firstPossibleStage, stages.FindIndex(x => x.Alias == cond.RefName!));
-					}
-				}
-
-				stages[firstPossibleStage].ConditionMap.Add(slice);
-			}
-		}
-
-		// Propagate field projections
+		// Fill the pipeline stages with information for the $project and $addField commands
 		//
-		{
-			string path;
-			List<List<BuilderCondition>>? map;
-			int stageIndex;
+		FillPipelineStagesWithProjections(stages, Builder.Fields);
 
-			foreach (var field in fields.Where(x => x.IncludeOrExclude).OrderBy(x => x.RefName ?? string.Empty).ThenBy(x => x.RefField?.ElementCount ?? 0))
+		// Pipelines
+		//
+
+		StageInfo stage;
+		BuilderCondition? firstConnect;
+		BsonDocument lookup;
+		BuiltCondition? filter;
+		BsonDocument? let;
+		string s;
+		bool isExpr;
+
+		// Declare func to get DB-side field names. They are depend on 'stages' and 'stageIndex'
+		int stageIndex = 0;
+		var getDBSideNameInsideLookup = string (string alias, FieldPath fieldPath) =>
+		{
+			var trueAlias = stages.Take(stageIndex).FirstOrDefault(x => x.Container.Name == alias)?.LookupAs;
+			if (trueAlias == null)
 			{
-				if (field.RefField?.ElementCount == 0)
+				if (stages[stageIndex].Container.Name == alias)
 				{
-					// project the joined document as the result field
-					stages.First(x => x.Alias == field.RefName!).LookupAs = field.Field.DBSideName;
+					return fieldPath.DBSideName;
+				}
+				throw new KeyNotFoundException($"Collection '{alias}' is not yet defined at this stage.");
+			}
+			else if (trueAlias.Length == 0)
+			{
+				return fieldPath.DBSideName;
+			}
+			return string.Concat(trueAlias, ".", fieldPath.DBSideName);
+		};
+		var getDBSideNameAfterLookup = string (string alias, FieldPath fieldPath) =>
+		{
+			var trueAlias = stages.Take(stageIndex + 1).FirstOrDefault(x => x.Container.Name == alias)?.LookupAs;
+			if (trueAlias == null)
+			{
+				throw new KeyNotFoundException($"Collection '{alias}' is not yet defined at this stage.");
+			}
+			else if (trueAlias.Length == 0)
+			{
+				return fieldPath.DBSideName;
+			}
+			return string.Concat(trueAlias, ".", fieldPath.DBSideName);
+		};
+
+		for ( ; stageIndex < stages.Count; stageIndex++)
+		{
+			stage = stages[stageIndex];
+
+			OutputProjections(result, stage.ProjectBefore);
+
+			// $lookup
+			if (stageIndex > 0)
+			{
+				// Joining container
+				lookup = new BsonDocument { { "from", stage.Container.DBSideName } };
+
+				// First connect condition to foreignField and localField
+				if (stage.Container.ContainerOperation == BuilderContainerOperations.LeftJoin || stage.Container.ContainerOperation == BuilderContainerOperations.Join)
+				{
+					firstConnect = stage.ConditionMap.First().First(x => x.IsConnectOnField);
+
+					lookup["foreignField"] = firstConnect.Field.DBSideName;
+					lookup["localField"] = getDBSideNameInsideLookup(firstConnect.RefName!, firstConnect.RefField!);
 				}
 				else
 				{
-					path = string.Concat(
-						stages.First(x => x.Alias == field.RefName!).LookupAs, ".",
-						field.RefField!.DBSideName
-					);
+					firstConnect = null;
+				}
 
-					// Propagate the include to the pipeline stage using the dependencies on conditions and the include fields.
-					// The goal is to place the include in the first possible stage.
-					// Important: any inclusion clears all other fields, so we insert it only after any mention of the entire document.
-					//
-					stageIndex = stages.FindIndex(x => x.Alias == field.RefName!);
-					for (int i = stageIndex + 1; i < stages.Count; i++)
+				// other connect conditions except firstConnect
+				filter = null;
+				let = null;
+				foreach (var conds in stage.ConditionMap.Where(x => x.Any(xx => xx.IsConnect && xx != firstConnect)))
+				{
+					isExpr = false;
+					foreach (var cond in conds.Where(x => x.IsOnField && x != firstConnect))
 					{
-						map = stages[i].ConditionMap;
+						if (let == null) let = new BsonDocument();
 
-						if (map.Any(x => x.Any(xx => xx.Field.Name == field.RefName || (xx.RefField != null && xx.RefField.Name == field.RefName))))
-						{
-							stageIndex = i;
-						}
+						s = getDBSideNameInsideLookup(cond.RefName!, cond.RefField!);
+						let[MakeVariableName(s)] = "$" + s;
+
+						isExpr = true;
 					}
-					stages[stageIndex].ProjectAfter.Add((path, field.Field.DBSideName, field));
+
+					filter = filter?.AppendByAnd(BuildConditionTree(isExpr, conds.Where(x => x != firstConnect), getDBSideNameInsideLookup, _arguments)!)
+								?? BuildConditionTree(isExpr, conds.Where(x => x != firstConnect), getDBSideNameInsideLookup, _arguments);
+				}
+				if (let != null)
+				{
+					lookup["let"] = let;
+				}
+				if (filter != null)
+				{
+					lookup["pipeline"] = new BsonArray() { new BsonDocument { { "$match", filter.BsonDocument } } };
+				}
+				else if (firstConnect == null/* stage.Container.ContainerOperation == BuilderContainerOperations.CrossJoin */)
+				{
+					lookup["pipeline"] = new BsonArray();
+				}
+
+				lookup["as"] = stages[stageIndex].LookupAs;
+
+				result.Add(new BsonDocument { { "$lookup", lookup } });
+
+				// $unwind
+				{
+					var leftJoinOrCrossJoin = stage.Container.ContainerOperation != BuilderContainerOperations.Join;
+					result.Add(new BsonDocument {
+						{ "$unwind", new BsonDocument {
+							{ "path", lookup["as"] },
+							{ "preserveNullAndEmptyArrays", leftJoinOrCrossJoin }
+						}}
+					});
 				}
 			}
 
-			foreach (var field in fields.Where(x => !x.IncludeOrExclude))
+			// $match
 			{
-				// Is this exclude for the entire joined document?
-				var joinedDoc = fields.FirstOrDefault(x =>
-					// search in includes
-					x.IncludeOrExclude
-					// for the entire document: (store) => store
-					&& x.RefField?.ElementCount == 0
-					// in this case our exclude must be a part of it: (sel) => sel.Store.LogoImg, (sel) => sel.Store
-					&& field.Field.FullName.StartsWith(x.Field.FullName)
-					&& field.Field.FullName.Length > x.Field.FullName.Length + 1
-					&& field.Field.FullName[x.Field.FullName.Length] == '.'
-				);
-				if (joinedDoc == null)
+				filter = null;
+				foreach (var conds in stage.ConditionMap.Where(x => !x.Any(xx => xx.IsConnect)))
 				{
-					path = field.Field.DBSideName;
-
-					// Propagate the exclude
-					//
-					stageIndex = -1;
-					for (int i = 0; i < stages.Count; i++)
-					{
-						map = stages[i].ConditionMap;
-
-						if (map.Any(x => x.Any(xx => xx.Field.FullName == field.Field.FullName)))
-						{
-							stageIndex = i;
-						}
-					}
-					if (stageIndex == -1)
-					{
-						stages[0].ProjectBefore.Add((path, null, field));
-					}
-					else
-					{
-						stages[stageIndex].ProjectAfter.Add((path, null, field));
-					}
+					isExpr = conds.Any(x => x.IsOnField);
+					filter = filter?.AppendByAnd(BuildConditionTree(isExpr, conds, getDBSideNameAfterLookup, _arguments)!)
+								?? BuildConditionTree(isExpr, conds, getDBSideNameAfterLookup, _arguments);
 				}
-				else
+				if (filter != null)
 				{
-					path = string.Concat(stages.First(x => x.Alias == joinedDoc.RefName!).LookupAs, ".",
-						string.Join(".", field.Field.Elements.Skip(joinedDoc.Field.ElementCount).Select(x => x.DBSideName)));
-
-					// Propagate the exclude
-					//
-					var trueFullName = string.Join(".", field.Field.Elements.Skip(joinedDoc.Field.ElementCount).Select(x => x.Name));
-					stageIndex = stages.FindIndex(x => x.Alias == joinedDoc.RefName!);
-					for (int i = stageIndex + 1; i < stages.Count; i++)
-					{
-						map = stages[i].ConditionMap;
-
-						if (map.Any(x => x.Any(xx =>
-								(xx.Name == joinedDoc.RefName && xx.Field.FullName == trueFullName) ||
-								(xx.RefName == joinedDoc.RefName && xx.RefField!.FullName == trueFullName))))
-						{
-							stageIndex = i;
-						}
-					}
-					stages[stageIndex].ProjectAfter.Add((path, null, field));
+					result.Add(new BsonDocument { { "$match", filter.BsonDocument } });
 				}
 			}
 
-			// Exclude elements missing in DTO compared to Document
-			if (containers[0].DocumentType != typeof(TDocument))
-			{
-				var docMap = BsonClassMap.LookupClassMap(typeof(TDocument));
-				var selMap = BsonClassMap.LookupClassMap(containers[0].DocumentType);
-				// 
-				foreach (var elem in docMap.AllMemberMaps.ExceptBy(selMap.AllMemberMaps.Select(x => x.MemberName), x => x.MemberName))
-				{
-					// this exclude has not been added before?
-					if (!stages.Any(x => x.ProjectBefore.Any(xx => xx.toPath == null && xx.fromPath == elem.ElementName) ||
-											x.ProjectAfter.Any(xx => xx.toPath == null && xx.fromPath == elem.ElementName)))
-					{
-						path = elem.ElementName;
-
-						stageIndex = -1;
-						for (int i = 0; i < stages.Count; i++)
-						{
-							map = stages[i].ConditionMap;
-
-							if (map.Any(x => x.Any(xx =>
-									(xx.Name == top.Name && xx.Field.FullName == path) ||
-									(xx.RefName == top.Name && xx.RefField!.FullName == path))))
-							{
-								stageIndex = i;
-							}
-						}
-						if (stageIndex == -1)
-						{
-							stages[0].ProjectBefore.Add((path, null, null));
-						}
-						else
-						{
-							stages[stageIndex].ProjectAfter.Add((path, null, null));
-						}
-					}
-				}
-			}
-
-			// Exclude joined conteiners not projected to documents
-			StageInfo stage;
-			for (int i = 1; i < stages.Count; i++)
-			{
-				stage = stages[i];
-				if (!stage.LookupAs.StartsWith("___")) continue;
-
-				stageIndex = i;
-				for (int j = i + 1; j < stages.Count; j++)
-				{
-					map = stages[i].ConditionMap;
-
-					if (map.Any(x => x.Any(xx => xx.Name == stage.Alias || xx.RefName == stage.Alias)))
-					{
-						stageIndex = i;
-					}
-				}
-				stages[stageIndex].ProjectAfter.Add((stages[i].LookupAs, null, null));
-			}
-		}
-
-		// Pipeline
-		//
-		{
-			BuilderCondition? firstConnect;
-			BsonDocument lookup;
-			BuiltCondition? filter;
-			BsonDocument? let;
-			string s;
-			bool isExpr;
-			int i = 0;
-			var getDBSideNameBefore = string (string alias, FieldPath fieldPath) =>
-			{
-				var trueAlias = stages.Take(i).FirstOrDefault(x => x.Alias == alias)?.LookupAs;
-
-				return string.IsNullOrEmpty(trueAlias)
-					? fieldPath.DBSideName
-					: string.Concat(trueAlias, ".", fieldPath.DBSideName);
-			};
-			var getDBSideNameAfter = string (string alias, FieldPath fieldPath) =>
-			{
-				var trueAlias = stages.Take(i + 1).FirstOrDefault(x => x.Alias == alias)?.LookupAs;
-
-				return string.IsNullOrEmpty(trueAlias)
-					? fieldPath.DBSideName
-					: string.Concat(trueAlias, ".", fieldPath.DBSideName);
-			};
-
-			for ( ; i < stages.Count; i++)
-			{
-				OutputProjections(result, stages, i, true);
-
-				// $lookup
-				if (i > 0)
-				{
-					// Joining container
-					lookup = new BsonDocument { { "from", containers[i].DBSideName } };
-
-					// First connect condition to foreignField and localField
-					if (containers[i].ContainerOperation == BuilderContainerOperations.LeftJoin || containers[i].ContainerOperation == BuilderContainerOperations.Join)
-					{
-						firstConnect = stages[i].ConditionMap.First().First(x => x.IsConnectOnField);
-
-						lookup["foreignField"] = firstConnect.Field.DBSideName;
-						lookup["localField"] = getDBSideNameBefore(firstConnect.RefName!, firstConnect.RefField!);
-					}
-					else
-					{
-						firstConnect = null;
-					}
-
-					// other connect conditions except firstConnect
-					filter = null;
-					let = null;
-					foreach (var conds in stages[i].ConditionMap.Where(x => x.Any(xx => xx.IsConnect && xx != firstConnect)))
-					{
-						isExpr = false;
-						foreach (var cond in conds.Where(x => x.IsOnField && x != firstConnect))
-						{
-							if (let == null) let = new BsonDocument();
-
-							s = getDBSideNameBefore(cond.RefName!, cond.RefField!);
-							let[MakeVariableName(s)] = "$" + s;
-
-							isExpr = true;
-						}
-
-						filter = filter?.AppendByAnd(BuildConditionTree(isExpr, conds.Where(x => x != firstConnect), getDBSideNameBefore, _arguments)!)
-									?? BuildConditionTree(isExpr, conds.Where(x => x != firstConnect), getDBSideNameBefore, _arguments);
-					}
-					if (let != null)
-					{
-						lookup["let"] = let;
-					}
-					if (filter != null)
-					{
-						lookup["pipeline"] = new BsonArray() { new BsonDocument { { "$match", filter.BsonDocument } } };
-					}
-					else if (firstConnect == null/* containers[i].ContainerOperation == BuilderContainerOperations.CrossJoin */)
-					{
-						lookup["pipeline"] = new BsonArray();
-					}
-
-					lookup["as"] = stages[i].LookupAs;
-
-					result.Add(new BsonDocument { { "$lookup", lookup } });
-
-					// $unwind
-					{
-						var leftJoinOrCrossJoin = containers[i].ContainerOperation != BuilderContainerOperations.Join;
-						result.Add(new BsonDocument {
-							{ "$unwind", new BsonDocument {
-								{ "path", lookup["as"] },
-								{ "preserveNullAndEmptyArrays", leftJoinOrCrossJoin }
-							}}
-						});
-					}
-				}
-
-				// $match
-				{
-					filter = null;
-					foreach (var conds in stages[i].ConditionMap.Where(x => !x.Any(xx => xx.IsConnect)))
-					{
-						isExpr = conds.Any(x => x.IsOnField);
-						filter = filter?.AppendByAnd(BuildConditionTree(isExpr, conds, getDBSideNameAfter, _arguments)!)
-									?? BuildConditionTree(isExpr, conds, getDBSideNameAfter, _arguments);
-					}
-					if (filter != null)
-					{
-						result.Add(new BsonDocument { { "$match", filter.BsonDocument } });
-					}
-				}
-
-				OutputProjections(result, stages, i, false);
-			}
+			OutputProjections(result, stage.ProjectAfter);
 		}
 
 		return result;
@@ -485,21 +323,207 @@ internal sealed class SelectQueryBuilder<TDocument, TSelect> : QueryBuilder<TDoc
 			builderConditions = connects.Where(x => x.IsOnField && x.Name == name).ToList();
 			if (builderConditions.Count > 0)
 			{
-				stages.First(x => x.Alias == name).ConditionMap.Add(builderConditions);
+				stages.First(x => x.Container.Name == name).ConditionMap.Add(builderConditions);
 			}
 
 			builderConditions = connects.Where(x => !x.IsOnField && x.Name == name).ToList();
 			if (builderConditions.Count > 0)
 			{
-				stages.First(x => x.Alias == name).ConditionMap.Add(builderConditions);
+				stages.First(x => x.Container.Name == name).ConditionMap.Add(builderConditions);
 			}
 		}
 	}
 
-	private static void OutputProjections(List<BsonDocument> result, List<StageInfo> stages, int stageIndex, bool beforeOrAfter)
+	/// <summary>
+	/// Fill the pipeline stages with conditions (condition slices)
+	/// </summary>
+	private static void FillPipelineStagesWithConditionSlices(List<StageInfo> stages, List<List<BuilderCondition>> slices)
 	{
-		var projectInfo = beforeOrAfter ? stages[stageIndex].ProjectBefore : stages[stageIndex].ProjectAfter;
+		int firstPossibleStage;
+		foreach (var slice in slices)
+		{
+			firstPossibleStage = 0;
 
+			foreach (var cond in slice)
+			{
+				firstPossibleStage = Math.Max(firstPossibleStage, stages.FindIndex(x => x.Container.Name == cond.Name));
+
+				if (cond.IsOnField)
+				{
+					firstPossibleStage = Math.Max(firstPossibleStage, stages.FindIndex(x => x.Container.Name == cond.RefName!));
+				}
+			}
+
+			stages[firstPossibleStage].ConditionMap.Add(slice);
+		}
+	}
+
+	/// <summary>
+	/// Fill the pipeline stages with projections
+	/// </summary>
+	private static void FillPipelineStagesWithProjections(List<StageInfo> stages, List<BuilderField> fields)
+	{
+		string path;
+		List<List<BuilderCondition>>? map;
+		int stageIndex;
+
+		// Fill the includes and change the LookupAs names for the joining documents the result of which is directly projected into the field.
+		foreach (var field in fields.Where(x => x.IncludeOrExclude).OrderBy(x => x.RefName ?? string.Empty).ThenBy(x => x.RefField?.ElementCount ?? 0))
+		{
+			if (field.RefField?.ElementCount == 0)
+			{
+				// project the joining document as the result field
+				stages.First(x => x.Container.Name == field.RefName!).LookupAs = field.Field.DBSideName;
+			}
+			else
+			{
+				stageIndex = stages.FindIndex(x => x.Container.Name == field.RefName!);
+
+				path = string.Concat(
+					stages[stageIndex].LookupAs, ".",
+					field.RefField!.DBSideName
+				);
+
+				// Propagate the include to the pipeline stage using the dependencies on conditions and the include fields.
+				// The goal is to place the include in the first possible stage.
+				// Important: any inclusion clears all other fields, so we can insert it only after any mention of the entire document.
+				//
+				for (int i = stageIndex + 1; i < stages.Count; i++)
+				{
+					map = stages[i].ConditionMap;
+
+					if (map.Any(x => x.Any(xx => xx.Name == field.RefName || (xx.RefName != null && xx.RefName == field.RefName))))
+					{
+						stageIndex = i;
+					}
+				}
+				stages[stageIndex].ProjectAfter.Add((path, field.Field.DBSideName, field));
+			}
+		}
+
+		foreach (var field in fields.Where(x => !x.IncludeOrExclude))
+		{
+			// Is this exclude for the entire joined document?
+			var joinedDoc = fields.FirstOrDefault(x =>
+				// search in includes
+				x.IncludeOrExclude
+				// for the entire document: (store) => store
+				&& x.RefField?.ElementCount == 0
+				// in this case our exclude must be a part of it: (sel) => sel.Store.LogoImg, (sel) => sel.Store
+				&& field.Field.FullName.StartsWith(x.Field.FullName)
+				&& field.Field.FullName.Length > x.Field.FullName.Length + 1
+				&& field.Field.FullName[x.Field.FullName.Length] == '.'
+			);
+			if (joinedDoc == null)
+			{
+				path = field.Field.DBSideName;
+
+				// Propagate the exclude
+				//
+				stageIndex = -1;
+				for (int i = 0; i < stages.Count; i++)
+				{
+					map = stages[i].ConditionMap;
+
+					if (map.Any(x => x.Any(xx => xx.Field.FullName == field.Field.FullName)))
+					{
+						stageIndex = i;
+					}
+				}
+				if (stageIndex == -1)
+				{
+					stages[0].ProjectBefore.Add((path, null, field));
+				}
+				else
+				{
+					stages[stageIndex].ProjectAfter.Add((path, null, field));
+				}
+			}
+			else
+			{
+				path = string.Concat(stages.First(x => x.Container.Name == joinedDoc.RefName!).LookupAs, ".",
+					string.Join(".", field.Field.Elements.Skip(joinedDoc.Field.ElementCount).Select(x => x.DBSideName)));
+
+				// Propagate the exclude
+				//
+				var trueFullName = string.Join(".", field.Field.Elements.Skip(joinedDoc.Field.ElementCount).Select(x => x.Name));
+				stageIndex = stages.FindIndex(x => x.Container.Name == joinedDoc.RefName!);
+				for (int i = stageIndex + 1; i < stages.Count; i++)
+				{
+					map = stages[i].ConditionMap;
+
+					if (map.Any(x => x.Any(xx =>
+							(xx.Name == joinedDoc.RefName && xx.Field.FullName == trueFullName) ||
+							(xx.RefName == joinedDoc.RefName && xx.RefField!.FullName == trueFullName))))
+					{
+						stageIndex = i;
+					}
+				}
+				stages[stageIndex].ProjectAfter.Add((path, null, field));
+			}
+		}
+
+		// Exclude Bson-elements missing in DTO compared to Document
+		if (stages[0].Container.DocumentType != typeof(TDocument))
+		{
+			var docMap = BsonClassMap.LookupClassMap(typeof(TDocument));
+			var selMap = BsonClassMap.LookupClassMap(stages[0].Container.DocumentType);
+			var topAlias = stages[0].Container.Name;
+			// 
+			foreach (var elem in docMap.AllMemberMaps.ExceptBy(selMap.AllMemberMaps.Select(x => x.MemberName), x => x.MemberName))
+			{
+				// this exclude has not been added before?
+				if (!stages.Any(x => x.ProjectBefore.Any(xx => xx.toPath == null && xx.fromPath == elem.ElementName) ||
+										x.ProjectAfter.Any(xx => xx.toPath == null && xx.fromPath == elem.ElementName)))
+				{
+					path = elem.ElementName;
+
+					stageIndex = -1;
+					for (int i = 0; i < stages.Count; i++)
+					{
+						map = stages[i].ConditionMap;
+
+						if (map.Any(x => x.Any(xx =>
+								(xx.Name == topAlias && xx.Field.FullName == path) ||
+								(xx.RefName == topAlias && xx.RefField!.FullName == path))))
+						{
+							stageIndex = i;
+						}
+					}
+					if (stageIndex == -1)
+					{
+						stages[0].ProjectBefore.Add((path, null, null));
+					}
+					else
+					{
+						stages[stageIndex].ProjectAfter.Add((path, null, null));
+					}
+				}
+			}
+		}
+
+		// Exclude joining conteiners not projected to documents
+		StageInfo stage;
+		for (int i = 1; i < stages.Count; i++)
+		{
+			stage = stages[i];
+			if (!stage.LookupAs.StartsWith("___")) continue;
+
+			stageIndex = i;
+			for (int j = i + 1; j < stages.Count; j++)
+			{
+				map = stages[j].ConditionMap;
+
+				if (map.Any(x => x.Any(xx => xx.Name == stage.Container.Name || xx.RefName == stage.Container.Name)))
+				{
+					stageIndex = j;
+				}
+			}
+			stages[stageIndex].ProjectAfter.Add((stages[i].LookupAs, null, null));
+		}
+	}
+	private static void OutputProjections(List<BsonDocument> result, List<(string fromPath, string? toPath, BuilderField? builderField)> projectInfo)
+	{
 		BsonDocument? projection = null;
 		foreach (var projField in projectInfo.Where(x => x.toPath == null && x.builderField?.OptionalExclusion == true))
 		{

@@ -29,7 +29,7 @@ internal record BuilderCondition
 	public readonly Type? RefFieldUnderlyingType;
 
 	public readonly object? Value;
-	public readonly ConditionOperations Operation;
+	public readonly FO Operation;
 
 	public BuilderCondition(
 		BuilderConditionFlags flags,
@@ -39,7 +39,7 @@ internal record BuilderCondition
 		string? refName,
 		LambdaExpression? refField,
 		object? value,
-		ConditionOperations operation)
+		FO operation)
 	{
 		Flags = flags & (BuilderConditionFlags.OnField | BuilderConditionFlags.OnConst | BuilderConditionFlags.OnParam | BuilderConditionFlags.IsByOr | BuilderConditionFlags.IsConnect);
 		Parentheses = parentheses;

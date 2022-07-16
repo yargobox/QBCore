@@ -35,17 +35,17 @@ internal sealed class CDSNodeBuilder : ICDSNodeBuilder
 
 		return new CDSNodeBuilder(_node.AddNode(typeof(TDataSource), nodeName));
 	}
-	public ICDSNodeBuilder AddCondition<TDocument, TParentDocument>(Expression<Func<TDocument, object?>> field, Expression<Func<TParentDocument, object?>> parentField, ConditionOperations operation = ConditionOperations.Equal, object? defaultValue = null)
+	public ICDSNodeBuilder AddCondition<TDocument, TParentDocument>(Expression<Func<TDocument, object?>> field, Expression<Func<TParentDocument, object?>> parentField, FO operation = FO.Equal, object? defaultValue = null)
 	{
 		_node.AddCondition<TDocument, TParentDocument>(field, parentField, operation, defaultValue);
 		return this;
 	}
-	public ICDSNodeBuilder AddCondition<TDocument, TParentDocument>(Expression<Func<TDocument, object?>> field, ICDSNodeBuilder parentNode, Expression<Func<TParentDocument, object?>> parentField, ConditionOperations operation = ConditionOperations.Equal, object? defaultValue = null)
+	public ICDSNodeBuilder AddCondition<TDocument, TParentDocument>(Expression<Func<TDocument, object?>> field, ICDSNodeBuilder parentNode, Expression<Func<TParentDocument, object?>> parentField, FO operation = FO.Equal, object? defaultValue = null)
 	{
 		_node.AddCondition<TDocument, TParentDocument>(field, ((CDSNodeBuilder)parentNode)._node, parentField, operation, defaultValue);
 		return this;
 	}
-	public ICDSNodeBuilder AddCondition<TDocument>(Expression<Func<TDocument, object?>> field, object? constValue, ConditionOperations operation = ConditionOperations.Equal, object? defaultValue = null)
+	public ICDSNodeBuilder AddCondition<TDocument>(Expression<Func<TDocument, object?>> field, object? constValue, FO operation = FO.Equal, object? defaultValue = null)
 	{
 		_node.AddCondition<TDocument>(field, constValue, operation, defaultValue);
 		return this;
