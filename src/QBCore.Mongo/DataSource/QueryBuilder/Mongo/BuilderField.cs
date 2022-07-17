@@ -6,19 +6,19 @@ namespace QBCore.DataSource.QueryBuilder.Mongo;
 internal record BuilderField
 (
 	FieldPath Field,
-	string? RefName,
+	string? RefAlias,
 	FieldPath? RefField,
 	bool OptionalExclusion
 )
 {
-	public bool IncludeOrExclude => RefName != null;
+	public bool IncludeOrExclude => RefAlias != null;
 
 	private string DebuggerDisplay
 	{
 		get
 		{
-			return RefName != null
-				? string.Format("Include {0} as {1}:{2}", Field.FullName, RefName, RefField?.FullName)
+			return RefAlias != null
+				? string.Format("Include {0} as {1}:{2}", Field.FullName, RefAlias, RefField?.FullName)
 				: string.Format("{0} {1}", OptionalExclusion ? "Optional" : "Exclude", Field.FullName);
 		}
 	}

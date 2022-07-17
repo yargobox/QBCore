@@ -20,11 +20,11 @@ internal record BuilderCondition
 	public readonly BuilderConditionFlags Flags;
 	public int Parentheses;
 
-	public readonly string Name;
+	public readonly string Alias;
 	public readonly FieldPath Field;
 	public readonly Type FieldUnderlyingType;
 
-	public readonly string? RefName;
+	public readonly string? RefAlias;
 	public readonly FieldPath? RefField;
 	public readonly Type? RefFieldUnderlyingType;
 
@@ -34,18 +34,18 @@ internal record BuilderCondition
 	public BuilderCondition(
 		BuilderConditionFlags flags,
 		int parentheses,
-		string name,
+		string alias,
 		LambdaExpression field,
-		string? refName,
+		string? refAlias,
 		LambdaExpression? refField,
 		object? value,
 		FO operation)
 	{
 		Flags = flags & (BuilderConditionFlags.OnField | BuilderConditionFlags.OnConst | BuilderConditionFlags.OnParam | BuilderConditionFlags.IsByOr | BuilderConditionFlags.IsConnect);
 		Parentheses = parentheses;
-		Name = name;
+		Alias = alias;
 		Field = new FieldPath(field, false);
-		RefName = refName;
+		RefAlias = refAlias;
 		RefField = refField != null ? new FieldPath(refField, true) : null;
 		Value = value;
 		Operation = operation;
@@ -86,9 +86,9 @@ internal record BuilderCondition
 	{
 		get
 		{
-			var s = RefName != null
-				? string.Format("{0}:{1} {2} {3}:{4}", Name, Field.FullName, Operation.ToString(), RefName, RefField?.FullName)
-				: string.Format("{0}:{1} {2} {3}", Name, Field.FullName, Operation.ToString(), Value?.ToString());
+			var s = RefAlias != null
+				? string.Format("{0}:{1} {2} {3}:{4}", Alias, Field.FullName, Operation.ToString(), RefAlias, RefField?.FullName)
+				: string.Format("{0}:{1} {2} {3}", Alias, Field.FullName, Operation.ToString(), Value?.ToString());
 
 			if (IsByOr)
 			{

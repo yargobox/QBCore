@@ -23,7 +23,7 @@ internal sealed class SelectQueryBuilder<TDocument, TSelect> : QueryBuilder<TDoc
 		public StageInfo(BuilderContainer container)
 		{
 			Container = container;
-			LookupAs = "___" + container.Name;
+			LookupAs = "___" + container.Alias;
 			ConditionMap = new List<List<BuilderCondition>>();
 			ProjectBefore = new List<(string fromPath, string? toPath, BuilderField? builderField)>();
 			ProjectAfter = new List<(string fromPath, string? toPath, BuilderField? builderField)>();
@@ -258,10 +258,10 @@ internal sealed class SelectQueryBuilder<TDocument, TSelect> : QueryBuilder<TDoc
 		int stageIndex = 0;
 		var getDBSideNameInsideLookup = string (string alias, FieldPath fieldPath) =>
 		{
-			var trueAlias = stages.Take(stageIndex).FirstOrDefault(x => x.Container.Name == alias)?.LookupAs;
+			var trueAlias = stages.Take(stageIndex).FirstOrDefault(x => x.Container.Alias == alias)?.LookupAs;
 			if (trueAlias == null)
 			{
-				if (stages[stageIndex].Container.Name == alias)
+				if (stages[stageIndex].Container.Alias == alias)
 				{
 					return fieldPath.DBSideName;
 				}
@@ -275,7 +275,7 @@ internal sealed class SelectQueryBuilder<TDocument, TSelect> : QueryBuilder<TDoc
 		};
 		var getDBSideNameAfterLookup = string (string alias, FieldPath fieldPath) =>
 		{
-			var trueAlias = stages.Take(stageIndex + 1).FirstOrDefault(x => x.Container.Name == alias)?.LookupAs;
+			var trueAlias = stages.Take(stageIndex + 1).FirstOrDefault(x => x.Container.Alias == alias)?.LookupAs;
 			if (trueAlias == null)
 			{
 				throw new KeyNotFoundException($"Collection '{alias}' is not yet defined at this stage.");
@@ -305,7 +305,7 @@ internal sealed class SelectQueryBuilder<TDocument, TSelect> : QueryBuilder<TDoc
 					firstConnect = stage.ConditionMap.First().First(x => x.IsConnectOnField);
 
 					lookup["foreignField"] = firstConnect.Field.DBSideName;
-					lookup["localField"] = getDBSideNameInsideLookup(firstConnect.RefName!, firstConnect.RefField!);
+					lookup["localField"] = getDBSideNameInsideLookup(firstConnect.RefAlias!, firstConnect.RefField!);
 				}
 				else
 				{
@@ -322,7 +322,7 @@ internal sealed class SelectQueryBuilder<TDocument, TSelect> : QueryBuilder<TDoc
 					{
 						if (let == null) let = new BsonDocument();
 
-						s = getDBSideNameInsideLookup(cond.RefName!, cond.RefField!);
+						s = getDBSideNameInsideLookup(cond.RefAlias!, cond.RefField!);
 						let[MakeVariableName(s)] = "$" + s;
 
 						isExpr = true;
@@ -387,18 +387,18 @@ internal sealed class SelectQueryBuilder<TDocument, TSelect> : QueryBuilder<TDoc
 	private static void FillPipelineStagesWithConnectConditions(List<StageInfo> stages, List<BuilderCondition> connects)
 	{
 		List<BuilderCondition> builderConditions;
-		foreach (var name in connects.Select(x => x.Name).Distinct())
+		foreach (var alias in connects.Select(x => x.Alias).Distinct())
 		{
-			builderConditions = connects.Where(x => x.IsOnField && x.Name == name).ToList();
+			builderConditions = connects.Where(x => x.IsOnField && x.Alias == alias).ToList();
 			if (builderConditions.Count > 0)
 			{
-				stages.First(x => x.Container.Name == name).ConditionMap.Add(builderConditions);
+				stages.First(x => x.Container.Alias == alias).ConditionMap.Add(builderConditions);
 			}
 
-			builderConditions = connects.Where(x => !x.IsOnField && x.Name == name).ToList();
+			builderConditions = connects.Where(x => !x.IsOnField && x.Alias == alias).ToList();
 			if (builderConditions.Count > 0)
 			{
-				stages.First(x => x.Container.Name == name).ConditionMap.Add(builderConditions);
+				stages.First(x => x.Container.Alias == alias).ConditionMap.Add(builderConditions);
 			}
 		}
 	}
@@ -415,11 +415,11 @@ internal sealed class SelectQueryBuilder<TDocument, TSelect> : QueryBuilder<TDoc
 
 			foreach (var cond in slice)
 			{
-				firstPossibleStage = Math.Max(firstPossibleStage, stages.FindIndex(x => x.Container.Name == cond.Name));
+				firstPossibleStage = Math.Max(firstPossibleStage, stages.FindIndex(x => x.Container.Alias == cond.Alias));
 
 				if (cond.IsOnField)
 				{
-					firstPossibleStage = Math.Max(firstPossibleStage, stages.FindIndex(x => x.Container.Name == cond.RefName!));
+					firstPossibleStage = Math.Max(firstPossibleStage, stages.FindIndex(x => x.Container.Alias == cond.RefAlias!));
 				}
 			}
 
@@ -437,16 +437,16 @@ internal sealed class SelectQueryBuilder<TDocument, TSelect> : QueryBuilder<TDoc
 		int stageIndex;
 
 		// Fill the includes and change the LookupAs names for the joining documents the result of which is directly projected into the field.
-		foreach (var field in fields.Where(x => x.IncludeOrExclude).OrderBy(x => x.RefName ?? string.Empty).ThenBy(x => x.RefField?.ElementCount ?? 0))
+		foreach (var field in fields.Where(x => x.IncludeOrExclude).OrderBy(x => x.RefAlias ?? string.Empty).ThenBy(x => x.RefField?.ElementCount ?? 0))
 		{
 			if (field.RefField?.ElementCount == 0)
 			{
 				// project the joining document as the result field
-				stages.First(x => x.Container.Name == field.RefName!).LookupAs = field.Field.DBSideName;
+				stages.First(x => x.Container.Alias == field.RefAlias!).LookupAs = field.Field.DBSideName;
 			}
 			else
 			{
-				stageIndex = stages.FindIndex(x => x.Container.Name == field.RefName!);
+				stageIndex = stages.FindIndex(x => x.Container.Alias == field.RefAlias!);
 
 				path = string.Concat(
 					stages[stageIndex].LookupAs, ".",
@@ -461,7 +461,7 @@ internal sealed class SelectQueryBuilder<TDocument, TSelect> : QueryBuilder<TDoc
 				{
 					map = stages[i].ConditionMap;
 
-					if (map.Any(x => x.Any(xx => xx.Name == field.RefName || (xx.RefName != null && xx.RefName == field.RefName))))
+					if (map.Any(x => x.Any(xx => xx.Alias == field.RefAlias || (xx.RefAlias != null && xx.RefAlias == field.RefAlias))))
 					{
 						stageIndex = i;
 					}
@@ -510,20 +510,20 @@ internal sealed class SelectQueryBuilder<TDocument, TSelect> : QueryBuilder<TDoc
 			}
 			else
 			{
-				path = string.Concat(stages.First(x => x.Container.Name == joinedDoc.RefName!).LookupAs, ".",
+				path = string.Concat(stages.First(x => x.Container.Alias == joinedDoc.RefAlias!).LookupAs, ".",
 					string.Join(".", field.Field.Elements.Skip(joinedDoc.Field.ElementCount).Select(x => x.DBSideName)));
 
 				// Propagate the exclude
 				//
 				var trueFullName = string.Join(".", field.Field.Elements.Skip(joinedDoc.Field.ElementCount).Select(x => x.Name));
-				stageIndex = stages.FindIndex(x => x.Container.Name == joinedDoc.RefName!);
+				stageIndex = stages.FindIndex(x => x.Container.Alias == joinedDoc.RefAlias!);
 				for (int i = stageIndex + 1; i < stages.Count; i++)
 				{
 					map = stages[i].ConditionMap;
 
 					if (map.Any(x => x.Any(xx =>
-							(xx.Name == joinedDoc.RefName && xx.Field.FullName == trueFullName) ||
-							(xx.RefName == joinedDoc.RefName && xx.RefField!.FullName == trueFullName))))
+							(xx.Alias == joinedDoc.RefAlias && xx.Field.FullName == trueFullName) ||
+							(xx.RefAlias == joinedDoc.RefAlias && xx.RefField!.FullName == trueFullName))))
 					{
 						stageIndex = i;
 					}
@@ -537,7 +537,7 @@ internal sealed class SelectQueryBuilder<TDocument, TSelect> : QueryBuilder<TDoc
 		{
 			var docMap = BsonClassMap.LookupClassMap(typeof(TDocument));
 			var selMap = BsonClassMap.LookupClassMap(stages[0].Container.DocumentType);
-			var topAlias = stages[0].Container.Name;
+			var topAlias = stages[0].Container.Alias;
 			// 
 			foreach (var elem in docMap.AllMemberMaps.ExceptBy(selMap.AllMemberMaps.Select(x => x.MemberName), x => x.MemberName))
 			{
@@ -553,8 +553,8 @@ internal sealed class SelectQueryBuilder<TDocument, TSelect> : QueryBuilder<TDoc
 						map = stages[i].ConditionMap;
 
 						if (map.Any(x => x.Any(xx =>
-								(xx.Name == topAlias && xx.Field.FullName == path) ||
-								(xx.RefName == topAlias && xx.RefField!.FullName == path))))
+								(xx.Alias == topAlias && xx.Field.FullName == path) ||
+								(xx.RefAlias == topAlias && xx.RefField!.FullName == path))))
 						{
 							stageIndex = i;
 						}
@@ -583,7 +583,7 @@ internal sealed class SelectQueryBuilder<TDocument, TSelect> : QueryBuilder<TDoc
 			{
 				map = stages[j].ConditionMap;
 
-				if (map.Any(x => x.Any(xx => xx.Name == stage.Container.Name || xx.RefName == stage.Container.Name)))
+				if (map.Any(x => x.Any(xx => xx.Alias == stage.Container.Alias || xx.RefAlias == stage.Container.Alias)))
 				{
 					stageIndex = j;
 				}

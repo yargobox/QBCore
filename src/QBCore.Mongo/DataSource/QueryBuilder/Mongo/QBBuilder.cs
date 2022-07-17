@@ -93,7 +93,7 @@ internal class QBBuilder<TDoc, TDto> :
 
 		// The root container cannot have connect conditions (depends on others)
 		//
-		if (connects.Any(x => x.Name == top.Name))
+		if (connects.Any(x => x.Alias == top.Alias))
 		{
 			throw new InvalidOperationException($"Incorrect definition of select query builder '{typeof(TDto).ToPretty()}'.");
 		}
@@ -109,14 +109,14 @@ internal class QBBuilder<TDoc, TDto> :
 
 			if (temp.ContainerOperation == BuilderContainerOperations.LeftJoin || temp.ContainerOperation == BuilderContainerOperations.Join)
 			{
-				if (!connects.Any(x => x.IsConnectOnField && x.Name == temp.Name))
+				if (!connects.Any(x => x.IsConnectOnField && x.Alias == temp.Alias))
 				{
 					throw new InvalidOperationException($"Incorrect definition of select query builder '{typeof(TDto).ToPretty()}': JOIN (LEFT JOIN) has to have at least one connect condition on a field.");
 				}
 			}
 			else if (temp.ContainerOperation == BuilderContainerOperations.CrossJoin)
 			{
-				if (connects.Any(x => x.IsConnectOnField && x.Name == temp.Name))
+				if (connects.Any(x => x.IsConnectOnField && x.Alias == temp.Alias))
 				{
 					throw new InvalidOperationException($"Incorrect definition of select query builder '{typeof(TDto).ToPretty()}': CROSS JOIN cannot have connection conditions on fields.");
 				}
@@ -139,13 +139,13 @@ internal class QBBuilder<TDoc, TDto> :
 		L_RESCAN:
 			top = containers[i];
 			foreach (var topDependOn in connects
-				.Where(x => x.IsOnField && x.Name == top.Name)
-				.Select(x => x.RefName))
+				.Where(x => x.IsOnField && x.Alias == top.Alias)
+				.Select(x => x.RefAlias))
 			{
 				for (int j = i + 1; j < containers.Count; j++)
 				{
 					bottom = containers[j];
-					if (bottom.Name == topDependOn)
+					if (bottom.Alias == topDependOn)
 					{
 						// The signal for an infinite loop is the return of the container to its previous position
 						if (bottom == temp)
@@ -163,7 +163,7 @@ internal class QBBuilder<TDoc, TDto> :
 
 	private QBBuilder<TDoc, TDto> AddContainer(
 		Type documentType,
-		string containerName,
+		string alias,
 		string dbSideName,
 		BuilderContainerTypes containerType,
 		BuilderContainerOperations containerOperation)
@@ -178,14 +178,14 @@ internal class QBBuilder<TDoc, TDto> :
 		{
 			throw new InvalidOperationException($"Incorrect definition of select query builder '{typeof(TDto).ToPretty()}': another initial container has already been added before.");
 		}
-		if (Containers.Any(x => x.Name == containerName))
+		if (Containers.Any(x => x.Alias == alias))
 		{
-			throw new InvalidOperationException($"Incorrect definition of select query builder '{typeof(TDto).ToPretty()}': initial container '{containerName}' has already been added before.");
+			throw new InvalidOperationException($"Incorrect definition of select query builder '{typeof(TDto).ToPretty()}': initial container '{alias}' has already been added before.");
 		}
 
 		Containers.Add(new BuilderContainer(
 			DocumentType: documentType,
-			Name: containerName,
+			Alias: alias,
 			DBSideName: dbSideName,
 			ContainerType: containerType,
 			ContainerOperation: containerOperation
@@ -196,22 +196,22 @@ internal class QBBuilder<TDoc, TDto> :
 
 	private QBBuilder<TDoc, TDto> AddCondition<TLocal, TRef>(
 		BuilderConditionFlags flags,
-		string? name,
+		string? alias,
 		Expression<Func<TLocal, object?>> field,
-		string? refName,
+		string? refAlias,
 		Expression<Func<TRef, object?>>? refField,
 		object? constValue,
 		string? paramName,
 		FO operation)
 	{
 		var trueContainerType = typeof(TLocal) == typeof(TDto) ? typeof(TDoc) : typeof(TLocal);
-		if (name == null)
+		if (alias == null)
 		{
-			name = Containers.Single(x => x.DocumentType == trueContainerType).Name;
+			alias = Containers.Single(x => x.DocumentType == trueContainerType).Alias;
 		}
-		else if (!Containers.Any(x => x.Name == name && x.DocumentType == trueContainerType))
+		else if (!Containers.Any(x => x.Alias == alias && x.DocumentType == trueContainerType))
 		{
-			throw new InvalidOperationException($"Incorrect condition definition of select query builder '{typeof(TDto).ToPretty()}': referenced container '{name}' of  document '{trueContainerType.ToPretty()}' has not been added yet.");
+			throw new InvalidOperationException($"Incorrect condition definition of select query builder '{typeof(TDto).ToPretty()}': referenced container '{alias}' of  document '{trueContainerType.ToPretty()}' has not been added yet.");
 		}
 
 		if (field == null)
@@ -222,13 +222,13 @@ internal class QBBuilder<TDoc, TDto> :
 		var onWhat = flags & (BuilderConditionFlags.OnField | BuilderConditionFlags.OnConst | BuilderConditionFlags.OnParam);
 		if (onWhat == BuilderConditionFlags.OnField)
 		{
-			if (refName == null)
+			if (refAlias == null)
 			{
-				refName = Containers.Single(x => x.DocumentType == typeof(TRef)).Name;
+				refAlias = Containers.Single(x => x.DocumentType == typeof(TRef)).Alias;
 			}
-			else if (!Containers.Any(x => x.Name == refName && x.DocumentType == typeof(TRef)))
+			else if (!Containers.Any(x => x.Alias == refAlias && x.DocumentType == typeof(TRef)))
 			{
-				throw new InvalidOperationException($"Incorrect condition definition of select query builder '{typeof(TDto).ToPretty()}': referenced container '{refName}' of  document '{typeof(TRef).ToPretty()}' has not been added yet.");
+				throw new InvalidOperationException($"Incorrect condition definition of select query builder '{typeof(TDto).ToPretty()}': referenced container '{refAlias}' of  document '{typeof(TRef).ToPretty()}' has not been added yet.");
 			}
 
 			if (refField == null)
@@ -249,9 +249,9 @@ internal class QBBuilder<TDoc, TDto> :
 			Connects.Add(new BuilderCondition(
 				flags: flags,
 				parentheses: 0,
-				name: name,
+				alias: alias,
 				field: field,
-				refName: refName,
+				refAlias: refAlias,
 				refField: refField,
 				value: onWhat == BuilderConditionFlags.OnParam ? paramName : onWhat == BuilderConditionFlags.OnConst ? constValue : null,
 				operation: operation
@@ -371,9 +371,9 @@ internal class QBBuilder<TDoc, TDto> :
 			Conditions.Add(new BuilderCondition(
 				flags: flags,
 				parentheses: _parentheses,
-				name: name,
+				alias: alias,
 				field: field,
-				refName: refName,
+				refAlias: refAlias,
 				refField: refField,
 				value: onWhat == BuilderConditionFlags.OnParam ? paramName : onWhat == BuilderConditionFlags.OnConst ? constValue : null,
 				operation: operation
@@ -386,7 +386,7 @@ internal class QBBuilder<TDoc, TDto> :
 		return this;
 	}
 
-	private QBBuilder<TDoc, TDto> AddInclude<TRef>(Expression<Func<TDto, object?>> field, string? refName, Expression<Func<TRef, object?>> refField)
+	private QBBuilder<TDoc, TDto> AddInclude<TRef>(Expression<Func<TDto, object?>> field, string? refAlias, Expression<Func<TRef, object?>> refField)
 	{
 		if (_isByOr != null || _parentheses > 0)
 		{
@@ -401,13 +401,13 @@ internal class QBBuilder<TDoc, TDto> :
 			throw new ArgumentNullException(nameof(refField));
 		}
 
-		if (refName == null)
+		if (refAlias == null)
 		{
-			refName = Containers.Single(x => x.DocumentType == typeof(TRef)).Name;
+			refAlias = Containers.Single(x => x.DocumentType == typeof(TRef)).Alias;
 		}
-		else if (!Containers.Any(x => x.Name == refName && x.DocumentType == typeof(TRef)))
+		else if (!Containers.Any(x => x.Alias == refAlias && x.DocumentType == typeof(TRef)))
 		{
-			throw new InvalidOperationException($"Incorrect field definition of select query builder '{typeof(TDto).ToPretty()}': referenced container '{refName}' of  document '{typeof(TRef).ToPretty()}' has not been added yet.");
+			throw new InvalidOperationException($"Incorrect field definition of select query builder '{typeof(TDto).ToPretty()}': referenced container '{refAlias}' of  document '{typeof(TRef).ToPretty()}' has not been added yet.");
 		}
 
 		var fieldPath = new FieldPath(field, false);
@@ -420,7 +420,7 @@ internal class QBBuilder<TDoc, TDto> :
 
 		Fields.Add(new BuilderField(
 			Field: fieldPath,
-			RefName: refName,
+			RefAlias: refAlias,
 			RefField: refFieldPath,
 			OptionalExclusion: false
 		));
@@ -447,7 +447,7 @@ internal class QBBuilder<TDoc, TDto> :
 
 		Fields.Add(new BuilderField(
 			Field: fieldPath,
-			RefName: null,
+			RefAlias: null,
 			RefField: null,
 			OptionalExclusion: optional
 		));

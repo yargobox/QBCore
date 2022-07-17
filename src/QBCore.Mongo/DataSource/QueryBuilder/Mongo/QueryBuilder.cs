@@ -295,7 +295,7 @@ internal abstract class QueryBuilder<TDocument, TProjection> : IQueryBuilder<TDo
 		}
 
 		var constValue = cond.IsOnParam ? paramValue : cond.Value;
-		var leftField = getDBSideName(cond.Name, cond.Field);
+		var leftField = getDBSideName(cond.Alias, cond.Field);
 
 		switch (cond.Operation & _supportedOperations)
 		{
@@ -387,8 +387,8 @@ internal abstract class QueryBuilder<TDocument, TProjection> : IQueryBuilder<TDo
 			throw new InvalidOperationException("Case-sensitive or case-insensitive operations are not supported for conditions between fields.");
 		}
 
-		var leftField = getDBSideName(cond.Name, cond.Field);
-		var rightField = getDBSideName(cond.RefName!, cond.RefField!);
+		var leftField = getDBSideName(cond.Alias, cond.Field);
+		var rightField = getDBSideName(cond.RefAlias!, cond.RefField!);
 
 		switch (cond.Operation & _supportedOperations)
 		{
@@ -420,7 +420,7 @@ internal abstract class QueryBuilder<TDocument, TProjection> : IQueryBuilder<TDo
 		{
 			if (!cond.IsFieldNullable)
 			{
-				throw new ArgumentNullException(nameof(value), $"Field {cond.Name}.{cond.FieldPath} does not support null values.");
+				throw new ArgumentNullException(nameof(value), $"Field {cond.Alias}.{cond.FieldPath} does not support null values.");
 			}
 
 			return BsonNull.Value;
@@ -431,7 +431,7 @@ internal abstract class QueryBuilder<TDocument, TProjection> : IQueryBuilder<TDo
 		{
 			if (!TryConvertIntegerToOtherInteger(value, cond.FieldUnderlyingType, out value))
 			{
-				throw new ArgumentException($"Field {cond.Name}.{cond.FieldPath} has type {cond.FieldType.ToPretty()} not {value.GetType().ToPretty()}.", nameof(value));
+				throw new ArgumentException($"Field {cond.Alias}.{cond.FieldPath} has type {cond.FieldType.ToPretty()} not {value.GetType().ToPretty()}.", nameof(value));
 			}
 		}
 		
@@ -445,7 +445,7 @@ internal abstract class QueryBuilder<TDocument, TProjection> : IQueryBuilder<TDo
 			{
 				return new BsonRegularExpression(string.Concat("^", Regex.Escape(stringValue.ToLower()), "$"), "i");//!!! localization
 			}
-			throw new InvalidOperationException($"Such operations can only be performed on strings. Field {cond.Name}.{cond.FieldPath} is not a string type.");
+			throw new InvalidOperationException($"Such operations can only be performed on strings. Field {cond.Alias}.{cond.FieldPath} is not a string type.");
 		}
 
 		return new BsonDocumentWrapper(value, BsonSerializer.SerializerRegistry.GetSerializer(cond.FieldType));
@@ -454,13 +454,13 @@ internal abstract class QueryBuilder<TDocument, TProjection> : IQueryBuilder<TDo
 	{
 		if (cond.FieldUnderlyingType != typeof(string))
 		{
-			throw new InvalidOperationException($"Such operations can only be performed on strings. Field {cond.Name}.{cond.FieldPath} is not a string type.");
+			throw new InvalidOperationException($"Such operations can only be performed on strings. Field {cond.Alias}.{cond.FieldPath} is not a string type.");
 		}
 		if (value == null)
 		{
 			if (!cond.IsFieldNullable)
 			{
-				throw new ArgumentNullException(nameof(value), $"Field {cond.Name}.{cond.FieldPath} does not support null values.");
+				throw new ArgumentNullException(nameof(value), $"Field {cond.Alias}.{cond.FieldPath} does not support null values.");
 			}
 
 			return BsonNull.Value;
@@ -476,19 +476,19 @@ internal abstract class QueryBuilder<TDocument, TProjection> : IQueryBuilder<TDo
 				return new BsonRegularExpression(Regex.Escape(stringValue));
 			}
 		}
-		throw new ArgumentException($"Field {cond.Name}.{cond.FieldPath} has type {cond.FieldType.ToPretty()} not {value.GetType().ToPretty()}.", nameof(value));
+		throw new ArgumentException($"Field {cond.Alias}.{cond.FieldPath} has type {cond.FieldType.ToPretty()} not {value.GetType().ToPretty()}.", nameof(value));
 	}
 	private static BsonValue RenderToBsonLong(BuilderCondition cond, object? value)
 	{
 		if (!_integerTypes.Contains(cond.FieldUnderlyingType))
 		{
-			throw new InvalidOperationException($"Such operations can only be performed on integers. Field {cond.Name}.{cond.FieldPath} is not an integer type.");
+			throw new InvalidOperationException($"Such operations can only be performed on integers. Field {cond.Alias}.{cond.FieldPath} is not an integer type.");
 		}
 		if (value == null)
 		{
 			if (!cond.IsFieldNullable)
 			{
-				throw new ArgumentNullException(nameof(value), $"Field {cond.Name}.{cond.FieldPath} does not support null values.");
+				throw new ArgumentNullException(nameof(value), $"Field {cond.Alias}.{cond.FieldPath} does not support null values.");
 			}
 
 			return BsonNull.Value;
@@ -499,7 +499,7 @@ internal abstract class QueryBuilder<TDocument, TProjection> : IQueryBuilder<TDo
 		{
 			if (!_integerTypes.Contains(type) && !_integerTypes.Contains(type.GetUnderlyingSystemType()))
 			{
-				throw new ArgumentException($"Field {cond.Name}.{cond.FieldPath} has type {cond.FieldType.ToPretty()} not {type.ToPretty()}.", nameof(value));
+				throw new ArgumentException($"Field {cond.Alias}.{cond.FieldPath} has type {cond.FieldType.ToPretty()} not {type.ToPretty()}.", nameof(value));
 			}
 		}
 
@@ -522,7 +522,7 @@ internal abstract class QueryBuilder<TDocument, TProjection> : IQueryBuilder<TDo
 			{
 				if (!cond.IsFieldNullable)
 				{
-					throw new ArgumentNullException(nameof(value), $"Field {cond.Name}.{cond.FieldPath} does not support null values.");
+					throw new ArgumentNullException(nameof(value), $"Field {cond.Alias}.{cond.FieldPath} does not support null values.");
 				}
 				
 				array.Add(BsonNull.Value);
@@ -539,7 +539,7 @@ internal abstract class QueryBuilder<TDocument, TProjection> : IQueryBuilder<TDo
 							array.Add(new BsonDocumentWrapper(obj, serializer ?? (serializer = BsonSerializer.SerializerRegistry.GetSerializer(cond.FieldType))));
 						}
 					}
-					throw new ArgumentException($"Field {cond.Name}.{cond.FieldPath} has type {cond.FieldType.ToPretty()} not {obj.GetType().ToPretty()}.", nameof(value));
+					throw new ArgumentException($"Field {cond.Alias}.{cond.FieldPath} has type {cond.FieldType.ToPretty()} not {obj.GetType().ToPretty()}.", nameof(value));
 				}
 
 				if (cond.Operation.HasFlag(FO.CaseInsensitive))
@@ -552,7 +552,7 @@ internal abstract class QueryBuilder<TDocument, TProjection> : IQueryBuilder<TDo
 					{
 						array.Add(new BsonRegularExpression(string.Concat("^", Regex.Escape(stringValue.ToLower()), "$"), "i"));// !!! localization
 					}
-					throw new ArgumentException($"Such operations can only be performed on strings. Field {cond.Name}.{cond.FieldPath} is not a string type.", nameof(value));
+					throw new ArgumentException($"Such operations can only be performed on strings. Field {cond.Alias}.{cond.FieldPath} is not a string type.", nameof(value));
 				}
 				else
 				{
