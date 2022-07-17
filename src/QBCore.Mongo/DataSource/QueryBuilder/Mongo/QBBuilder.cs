@@ -178,6 +178,10 @@ internal class QBBuilder<TDoc, TDto> :
 		{
 			throw new InvalidOperationException($"Incorrect definition of select query builder '{typeof(TDto).ToPretty()}': another initial container has already been added before.");
 		}
+		if (alias.Contains('.'))
+		{
+			throw new InvalidOperationException($"Incorrect definition of select query builder '{typeof(TDto).ToPretty()}': container alias '{alias}' cannot contain a period character '.'.");
+		}
 		if (Containers.Any(x => x.Alias == alias))
 		{
 			throw new InvalidOperationException($"Incorrect definition of select query builder '{typeof(TDto).ToPretty()}': initial container '{alias}' has already been added before.");
