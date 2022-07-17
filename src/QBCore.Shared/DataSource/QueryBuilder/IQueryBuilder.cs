@@ -11,7 +11,7 @@ public interface IQueryBuilder : IOriginal
 	Type ProjectionType { get; }
 	
 	Type DatabaseContextInterface { get; }
-	object DbContext { get; set; }
+	IDataContext DataContext { get; }
 }
 
 public interface IQueryBuilder<TDocument, TProjection> : IQueryBuilder
@@ -31,23 +31,8 @@ public interface IInsertQueryBuilder<TDocument, TCreate> : IQueryBuilder<TDocume
 public interface ISelectQueryBuilder<TDocument, TSelect> : IQueryBuilder<TDocument, TSelect>
 {
 	IQueryable<TDocument> AsQueryable(DataSourceQueryableOptions? options = null);
-
-	Task<long> CountAsync(
-		IReadOnlyCollection<QBCondition>? conditions = null,
-		IReadOnlyDictionary<string, object?>? arguments = null,
-		DataSourceSelectOptions? options = null,
-		CancellationToken cancellationToken = default(CancellationToken)
-	);
-
-	IAsyncEnumerable<TSelect> SelectAsync(
-		IReadOnlyCollection<QBCondition>? conditions = null,
-		IReadOnlyDictionary<string, object?>? arguments = null,
-		IReadOnlyCollection<QBSortOrder>? sortOrders = null,
-		long? skip = null,
-		int? take = null,
-		DataSourceSelectOptions? options = null,
-		CancellationToken cancellationToken = default(CancellationToken)
-	);
+	Task<long> CountAsync(DataSourceCountOptions? options = null, CancellationToken cancellationToken = default(CancellationToken));
+	IAsyncEnumerable<TSelect> SelectAsync(long? skip = null, int? take = null, DataSourceSelectOptions? options = null, CancellationToken cancellationToken = default(CancellationToken));
 }
 
 public interface IUpdateQueryBuilder<TDocument, TUpdate> : IQueryBuilder<TDocument, TUpdate>

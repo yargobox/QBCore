@@ -1,3 +1,4 @@
+using QBCore.Configuration;
 using QBCore.ObjectFactory;
 
 namespace QBCore.DataSource.QueryBuilder.Mongo;
@@ -8,8 +9,8 @@ internal sealed class SoftDelQueryBuilder<TDocument, TDelete> : QueryBuilder<TDo
 
 	public override Origin Source => new Origin(this.GetType());
 
-	public SoftDelQueryBuilder(QBBuilder<TDocument, TDelete> building)
-		: base(building)
+	public SoftDelQueryBuilder(QBBuilder<TDocument, TDelete> building, IDataContext dataContext)
+		: base(building, dataContext)
 	{
 	}
 }

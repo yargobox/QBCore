@@ -1,3 +1,4 @@
+using QBCore.Configuration;
 using QBCore.DataSource.Options;
 using QBCore.ObjectFactory;
 
@@ -9,8 +10,8 @@ internal sealed class InsertQueryBuilder<TDocument, TCreate> : QueryBuilder<TDoc
 
 	public override Origin Source => new Origin(this.GetType());
 
-	public InsertQueryBuilder(QBBuilder<TDocument, TCreate> building)
-		: base(building)
+	public InsertQueryBuilder(QBBuilder<TDocument, TCreate> building, IDataContext dataContext)
+		: base(building, dataContext)
 	{
 	}
 

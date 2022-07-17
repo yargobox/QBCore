@@ -1,3 +1,4 @@
+using QBCore.Configuration;
 using QBCore.DataSource.Options;
 using QBCore.ObjectFactory;
 
@@ -9,8 +10,8 @@ internal sealed class UpdateQueryBuilder<TDocument, TUpdate> : QueryBuilder<TDoc
 
 	public override Origin Source => new Origin(this.GetType());
 
-	public UpdateQueryBuilder(QBBuilder<TDocument, TUpdate> building)
-		: base(building)
+	public UpdateQueryBuilder(QBBuilder<TDocument, TUpdate> building, IDataContext dataContext)
+		: base(building, dataContext)
 	{
 	}
 

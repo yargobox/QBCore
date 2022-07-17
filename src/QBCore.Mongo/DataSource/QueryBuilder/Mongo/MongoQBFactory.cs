@@ -84,7 +84,7 @@ public class MongoQBFactory : IQueryBuilderFactory
 		}
 	}
 
-	public IInsertQueryBuilder<TDocument, TCreate> CreateQBInsert<TDocument, TCreate>()
+	public IInsertQueryBuilder<TDocument, TCreate> CreateQBInsert<TDocument, TCreate>(IDataContext dataContext)
 	{
 		if (_insert == null)
 		{
@@ -97,14 +97,14 @@ public class MongoQBFactory : IQueryBuilderFactory
 					.Invoke(this, null);
 		}
 
-		if (_insert is Func<IInsertQueryBuilder<TDocument, TCreate>> creator)
+		if (_insert is Func<IDataContext, IInsertQueryBuilder<TDocument, TCreate>> creator)
 		{
-			return creator();
+			return creator(dataContext);
 		}
 		throw new InvalidOperationException($"Datasource {DataSourceConcrete.ToPretty()} does not have a query builder like {typeof(IInsertQueryBuilder<TDocument, TCreate>).ToPretty()}.");
 	}
 
-	public ISelectQueryBuilder<TDocument, TSelect> CreateQBSelect<TDocument, TSelect>()
+	public ISelectQueryBuilder<TDocument, TSelect> CreateQBSelect<TDocument, TSelect>(IDataContext dataContext)
 	{
 		if (_select == null)
 		{
@@ -117,14 +117,14 @@ public class MongoQBFactory : IQueryBuilderFactory
 					.Invoke(this, null);
 		}
 
-		if (_select is Func<ISelectQueryBuilder<TDocument, TSelect>> creator)
+		if (_select is Func<IDataContext, ISelectQueryBuilder<TDocument, TSelect>> creator)
 		{
-			return creator();
+			return creator(dataContext);
 		}
 		throw new InvalidOperationException($"Datasource {DataSourceConcrete.ToPretty()} does not have a query builder like {typeof(ISelectQueryBuilder<TDocument, TSelect>).ToPretty()}.");
 	}
 
-	public IUpdateQueryBuilder<TDocument, TUpdate> CreateQBUpdate<TDocument, TUpdate>()
+	public IUpdateQueryBuilder<TDocument, TUpdate> CreateQBUpdate<TDocument, TUpdate>(IDataContext dataContext)
 	{
 		if (_update == null)
 		{
@@ -137,14 +137,14 @@ public class MongoQBFactory : IQueryBuilderFactory
 					.Invoke(this, null);
 		}
 
-		if (_update is Func<IUpdateQueryBuilder<TDocument, TUpdate>> creator)
+		if (_update is Func<IDataContext, IUpdateQueryBuilder<TDocument, TUpdate>> creator)
 		{
-			return creator();
+			return creator(dataContext);
 		}
 		throw new InvalidOperationException($"Datasource {DataSourceConcrete.ToPretty()} does not have a query builder like {typeof(IUpdateQueryBuilder<TDocument, TUpdate>).ToPretty()}.");
 	}
 
-	public IDeleteQueryBuilder<TDocument, TDelete> CreateQBDelete<TDocument, TDelete>()
+	public IDeleteQueryBuilder<TDocument, TDelete> CreateQBDelete<TDocument, TDelete>(IDataContext dataContext)
 	{
 		if (_delete == null && !SupportedQueryBuilders.HasFlag(QueryBuilderTypes.SoftDel))
 		{
@@ -157,14 +157,14 @@ public class MongoQBFactory : IQueryBuilderFactory
 					.Invoke(this, null);
 		}
 
-		if (_delete is Func<IDeleteQueryBuilder<TDocument, TDelete>> creator)
+		if (_delete is Func<IDataContext, IDeleteQueryBuilder<TDocument, TDelete>> creator)
 		{
-			return creator();
+			return creator(dataContext);
 		}
 		throw new InvalidOperationException($"Datasource {DataSourceConcrete.ToPretty()} does not have a query builder like {typeof(IDeleteQueryBuilder<TDocument, TDelete>).ToPretty()}.");
 	}
 
-	public IDeleteQueryBuilder<TDocument, TDelete> CreateQBSoftDel<TDocument, TDelete>()
+	public IDeleteQueryBuilder<TDocument, TDelete> CreateQBSoftDel<TDocument, TDelete>(IDataContext dataContext)
 	{
 		if (_delete == null && !SupportedQueryBuilders.HasFlag(QueryBuilderTypes.Delete))
 		{
@@ -177,14 +177,14 @@ public class MongoQBFactory : IQueryBuilderFactory
 					.Invoke(this, null);
 		}
 
-		if (_delete is Func<IDeleteQueryBuilder<TDocument, TDelete>> creator)
+		if (_delete is Func<IDataContext, IDeleteQueryBuilder<TDocument, TDelete>> creator)
 		{
-			return creator();
+			return creator(dataContext);
 		}
 		throw new InvalidOperationException($"Datasource {DataSourceConcrete.ToPretty()} does not have a query builder like {typeof(IQBSoftDelBuilder<TDocument, TDelete>).ToPretty()}.");
 	}
 
-	public IRestoreQueryBuilder<TDocument, TRestore> CreateQBRestore<TDocument, TRestore>()
+	public IRestoreQueryBuilder<TDocument, TRestore> CreateQBRestore<TDocument, TRestore>(IDataContext dataContext)
 	{
 		if (_restore == null)
 		{
@@ -197,14 +197,14 @@ public class MongoQBFactory : IQueryBuilderFactory
 					.Invoke(this, null);
 		}
 
-		if (_restore is Func<IRestoreQueryBuilder<TDocument, TRestore>> creator)
+		if (_restore is Func<IDataContext, IRestoreQueryBuilder<TDocument, TRestore>> creator)
 		{
-			return creator();
+			return creator(dataContext);
 		}
 		throw new InvalidOperationException($"Datasource {DataSourceConcrete.ToPretty()} does not have a query builder like {typeof(IRestoreQueryBuilder<TDocument, TRestore>).ToPretty()}.");
 	}
 
-	private Func<IInsertQueryBuilder<TDocument, TCreate>> MakeInsertFactoryMethod<TDocument, TCreate>()
+	private Func<IDataContext, IInsertQueryBuilder<TDocument, TCreate>> MakeInsertFactoryMethod<TDocument, TCreate>()
 	{
 		var setupAction =
 		(
@@ -218,9 +218,9 @@ public class MongoQBFactory : IQueryBuilderFactory
 		var setup = new QBBuilder<TDocument, TCreate>();
 		setupAction(setup);
 
-		return () => new InsertQueryBuilder<TDocument, TCreate>(new QBBuilder<TDocument, TCreate>(setup));
+		return (IDataContext dataContext) => new InsertQueryBuilder<TDocument, TCreate>(new QBBuilder<TDocument, TCreate>(setup), dataContext);
 	}
-	private Func<ISelectQueryBuilder<TDocument, TSelect>> MakeSelectFactoryMethod<TDocument, TSelect>()
+	private Func<IDataContext, ISelectQueryBuilder<TDocument, TSelect>> MakeSelectFactoryMethod<TDocument, TSelect>()
 	{
 		var setupAction =
 		(
@@ -235,9 +235,9 @@ public class MongoQBFactory : IQueryBuilderFactory
 		setupAction(setup);
 		setup.NormalizeSelect();
 
-		return () => new SelectQueryBuilder<TDocument, TSelect>(new QBBuilder<TDocument, TSelect>(setup));
+		return (IDataContext dataContext) => new SelectQueryBuilder<TDocument, TSelect>(new QBBuilder<TDocument, TSelect>(setup), dataContext);
 	}
-	private Func<IUpdateQueryBuilder<TDocument, TUpdate>> MakeUpdateFactoryMethod<TDocument, TUpdate>()
+	private Func<IDataContext, IUpdateQueryBuilder<TDocument, TUpdate>> MakeUpdateFactoryMethod<TDocument, TUpdate>()
 	{
 		var setupAction =
 		(
@@ -251,9 +251,9 @@ public class MongoQBFactory : IQueryBuilderFactory
 		var setup = new QBBuilder<TDocument, TUpdate>();
 		setupAction(setup);
 
-		return () => new UpdateQueryBuilder<TDocument, TUpdate>(new QBBuilder<TDocument, TUpdate>(setup));
+		return (IDataContext dataContext) => new UpdateQueryBuilder<TDocument, TUpdate>(new QBBuilder<TDocument, TUpdate>(setup), dataContext);
 	}
-	private Func<IDeleteQueryBuilder<TDocument, TDelete>> MakeDeleteFactoryMethod<TDocument, TDelete>()
+	private Func<IDataContext, IDeleteQueryBuilder<TDocument, TDelete>> MakeDeleteFactoryMethod<TDocument, TDelete>()
 	{
 		var setupAction =
 		(
@@ -267,9 +267,9 @@ public class MongoQBFactory : IQueryBuilderFactory
 		var setup = new QBBuilder<TDocument, TDelete>();
 		setupAction(setup);
 
-		return () => new DeleteQueryBuilder<TDocument, TDelete>(new QBBuilder<TDocument, TDelete>(setup));
+		return (IDataContext dataContext) => new DeleteQueryBuilder<TDocument, TDelete>(new QBBuilder<TDocument, TDelete>(setup), dataContext);
 	}
-	private Func<IDeleteQueryBuilder<TDocument, TDelete>> MakeSoftDelFactoryMethod<TDocument, TDelete>()
+	private Func<IDataContext, IDeleteQueryBuilder<TDocument, TDelete>> MakeSoftDelFactoryMethod<TDocument, TDelete>()
 	{
 		var setupAction =
 		(
@@ -283,9 +283,9 @@ public class MongoQBFactory : IQueryBuilderFactory
 		var setup = new QBBuilder<TDocument, TDelete>();
 		setupAction(setup);
 
-		return () => new SoftDelQueryBuilder<TDocument, TDelete>(new QBBuilder<TDocument, TDelete>(setup));
+		return (IDataContext dataContext) => new SoftDelQueryBuilder<TDocument, TDelete>(new QBBuilder<TDocument, TDelete>(setup), dataContext);
 	}
-	private Func<IRestoreQueryBuilder<TDocument, TRestore>> MakeRestoreFactoryMethod<TDocument, TRestore>()
+	private Func<IDataContext, IRestoreQueryBuilder<TDocument, TRestore>> MakeRestoreFactoryMethod<TDocument, TRestore>()
 	{
 		var setupAction =
 		(
@@ -299,6 +299,6 @@ public class MongoQBFactory : IQueryBuilderFactory
 		var setup = new QBBuilder<TDocument, TRestore>();
 		setupAction(setup);
 
-		return () => new RestoreQueryBuilder<TDocument, TRestore>(new QBBuilder<TDocument, TRestore>(setup));
+		return (IDataContext dataContext) => new RestoreQueryBuilder<TDocument, TRestore>(new QBBuilder<TDocument, TRestore>(setup), dataContext);
 	}
 }

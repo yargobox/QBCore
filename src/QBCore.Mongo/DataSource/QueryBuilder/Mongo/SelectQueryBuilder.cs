@@ -2,6 +2,7 @@ using System.Runtime.CompilerServices;
 using MongoDB.Bson;
 using MongoDB.Bson.Serialization;
 using MongoDB.Driver;
+using QBCore.Configuration;
 using QBCore.DataSource.Options;
 using QBCore.Extensions.Collections.Generic;
 using QBCore.Extensions.Text;
@@ -33,8 +34,8 @@ internal sealed class SelectQueryBuilder<TDocument, TSelect> : QueryBuilder<TDoc
 
 	public override Origin Source => new Origin(this.GetType());
 
-	public SelectQueryBuilder(QBBuilder<TDocument, TSelect> building)
-		: base(building)
+	public SelectQueryBuilder(QBBuilder<TDocument, TSelect> building, IDataContext dataContext)
+		: base(building, dataContext)
 	{
 	}
 
@@ -44,15 +45,10 @@ internal sealed class SelectQueryBuilder<TDocument, TSelect> : QueryBuilder<TDoc
 		{
 			if (_collection == null)
 			{
-				if (_dbContext == null)
-				{
-					throw new InvalidOperationException($"Database context of select query builder '{typeof(TSelect).ToPretty()}' has not been set.");
-				}
-
 				var top = Builder.Containers.FirstOrDefault(x => x.ContainerOperation == BuilderContainerOperations.Select);
 				if (top?.ContainerType == BuilderContainerTypes.Table || top?.ContainerType == BuilderContainerTypes.View)
 				{
-					_collection = _dbContext.DB.GetCollection<TDocument>(top!.DBSideName);
+					_collection = _mongoDbContext.DB.GetCollection<TDocument>(top!.DBSideName);
 				}
 				else
 				{
@@ -78,11 +74,7 @@ internal sealed class SelectQueryBuilder<TDocument, TSelect> : QueryBuilder<TDoc
 		return Collection.AsQueryable((IClientSessionHandle?)options?.NativeClientSession, (AggregateOptions?)options?.NativeOptions);
 	}
 
-	public async Task<long> CountAsync(
-		IReadOnlyCollection<QBCondition>? conditions = null,
-		IReadOnlyDictionary<string, object?>? arguments = null,
-		DataSourceSelectOptions? options = null,
-		CancellationToken cancellationToken = default)
+	public async Task<long> CountAsync(DataSourceCountOptions? options = null, CancellationToken cancellationToken = default)
 	{
 		if (options?.NativeOptions != null && options.NativeOptions is not AggregateOptions)
 		{
@@ -95,21 +87,14 @@ internal sealed class SelectQueryBuilder<TDocument, TSelect> : QueryBuilder<TDoc
 		var aggrOptions = (AggregateOptions?)options?.NativeOptions;
 		var clientSessionHandle = (IClientSessionHandle?)options?.NativeClientSession;
 		_ = Collection;
-		var query = BuildSelectQuery(Builder, arguments);
+		var query = BuildSelectQuery(Builder, null!);//!!!
 
 		await Task.CompletedTask;
 		throw new NotImplementedException();
 		//return await Collection.CountDocumentsAsync(Builders<TDocument>.Filter.Empty, countOptions, cancellationToken);
 	}
 
-	public async IAsyncEnumerable<TSelect> SelectAsync(
-		IReadOnlyCollection<QBCondition>? conditions = null,
-		IReadOnlyDictionary<string, object?>? arguments = null,
-		IReadOnlyCollection<QBSortOrder>? sortOrders = null,
-		long? skip = null,
-		int? take = null,
-		DataSourceSelectOptions? options = null,
-		[EnumeratorCancellation] CancellationToken cancellationToken = default(CancellationToken))
+	public async IAsyncEnumerable<TSelect> SelectAsync(long? skip = null, int? take = null, DataSourceSelectOptions? options = null, [EnumeratorCancellation] CancellationToken cancellationToken = default(CancellationToken))
 	{
 		if (skip < 0)
 		{
@@ -131,7 +116,7 @@ internal sealed class SelectQueryBuilder<TDocument, TSelect> : QueryBuilder<TDoc
 		{
 			throw new ArgumentException(nameof(options.NativeClientSession));
 		}
-		if (options?.PreparedNativeQuery != null && (options.PreparedNativeQuery is not List<BsonDocument> || conditions != null || arguments != null))
+		if (options?.PreparedNativeQuery != null && options.PreparedNativeQuery is not List<BsonDocument>)
 		{
 			throw new ArgumentException(nameof(options.PreparedNativeQuery));
 		}
@@ -193,7 +178,7 @@ internal sealed class SelectQueryBuilder<TDocument, TSelect> : QueryBuilder<TDoc
 		}
 		else
 		{
-			query = BuildSelectQuery(Builder, arguments);
+			query = BuildSelectQuery(Builder, null!);//!!!
 
 			if (skip != null)
 			{
@@ -368,7 +353,7 @@ internal sealed class SelectQueryBuilder<TDocument, TSelect> : QueryBuilder<TDoc
 					var leftJoinOrCrossJoin = stage.Container.ContainerOperation != BuilderContainerOperations.Join;
 					result.Add(new BsonDocument {
 						{ "$unwind", new BsonDocument {
-							{ "path", lookup["as"] },
+							{ "path", "$" + lookup["as"] },
 							{ "preserveNullAndEmptyArrays", leftJoinOrCrossJoin }
 						}}
 					});

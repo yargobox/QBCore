@@ -66,10 +66,9 @@ public abstract partial class DataSource<TKey, TDocument, TCreate, TSelect, TUpd
 
 	public IAsyncEnumerable<TSelect> SelectAsync(SoftDel mode = SoftDel.Actual, IReadOnlyCollection<IDSCondition>? conditions = null, IReadOnlyCollection<IDSSortOrder>? sortOrders = null, long? skip = null, int? take = null, DataSourceSelectOptions? options = null, CancellationToken cancellationToken = default(CancellationToken))
 	{
-		var queryBuilder = Definition.QBFactory.CreateQBSelect<TDocument, TSelect>();
-		queryBuilder.DbContext = _dataContext.Context;
+		var queryBuilder = Definition.QBFactory.CreateQBSelect<TDocument, TSelect>(_dataContext);
 
-		return queryBuilder.SelectAsync(null, null, null, skip, take, options, cancellationToken);
+		return queryBuilder.SelectAsync(skip, take, options, cancellationToken);
 	}
 
 	public Task<TUpdate> UpdateAsync(TKey id, TUpdate document, IReadOnlyCollection<string>? modifiedFieldNames = null, DataSourceUpdateOptions? options = null, CancellationToken cancellationToken = default(CancellationToken))

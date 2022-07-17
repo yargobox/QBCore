@@ -18,11 +18,11 @@ internal abstract class QueryBuilder<TDocument, TProjection> : IQueryBuilder<TDo
 	public Type DocumentType => typeof(TDocument);
 	public Type ProjectionType => typeof(TProjection);
 	public Type DatabaseContextInterface => typeof(IMongoDbContext);
-	public object DbContext { get => _dbContext; set => _dbContext = (IMongoDbContext)value; }
+	public IDataContext DataContext { get; }
 	public QBBuilder<TDocument, TProjection> Builder { get; }
 	public abstract Origin Source { get; }
 
-	protected IMongoDbContext _dbContext;
+	protected IMongoDbContext _mongoDbContext;
 
 
 	#region Static ReadOnly & Const Properties
@@ -52,10 +52,24 @@ internal abstract class QueryBuilder<TDocument, TProjection> : IQueryBuilder<TDo
 
 	#endregion
 
-	public QueryBuilder(QBBuilder<TDocument, TProjection> builder)
+	public QueryBuilder(QBBuilder<TDocument, TProjection> builder, IDataContext dataContext)
 	{
+		if (builder == null)
+		{
+			throw new ArgumentNullException(nameof(builder));
+		}
+		if (dataContext == null)
+		{
+			throw new ArgumentNullException(nameof(dataContext));
+		}
+		if (dataContext.Context is not IMongoDbContext)
+		{
+			throw new ArgumentException(nameof(dataContext));
+		}
+
 		Builder = builder;
-		_dbContext = null!;
+		DataContext = dataContext;
+		_mongoDbContext = (IMongoDbContext)dataContext.Context;
 	}
 
 	/// <summary>

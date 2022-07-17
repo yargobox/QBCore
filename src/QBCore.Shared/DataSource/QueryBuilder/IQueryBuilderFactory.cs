@@ -1,3 +1,5 @@
+using QBCore.Configuration;
+
 namespace QBCore.DataSource.QueryBuilder;
 
 public interface IQueryBuilderFactory
@@ -6,10 +8,10 @@ public interface IQueryBuilderFactory
 	Type DatabaseContextInterface { get; }
 	QueryBuilderTypes SupportedQueryBuilders { get; }
 
-	IInsertQueryBuilder<TDocument, TCreate> CreateQBInsert<TDocument, TCreate>();
-	ISelectQueryBuilder<TDocument, TSelect> CreateQBSelect<TDocument, TSelect>();
-	IUpdateQueryBuilder<TDocument, TUpdate> CreateQBUpdate<TDocument, TUpdate>();
-	IDeleteQueryBuilder<TDocument, TDelete> CreateQBDelete<TDocument, TDelete>();
-	IDeleteQueryBuilder<TDocument, TDelete> CreateQBSoftDel<TDocument, TDelete>();
-	IRestoreQueryBuilder<TDocument, TRestore> CreateQBRestore<TDocument, TRestore>();
+	IInsertQueryBuilder<TDocument, TCreate> CreateQBInsert<TDocument, TCreate>(IDataContext dataContext);
+	ISelectQueryBuilder<TDocument, TSelect> CreateQBSelect<TDocument, TSelect>(IDataContext dataContext);
+	IUpdateQueryBuilder<TDocument, TUpdate> CreateQBUpdate<TDocument, TUpdate>(IDataContext dataContext);
+	IDeleteQueryBuilder<TDocument, TDelete> CreateQBDelete<TDocument, TDelete>(IDataContext dataContext);
+	IDeleteQueryBuilder<TDocument, TDelete> CreateQBSoftDel<TDocument, TDelete>(IDataContext dataContext);
+	IRestoreQueryBuilder<TDocument, TRestore> CreateQBRestore<TDocument, TRestore>(IDataContext dataContext);
 }
