@@ -17,6 +17,6 @@ public class ProductSelectDto
 
 	static void Builder(IQBMongoSelectBuilder<Product, ProductSelectDto> builder)
 	{
-		builder.SelectFromTable("products");
+		builder.SelectFrom("products");
 	}
 }

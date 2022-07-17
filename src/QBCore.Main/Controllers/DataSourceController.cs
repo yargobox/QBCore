@@ -2,6 +2,7 @@ using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using QBCore.DataSource;
+using QBCore.DataSource.Options;
 
 namespace QBCore.Controllers;
 
@@ -31,13 +32,17 @@ public class DataSourceController<TKey, TDocument, TCreate, TSelect, TUpdate, TD
 				var actionName = ControllerContext.ActionDescriptor.ActionName;
 				var controllerName = ControllerContext.ActionDescriptor.ControllerName; */
 
-		return await Task.FromResult(Ok(_service.SelectAsync()));
+		var options = new DataSourceSelectOptions
+		{
+			GetQueryString = x => Console.WriteLine(x)//!!!
+		};
+		return await Task.FromResult(Ok(_service.SelectAsync(SoftDel.Actual, null, null, null, null, options)));
 
 
-		Console.WriteLine(ControllerContext.ActionDescriptor.ActionName);
+/* 		Console.WriteLine(ControllerContext.ActionDescriptor.ActionName);
 		Console.WriteLine(string.Join(", ", ControllerContext.ActionDescriptor.RouteValues.Select(x => x.Key + " = " + x.Value)));
 		Console.WriteLine(string.Join(", ", Request.Query.Select(x => x.Key + " = " + x.Value)));
-		return await Task.FromResult(Ok(Enumerable.Empty<TSelect>()));
+		return await Task.FromResult(Ok(Enumerable.Empty<TSelect>())); */
 	}
 
 	[HttpGet("{id}"), ActionName("get")]

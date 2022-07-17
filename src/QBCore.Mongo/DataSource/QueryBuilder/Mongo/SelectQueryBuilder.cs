@@ -33,8 +33,6 @@ internal sealed class SelectQueryBuilder<TDocument, TSelect> : QueryBuilder<TDoc
 
 	public override Origin Source => new Origin(this.GetType());
 
-	private IReadOnlyDictionary<string, object?>? _arguments;
-
 	public SelectQueryBuilder(QBBuilder<TDocument, TSelect> building)
 		: base(building)
 	{
@@ -97,8 +95,7 @@ internal sealed class SelectQueryBuilder<TDocument, TSelect> : QueryBuilder<TDoc
 		var aggrOptions = (AggregateOptions?)options?.NativeOptions;
 		var clientSessionHandle = (IClientSessionHandle?)options?.NativeClientSession;
 		_ = Collection;
-		_arguments = arguments;
-		var query = BuildSelectQuery();
+		var query = BuildSelectQuery(Builder, arguments);
 
 		await Task.CompletedTask;
 		throw new NotImplementedException();
@@ -114,6 +111,18 @@ internal sealed class SelectQueryBuilder<TDocument, TSelect> : QueryBuilder<TDoc
 		DataSourceSelectOptions? options = null,
 		[EnumeratorCancellation] CancellationToken cancellationToken = default(CancellationToken))
 	{
+		if (skip < 0)
+		{
+			throw new ArgumentException(nameof(skip));
+		}
+		if (take < 0)
+		{
+			throw new ArgumentException(nameof(take));
+		}
+		if (take == 0)
+		{
+			yield break;
+		}
 		if (options?.NativeOptions != null && options.NativeOptions is not AggregateOptions)
 		{
 			throw new ArgumentException(nameof(options.NativeOptions));
@@ -122,13 +131,88 @@ internal sealed class SelectQueryBuilder<TDocument, TSelect> : QueryBuilder<TDoc
 		{
 			throw new ArgumentException(nameof(options.NativeClientSession));
 		}
+		if (options?.PreparedNativeQuery != null && (options.PreparedNativeQuery is not List<BsonDocument> || conditions != null || arguments != null))
+		{
+			throw new ArgumentException(nameof(options.PreparedNativeQuery));
+		}
+
+		_ = Collection;
+
 		var aggrOptions = (AggregateOptions?)options?.NativeOptions;
 		var clientSessionHandle = (IClientSessionHandle?)options?.NativeClientSession;
-		_ = Collection;
-		_arguments = arguments;
-		var query = BuildSelectQuery();
+		var preparedQuery = (List<BsonDocument>?)options?.PreparedNativeQuery;
 
-		Console.WriteLine(new BsonDocument { { "aggregate", new BsonArray(query) } }.ToString());//!!!
+		List<BsonDocument> query;
+
+		if (preparedQuery != null)
+		{
+			var skipIndex = preparedQuery.FindLastIndex(x => x.Contains("$skip"));
+			var limitIndex = preparedQuery.FindLastIndex(x => x.Contains("$limit"));
+
+			if (skip != null)
+			{
+				if (skipIndex >= 0)
+				{
+					preparedQuery[skipIndex]["$skip"] = skip;
+				}
+				else if (limitIndex >= 0)
+				{
+					preparedQuery.Insert(limitIndex, new BsonDocument { { "$skip", skip } });
+				}
+				else
+				{
+					preparedQuery.Add(new BsonDocument { { "$skip", skip } });
+				}
+			}
+			else if (skipIndex >= 0)
+			{
+				preparedQuery.RemoveAt(skipIndex);
+			}
+
+			if (take != null)
+			{
+				if (limitIndex >= 0)
+				{
+					preparedQuery[limitIndex]["$limit"] = take;
+				}
+				else if (skipIndex >= 0)
+				{
+					preparedQuery.Insert(skipIndex + 1, new BsonDocument { { "$limit", take } });
+				}
+				else
+				{
+					preparedQuery.Add(new BsonDocument { { "$limit", take } });
+				}
+			}
+			else if (limitIndex >= 0)
+			{
+				preparedQuery.RemoveAt(limitIndex);
+			}
+
+			query = preparedQuery;
+		}
+		else
+		{
+			query = BuildSelectQuery(Builder, arguments);
+
+			if (skip != null)
+			{
+				query.Add(new BsonDocument { { "$skip", skip } });
+			}
+			if (take != null)
+			{
+				query.Add(new BsonDocument { { "$limit", take } });
+			}
+		}
+
+		if (options?.GetNativeQuery != null)
+		{
+			options.GetNativeQuery(query);
+		}
+		if (options?.GetQueryString != null)
+		{
+			options.GetQueryString(new BsonArray(query).ToString());
+		}
 
 		using (var cursor = clientSessionHandle == null
 			? await Collection.AggregateAsync<TSelect>(query, aggrOptions, cancellationToken)
@@ -145,13 +229,13 @@ internal sealed class SelectQueryBuilder<TDocument, TSelect> : QueryBuilder<TDoc
 		}
 	}
 
-	private List<BsonDocument> BuildSelectQuery()
+	public static List<BsonDocument> BuildSelectQuery(QBBuilder<TDocument, TSelect> builder, IReadOnlyDictionary<string, object?>? arguments)
 	{
 		var result = new List<BsonDocument>();
 
 		// Add pipeline stages for each container and clear the first stage's LookupAs (it musn't be used)
 		//
-		var stages = new List<StageInfo>(Builder.Containers.Select(x => new StageInfo(x)));
+		var stages = new List<StageInfo>(builder.Containers.Select(x => new StageInfo(x)));
 		stages[0].LookupAs = string.Empty;
 
 		// Fill the pipeline stages with connect conditions.
@@ -159,11 +243,11 @@ internal sealed class SelectQueryBuilder<TDocument, TSelect> : QueryBuilder<TDoc
 		// In a pipeline stage condition map, connect conditions between fields come first.
 		// Then follow the connect conditions on constant values. And only after them, the regular conditions as expressions.
 		//
-		FillPipelineStagesWithConnectConditions(stages, Builder.Connects);
+		FillPipelineStagesWithConnectConditions(stages, builder.Connects);
 
 		// Slice the regular conditions to the smallest possible parts. The separator is the AND operation.
 		//
-		var slices = SliceConditions(Builder.Conditions);
+		var slices = SliceConditions(builder.Conditions);
 
 		// Fill the pipeline stages with conditions (condition slices) using the dependencies of each condition in the slice.
 		// The goal is to place the slice in the first possible stage.
@@ -172,7 +256,7 @@ internal sealed class SelectQueryBuilder<TDocument, TSelect> : QueryBuilder<TDoc
 
 		// Fill the pipeline stages with information for the $project and $addField commands
 		//
-		FillPipelineStagesWithProjections(stages, Builder.Fields);
+		FillPipelineStagesWithProjections(stages, builder.Fields);
 
 		// Pipelines
 		//
@@ -259,8 +343,8 @@ internal sealed class SelectQueryBuilder<TDocument, TSelect> : QueryBuilder<TDoc
 						isExpr = true;
 					}
 
-					filter = filter?.AppendByAnd(BuildConditionTree(isExpr, conds.Where(x => x != firstConnect), getDBSideNameInsideLookup, _arguments)!)
-								?? BuildConditionTree(isExpr, conds.Where(x => x != firstConnect), getDBSideNameInsideLookup, _arguments);
+					filter = filter?.AppendByAnd(BuildConditionTree(isExpr, conds.Where(x => x != firstConnect), getDBSideNameInsideLookup, arguments)!)
+								?? BuildConditionTree(isExpr, conds.Where(x => x != firstConnect), getDBSideNameInsideLookup, arguments);
 				}
 				if (let != null)
 				{
@@ -297,8 +381,8 @@ internal sealed class SelectQueryBuilder<TDocument, TSelect> : QueryBuilder<TDoc
 				foreach (var conds in stage.ConditionMap.Where(x => !x.Any(xx => xx.IsConnect)))
 				{
 					isExpr = conds.Any(x => x.IsOnField);
-					filter = filter?.AppendByAnd(BuildConditionTree(isExpr, conds, getDBSideNameAfterLookup, _arguments)!)
-								?? BuildConditionTree(isExpr, conds, getDBSideNameAfterLookup, _arguments);
+					filter = filter?.AppendByAnd(BuildConditionTree(isExpr, conds, getDBSideNameAfterLookup, arguments)!)
+								?? BuildConditionTree(isExpr, conds, getDBSideNameAfterLookup, arguments);
 				}
 				if (filter != null)
 				{

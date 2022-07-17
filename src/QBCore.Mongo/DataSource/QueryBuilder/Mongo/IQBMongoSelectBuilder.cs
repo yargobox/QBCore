@@ -9,17 +9,17 @@ public interface IQBMongoSelectBuilder<TDoc, TDto> : IQBSelectBuilder<TDoc, TDto
 	IQBMongoSelectBuilder<TDoc, TDto> Exclude(Expression<Func<TDto, object?>> field);
 	IQBMongoSelectBuilder<TDoc, TDto> Optional(Expression<Func<TDto, object?>> field);
 
-	IQBMongoSelectBuilder<TDoc, TDto> SelectFromTable(string tableName);
-	IQBMongoSelectBuilder<TDoc, TDto> SelectFromTable(string alias, string tableName);
+	IQBMongoSelectBuilder<TDoc, TDto> SelectFrom(string tableName);
+	IQBMongoSelectBuilder<TDoc, TDto> SelectFrom(string alias, string tableName);
 
-	IQBMongoSelectBuilder<TDoc, TDto> LeftJoinTable<TRef>(string tableName);
-	IQBMongoSelectBuilder<TDoc, TDto> LeftJoinTable<TRef>(string alias, string tableName);
+	IQBMongoSelectBuilder<TDoc, TDto> LeftJoin<TRef>(string tableName);
+	IQBMongoSelectBuilder<TDoc, TDto> LeftJoin<TRef>(string alias, string tableName);
 
-	IQBMongoSelectBuilder<TDoc, TDto> JoinTable<TRef>(string tableName);
-	IQBMongoSelectBuilder<TDoc, TDto> JoinTable<TRef>(string alias, string tableName);
+	IQBMongoSelectBuilder<TDoc, TDto> Join<TRef>(string tableName);
+	IQBMongoSelectBuilder<TDoc, TDto> Join<TRef>(string alias, string tableName);
 
-	IQBMongoSelectBuilder<TDoc, TDto> CrossJoinTable<TRef>(string tableName);
-	IQBMongoSelectBuilder<TDoc, TDto> CrossJoinTable<TRef>(string alias, string tableName);
+	IQBMongoSelectBuilder<TDoc, TDto> CrossJoin<TRef>(string tableName);
+	IQBMongoSelectBuilder<TDoc, TDto> CrossJoin<TRef>(string alias, string tableName);
 
 	IQBMongoSelectBuilder<TDoc, TDto> Connect<TLocal, TRef>(Expression<Func<TLocal, object?>> field, Expression<Func<TRef, object?>> refField, FO operation);
 	IQBMongoSelectBuilder<TDoc, TDto> Connect<TLocal, TRef>(Expression<Func<TLocal, object?>> field, string refAlias, Expression<Func<TRef, object?>> refField, FO operation);

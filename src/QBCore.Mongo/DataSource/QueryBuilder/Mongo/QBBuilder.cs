@@ -109,16 +109,16 @@ internal class QBBuilder<TDoc, TDto> :
 
 			if (temp.ContainerOperation == BuilderContainerOperations.LeftJoin || temp.ContainerOperation == BuilderContainerOperations.Join)
 			{
-				if (!connects.Any(x => x.IsConnectOnField))
+				if (!connects.Any(x => x.IsConnectOnField && x.Name == temp.Name))
 				{
-					throw new InvalidOperationException($"Incorrect definition of select query builder '{typeof(TDto).ToPretty()}'.");
+					throw new InvalidOperationException($"Incorrect definition of select query builder '{typeof(TDto).ToPretty()}': JOIN (LEFT JOIN) has to have at least one connect condition on a field.");
 				}
 			}
 			else if (temp.ContainerOperation == BuilderContainerOperations.CrossJoin)
 			{
-				if (connects.Any(x => x.IsConnectOnField))
+				if (connects.Any(x => x.IsConnectOnField && x.Name == temp.Name))
 				{
-					throw new InvalidOperationException($"Incorrect definition of select query builder '{typeof(TDto).ToPretty()}'.");
+					throw new InvalidOperationException($"Incorrect definition of select query builder '{typeof(TDto).ToPretty()}': CROSS JOIN cannot have connection conditions on fields.");
 				}
 
 				containers.RemoveAt(i);
@@ -466,24 +466,24 @@ internal class QBBuilder<TDoc, TDto> :
 	public IQBMongoSelectBuilder<TDoc, TDto> Optional(Expression<Func<TDto, object?>> field)
 		=> AddExclude(field, true);
 
-	public IQBMongoSelectBuilder<TDoc, TDto> SelectFromTable(string tableName)
+	public IQBMongoSelectBuilder<TDoc, TDto> SelectFrom(string tableName)
 		=> AddContainer(typeof(TDoc), tableName, tableName, BuilderContainerTypes.Table, BuilderContainerOperations.Select);
-	public IQBMongoSelectBuilder<TDoc, TDto> SelectFromTable(string alias, string tableName)
+	public IQBMongoSelectBuilder<TDoc, TDto> SelectFrom(string alias, string tableName)
 		=> AddContainer(typeof(TDoc), alias, tableName, BuilderContainerTypes.Table, BuilderContainerOperations.Select);
 
-	public IQBMongoSelectBuilder<TDoc, TDto> LeftJoinTable<TRef>(string tableName)
+	public IQBMongoSelectBuilder<TDoc, TDto> LeftJoin<TRef>(string tableName)
 		=> AddContainer(typeof(TRef), tableName, tableName, BuilderContainerTypes.Table, BuilderContainerOperations.LeftJoin);
-	public IQBMongoSelectBuilder<TDoc, TDto> LeftJoinTable<TRef>(string alias, string tableName)
+	public IQBMongoSelectBuilder<TDoc, TDto> LeftJoin<TRef>(string alias, string tableName)
 		=> AddContainer(typeof(TRef), alias, tableName, BuilderContainerTypes.Table, BuilderContainerOperations.LeftJoin);
 
-	public IQBMongoSelectBuilder<TDoc, TDto> JoinTable<TRef>(string tableName)
+	public IQBMongoSelectBuilder<TDoc, TDto> Join<TRef>(string tableName)
 		=> AddContainer(typeof(TRef), tableName, tableName, BuilderContainerTypes.Table, BuilderContainerOperations.Join);
-	public IQBMongoSelectBuilder<TDoc, TDto> JoinTable<TRef>(string alias, string tableName)
+	public IQBMongoSelectBuilder<TDoc, TDto> Join<TRef>(string alias, string tableName)
 		=> AddContainer(typeof(TRef), alias, tableName, BuilderContainerTypes.Table, BuilderContainerOperations.Join);
 
-	public IQBMongoSelectBuilder<TDoc, TDto> CrossJoinTable<TRef>(string tableName)
+	public IQBMongoSelectBuilder<TDoc, TDto> CrossJoin<TRef>(string tableName)
 		=> AddContainer(typeof(TRef), tableName, tableName, BuilderContainerTypes.Table, BuilderContainerOperations.CrossJoin);
-	public IQBMongoSelectBuilder<TDoc, TDto> CrossJoinTable<TRef>(string alias, string tableName)
+	public IQBMongoSelectBuilder<TDoc, TDto> CrossJoin<TRef>(string alias, string tableName)
 		=> AddContainer(typeof(TRef), alias, tableName, BuilderContainerTypes.Table, BuilderContainerOperations.CrossJoin);
 
 	public IQBMongoSelectBuilder<TDoc, TDto> Connect<TLocal, TRef>(Expression<Func<TLocal, object?>> field, Expression<Func<TRef, object?>> refField, FO operation)

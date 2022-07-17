@@ -13,6 +13,6 @@ public class StoreSelectDto
 
 	static void Builder(IQBMongoSelectBuilder<Store, StoreSelectDto> builder)
 	{
-		builder.SelectFromTable("stores");
+		builder.SelectFrom("stores");
 	}
 }

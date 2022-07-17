@@ -69,7 +69,7 @@ public abstract partial class DataSource<TKey, TDocument, TCreate, TSelect, TUpd
 		var queryBuilder = Definition.QBFactory.CreateQBSelect<TDocument, TSelect>();
 		queryBuilder.DbContext = _dataContext.Context;
 
-		return queryBuilder.SelectAsync();
+		return queryBuilder.SelectAsync(null, null, null, skip, take, options, cancellationToken);
 	}
 
 	public Task<TUpdate> UpdateAsync(TKey id, TUpdate document, IReadOnlyCollection<string>? modifiedFieldNames = null, DataSourceUpdateOptions? options = null, CancellationToken cancellationToken = default(CancellationToken))
