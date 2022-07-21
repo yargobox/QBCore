@@ -17,7 +17,7 @@ internal sealed class UpdateQueryBuilder<TDocument, TUpdate> : QueryBuilder<TDoc
 
 	public Task<TUpdate> UpdateAsync(
 		TUpdate document,
-		IReadOnlyCollection<QBCondition> conditions,
+		IReadOnlyCollection<QueryBuilder.QBCondition> conditions,
 		IReadOnlyCollection<string>? modifiedFieldNames = null,
 		IReadOnlyCollection<QBArgument>? parameters = null,
 		DataSourceUpdateOptions? options = null,

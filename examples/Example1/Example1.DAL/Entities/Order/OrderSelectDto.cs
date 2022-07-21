@@ -11,10 +11,10 @@ namespace Example1.DAL.Entities.Orders;
 
 public class OrderSelectDto
 {
-	public int? Id { get; set; }
-	public string? Name { get; set; }
+	[DsId] public int? Id { get; set; }
+	[DsName] public string? Name { get; set; }
 
-	public int? StoreId { get; set; }
+	[DsRef] public int? StoreId { get; set; }
 
 	public string? StoreName { get; set; }
 	public StoreSelectDto? Store { get; set; }
@@ -24,9 +24,9 @@ public class OrderSelectDto
 
 	public decimal? Total { get; set; }
 
-	public DateTimeOffset? Created { get; set; }
-	public DateTimeOffset? Updated { get; set; }
-	public DateTimeOffset? Deleted { get; set; }
+	[DsCreated] public DateTimeOffset? Created { get; set; }
+	[DsUpdated] public DateTimeOffset? Updated { get; set; }
+	[DsDeleted] public DateTimeOffset? Deleted { get; set; }
 
 	static void Builder(IQBMongoSelectBuilder<Order, OrderSelectDto> builder)
 	{

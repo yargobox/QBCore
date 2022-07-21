@@ -1,3 +1,4 @@
+using System.Linq.Expressions;
 using QBCore.Configuration;
 using QBCore.DataSource.Options;
 using QBCore.ObjectFactory;
@@ -30,6 +31,7 @@ public interface IInsertQueryBuilder<TDocument, TCreate> : IQueryBuilder<TDocume
 
 public interface ISelectQueryBuilder<TDocument, TSelect> : IQueryBuilder<TDocument, TSelect>
 {
+	IQBSelectBuilder<TDocument, TSelect> SelectBuilder { get; }
 	IQueryable<TDocument> AsQueryable(DataSourceQueryableOptions? options = null);
 	Task<long> CountAsync(DataSourceCountOptions? options = null, CancellationToken cancellationToken = default(CancellationToken));
 	IAsyncEnumerable<TSelect> SelectAsync(long? skip = null, int? take = null, DataSourceSelectOptions? options = null, CancellationToken cancellationToken = default(CancellationToken));

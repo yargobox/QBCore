@@ -1,7 +1,7 @@
 namespace QBCore.DataSource;
 
 [Flags]
-public enum DSAggregationOperations
+public enum AggregationOperations
 {
 	None = 0,
 	Sum = 1,

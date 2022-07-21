@@ -1,13 +1,13 @@
 namespace QBCore.DataSource.QueryBuilder;
 
-public class QBSortOrder
+public record QBSortOrder
 {
-	public string FieldName { get; }
-	public bool Descending { get; }
+	public readonly FieldPath Field;
+	public readonly bool Descending;
 
-	public QBSortOrder(string fieldName, bool descending)
+	public QBSortOrder(FieldPath Field, bool Descending)
 	{
-		FieldName = fieldName;
-		Descending = descending;
+		this.Field = Field;
+		this.Descending = Descending;
 	}
 }

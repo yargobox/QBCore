@@ -78,25 +78,22 @@ internal abstract class QueryBuilder<TDocument, TProjection> : IQueryBuilder<TDo
 	/// <param name="conditions">Regular conditions</param>
 	/// <remarks>
 	/// AND has a higher precedence than OR. To split correctly,
-	/// we must wrap the AND operands in parentheses (or treat them as if they were).<para />
+	/// the AND operands must be wrapped in parentheses.<para />
 	///<para />
 	/// a                                => a<para />
 	/// a AND b                          => a, b<para />
 	/// a OR b                           => a OR b<para />
-	/// a AND b OR c                     => (a AND b) OR c<para />
+	/// a AND b OR c = (a AND b) OR c    => (a AND b) OR c<para />
 	/// a AND (b OR c)                   => a, b OR c<para />
-	/// a OR b AND c                     => a OR (b AND c)<para />
-	/// a OR b AND c AND d               => a OR (b AND c AND d)<para />
-	/// a OR b AND c OR d                => a OR (b AND c) OR d<para />
-	/// a OR b AND c AND d OR e          => a OR (b AND c AND d) OR e<para />
+	/// a OR b AND c = a OR (b AND c)    => a OR (b AND c)<para />
 	/// (a OR b) AND c                   => a OR b, c<para />
 	/// ((a OR b) AND c) AND e           => a OR b, c, e<para />
 	/// ((a OR b) AND c) OR e            => ((a OR b) AND c) OR e
 	/// </remarks>
-	protected static List<List<BuilderCondition>> SliceConditions(IEnumerable<BuilderCondition> conditions)
+	protected static List<List<QBCondition>> SliceConditions(IEnumerable<QBCondition> conditions)
 	{
-		var list = new List<List<BuilderCondition>>() { { conditions.ToList() } };
-		List<BuilderCondition> conds;
+		var list = new List<List<QBCondition>>() { { conditions.ToList() } };
+		List<QBCondition> conds;
 		int first, splitIndex, sum;
 
 		for (int i = 0, j; i < list.Count;)
@@ -147,7 +144,7 @@ internal abstract class QueryBuilder<TDocument, TProjection> : IQueryBuilder<TDo
 
 	#region BuildConditionTree
 
-	protected static BuiltCondition? BuildConditionTree(bool useExprFormat, IEnumerable<BuilderCondition> conditions, Func<string, FieldPath, string> getDBSideName, IReadOnlyDictionary<string, object?>? arguments)
+	protected static BuiltCondition? BuildConditionTree(bool useExprFormat, IEnumerable<QBCondition> conditions, Func<string, FieldPath, string> getDBSideName, IReadOnlyDictionary<string, object?>? arguments)
 	{
 		BuiltCondition? filter = null;
 		bool moveNext = true;
@@ -194,7 +191,7 @@ internal abstract class QueryBuilder<TDocument, TProjection> : IQueryBuilder<TDo
 			return filter;
 		}
 	}
-	private static (BuiltCondition filter, int level) BuildConditionTree(bool useExprFormat, IEnumerator<BuilderCondition> e, ref bool moveNext, int parentheses, Func<string, FieldPath, string> getDBSideName, IReadOnlyDictionary<string, object?>? arguments)
+	private static (BuiltCondition filter, int level) BuildConditionTree(bool useExprFormat, IEnumerator<QBCondition> e, ref bool moveNext, int parentheses, Func<string, FieldPath, string> getDBSideName, IReadOnlyDictionary<string, object?>? arguments)
 	{
 		BuiltCondition filter;
 
@@ -259,7 +256,7 @@ internal abstract class QueryBuilder<TDocument, TProjection> : IQueryBuilder<TDo
 		return (filter, 0);
 	}
 
-	private static BsonDocument BuildCondition(bool useExprFormat, BuilderCondition cond, Func<string, FieldPath, string> getDBSideName, IReadOnlyDictionary<string, object?>? arguments)
+	private static BsonDocument BuildCondition(bool useExprFormat, QBCondition cond, Func<string, FieldPath, string> getDBSideName, IReadOnlyDictionary<string, object?>? arguments)
 	{
 		if (cond.IsOnField)
 		{
@@ -287,7 +284,7 @@ internal abstract class QueryBuilder<TDocument, TProjection> : IQueryBuilder<TDo
 	}
 
 	#endregion
-	protected static BsonDocument MakeConditionOnConst(bool useExprFormat, BuilderCondition cond, Func<string, FieldPath, string> getDBSideName, object? paramValue = null)
+	protected static BsonDocument MakeConditionOnConst(bool useExprFormat, QBCondition cond, Func<string, FieldPath, string> getDBSideName, object? paramValue = null)
 	{
 		if (!cond.IsOnParam && !cond.IsOnConst)
 		{
@@ -376,7 +373,7 @@ internal abstract class QueryBuilder<TDocument, TProjection> : IQueryBuilder<TDo
 		}
 	}
 
-	protected static BsonDocument MakeConditionOnField(bool rightIsVar, BuilderCondition cond, Func<string, FieldPath, string> getDBSideName)
+	protected static BsonDocument MakeConditionOnField(bool rightIsVar, QBCondition cond, Func<string, FieldPath, string> getDBSideName)
 	{
 		if (!cond.IsOnField)
 		{
@@ -414,7 +411,7 @@ internal abstract class QueryBuilder<TDocument, TProjection> : IQueryBuilder<TDo
 		}
 	}
 
-	private static BsonValue RenderToBsonValue(BuilderCondition cond, object? value, bool allowCaseInsensitive)
+	private static BsonValue RenderToBsonValue(QBCondition cond, object? value, bool allowCaseInsensitive)
 	{
 		if (value == null)
 		{
@@ -450,7 +447,7 @@ internal abstract class QueryBuilder<TDocument, TProjection> : IQueryBuilder<TDo
 
 		return new BsonDocumentWrapper(value, BsonSerializer.SerializerRegistry.GetSerializer(cond.FieldType));
 	}
-	private static BsonValue RenderToBsonContainsRegex(BuilderCondition cond, object? value)
+	private static BsonValue RenderToBsonContainsRegex(QBCondition cond, object? value)
 	{
 		if (cond.FieldUnderlyingType != typeof(string))
 		{
@@ -478,7 +475,7 @@ internal abstract class QueryBuilder<TDocument, TProjection> : IQueryBuilder<TDo
 		}
 		throw new ArgumentException($"Field {cond.Alias}.{cond.FieldPath} has type {cond.FieldType.ToPretty()} not {value.GetType().ToPretty()}.", nameof(value));
 	}
-	private static BsonValue RenderToBsonLong(BuilderCondition cond, object? value)
+	private static BsonValue RenderToBsonLong(QBCondition cond, object? value)
 	{
 		if (!_integerTypes.Contains(cond.FieldUnderlyingType))
 		{
@@ -506,7 +503,7 @@ internal abstract class QueryBuilder<TDocument, TProjection> : IQueryBuilder<TDo
 		long longValue = unchecked((long)value);
 		return new BsonInt64(longValue);
 	}
-	private static BsonValue RenderToBsonArray(BuilderCondition cond, object? value, bool allowCaseInsensitive)
+	private static BsonValue RenderToBsonArray(QBCondition cond, object? value, bool allowCaseInsensitive)
 	{
 		if (value == null)
 		{

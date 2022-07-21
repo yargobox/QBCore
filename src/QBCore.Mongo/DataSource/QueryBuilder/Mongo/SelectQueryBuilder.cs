@@ -14,25 +14,27 @@ internal sealed class SelectQueryBuilder<TDocument, TSelect> : QueryBuilder<TDoc
 {
 	private sealed class StageInfo
 	{
-		public readonly BuilderContainer Container;
+		public readonly QBContainer Container;
 		public string LookupAs;
-		public readonly List<List<BuilderCondition>> ConditionMap;
-		public readonly List<(string fromPath, string? toPath, BuilderField? builderField)> ProjectBefore;
-		public readonly List<(string fromPath, string? toPath, BuilderField? builderField)> ProjectAfter;
+		public readonly List<List<QBCondition>> ConditionMap;
+		public readonly List<(string fromPath, string? toPath, QBField? builderField)> ProjectBefore;
+		public readonly List<(string fromPath, string? toPath, QBField? builderField)> ProjectAfter;
 
-		public StageInfo(BuilderContainer container)
+		public StageInfo(QBContainer container)
 		{
 			Container = container;
 			LookupAs = "___" + container.Alias;
-			ConditionMap = new List<List<BuilderCondition>>();
-			ProjectBefore = new List<(string fromPath, string? toPath, BuilderField? builderField)>();
-			ProjectAfter = new List<(string fromPath, string? toPath, BuilderField? builderField)>();
+			ConditionMap = new List<List<QBCondition>>();
+			ProjectBefore = new List<(string fromPath, string? toPath, QBField? builderField)>();
+			ProjectAfter = new List<(string fromPath, string? toPath, QBField? builderField)>();
 		}
 	}
 
 	public override QueryBuilderTypes QueryBuilderType => QueryBuilderTypes.Select;
 
 	public override Origin Source => new Origin(this.GetType());
+
+	public IQBSelectBuilder<TDocument, TSelect> SelectBuilder => Builder;
 
 	public SelectQueryBuilder(QBBuilder<TDocument, TSelect> building, IDataContext dataContext)
 		: base(building, dataContext)
@@ -45,8 +47,8 @@ internal sealed class SelectQueryBuilder<TDocument, TSelect> : QueryBuilder<TDoc
 		{
 			if (_collection == null)
 			{
-				var top = Builder.Containers.FirstOrDefault(x => x.ContainerOperation == BuilderContainerOperations.Select);
-				if (top?.ContainerType == BuilderContainerTypes.Table || top?.ContainerType == BuilderContainerTypes.View)
+				var top = Builder.Containers.FirstOrDefault(x => x.ContainerOperation == ContainerOperations.Select);
+				if (top?.ContainerType == ContainerTypes.Table || top?.ContainerType == ContainerTypes.View)
 				{
 					_collection = _mongoDbContext.DB.GetCollection<TDocument>(top!.DBSideName);
 				}
@@ -87,7 +89,7 @@ internal sealed class SelectQueryBuilder<TDocument, TSelect> : QueryBuilder<TDoc
 		var aggrOptions = (AggregateOptions?)options?.NativeOptions;
 		var clientSessionHandle = (IClientSessionHandle?)options?.NativeClientSession;
 		_ = Collection;
-		var query = BuildSelectQuery(Builder, null!);//!!!
+		var query = BuildSelectQuery(Builder, Builder.Containers, Builder.Connects, Builder.Conditions, Builder.Fields, null!);//!!!
 
 		await Task.CompletedTask;
 		throw new NotImplementedException();
@@ -178,7 +180,7 @@ internal sealed class SelectQueryBuilder<TDocument, TSelect> : QueryBuilder<TDoc
 		}
 		else
 		{
-			query = BuildSelectQuery(Builder, null!);//!!!
+			query = BuildSelectQuery(Builder, Builder.Containers, Builder.Connects, Builder.Conditions, Builder.Fields, null!);//!!!
 
 			if (skip != null)
 			{
@@ -214,13 +216,13 @@ internal sealed class SelectQueryBuilder<TDocument, TSelect> : QueryBuilder<TDoc
 		}
 	}
 
-	public static List<BsonDocument> BuildSelectQuery(QBBuilder<TDocument, TSelect> builder, IReadOnlyDictionary<string, object?>? arguments)
+	public static List<BsonDocument> BuildSelectQuery(QBBuilder<TDocument, TSelect> builder, IReadOnlyList<QBContainer> containers, IReadOnlyList<QBCondition> connects, IReadOnlyList<QBCondition> conditions, IReadOnlyList<QBField> fields, IReadOnlyDictionary<string, object?>? arguments)
 	{
 		var result = new List<BsonDocument>();
 
 		// Add pipeline stages for each container and clear the first stage's LookupAs (it musn't be used)
 		//
-		var stages = new List<StageInfo>(builder.Containers.Select(x => new StageInfo(x)));
+		var stages = new List<StageInfo>(containers.Select(x => new StageInfo(x)));
 		stages[0].LookupAs = string.Empty;
 
 		// Fill the pipeline stages with connect conditions.
@@ -228,11 +230,11 @@ internal sealed class SelectQueryBuilder<TDocument, TSelect> : QueryBuilder<TDoc
 		// In a pipeline stage condition map, connect conditions between fields come first.
 		// Then follow the connect conditions on constant values. And only after them, the regular conditions as expressions.
 		//
-		FillPipelineStagesWithConnectConditions(stages, builder.Connects);
+		FillPipelineStagesWithConnectConditions(stages, connects);
 
 		// Slice the regular conditions to the smallest possible parts. The separator is the AND operation.
 		//
-		var slices = SliceConditions(builder.Conditions);
+		var slices = SliceConditions(conditions);
 
 		// Fill the pipeline stages with conditions (condition slices) using the dependencies of each condition in the slice.
 		// The goal is to place the slice in the first possible stage.
@@ -241,13 +243,13 @@ internal sealed class SelectQueryBuilder<TDocument, TSelect> : QueryBuilder<TDoc
 
 		// Fill the pipeline stages with information for the $project and $addField commands
 		//
-		FillPipelineStagesWithProjections(stages, builder.Fields);
+		FillPipelineStagesWithProjections(stages, fields);
 
 		// Pipelines
 		//
 
 		StageInfo stage;
-		BuilderCondition? firstConnect;
+		QBCondition? firstConnect;
 		BsonDocument lookup;
 		BuiltCondition? filter;
 		BsonDocument? let;
@@ -300,7 +302,7 @@ internal sealed class SelectQueryBuilder<TDocument, TSelect> : QueryBuilder<TDoc
 				lookup = new BsonDocument { { "from", stage.Container.DBSideName } };
 
 				// First connect condition to foreignField and localField
-				if (stage.Container.ContainerOperation == BuilderContainerOperations.LeftJoin || stage.Container.ContainerOperation == BuilderContainerOperations.Join)
+				if (stage.Container.ContainerOperation == ContainerOperations.LeftJoin || stage.Container.ContainerOperation == ContainerOperations.Join)
 				{
 					firstConnect = stage.ConditionMap.First().First(x => x.IsConnectOnField);
 
@@ -350,7 +352,7 @@ internal sealed class SelectQueryBuilder<TDocument, TSelect> : QueryBuilder<TDoc
 
 				// $unwind
 				{
-					var leftJoinOrCrossJoin = stage.Container.ContainerOperation != BuilderContainerOperations.Join;
+					var leftJoinOrCrossJoin = stage.Container.ContainerOperation != ContainerOperations.Join;
 					result.Add(new BsonDocument {
 						{ "$unwind", new BsonDocument {
 							{ "path", "$" + lookup["as"] },
@@ -384,9 +386,9 @@ internal sealed class SelectQueryBuilder<TDocument, TSelect> : QueryBuilder<TDoc
 	/// <summary>
 	/// Fill the pipeline stages with connect conditions.
 	/// </summary>
-	private static void FillPipelineStagesWithConnectConditions(List<StageInfo> stages, List<BuilderCondition> connects)
+	private static void FillPipelineStagesWithConnectConditions(List<StageInfo> stages, IReadOnlyList<QBCondition> connects)
 	{
-		List<BuilderCondition> builderConditions;
+		List<QBCondition> builderConditions;
 		foreach (var alias in connects.Select(x => x.Alias).Distinct())
 		{
 			builderConditions = connects.Where(x => x.IsOnField && x.Alias == alias).ToList();
@@ -406,7 +408,7 @@ internal sealed class SelectQueryBuilder<TDocument, TSelect> : QueryBuilder<TDoc
 	/// <summary>
 	/// Fill the pipeline stages with conditions (condition slices)
 	/// </summary>
-	private static void FillPipelineStagesWithConditionSlices(List<StageInfo> stages, List<List<BuilderCondition>> slices)
+	private static void FillPipelineStagesWithConditionSlices(List<StageInfo> stages, List<List<QBCondition>> slices)
 	{
 		int firstPossibleStage;
 		foreach (var slice in slices)
@@ -430,10 +432,10 @@ internal sealed class SelectQueryBuilder<TDocument, TSelect> : QueryBuilder<TDoc
 	/// <summary>
 	/// Fill the pipeline stages with projections
 	/// </summary>
-	private static void FillPipelineStagesWithProjections(List<StageInfo> stages, List<BuilderField> fields)
+	private static void FillPipelineStagesWithProjections(List<StageInfo> stages, IReadOnlyList<QBField> fields)
 	{
 		string path;
-		List<List<BuilderCondition>>? map;
+		List<List<QBCondition>>? map;
 		int stageIndex;
 
 		// Fill the includes and change the LookupAs names for the joining documents the result of which is directly projected into the field.
@@ -511,7 +513,7 @@ internal sealed class SelectQueryBuilder<TDocument, TSelect> : QueryBuilder<TDoc
 			else
 			{
 				path = string.Concat(stages.First(x => x.Container.Alias == joinedDoc.RefAlias!).LookupAs, ".",
-					string.Join(".", field.Field.Elements.Skip(joinedDoc.Field.ElementCount).Select(x => x.DBSideName)));
+					string.Join(".", field.Field.Elements.Skip(joinedDoc.Field.ElementCount).Select(x => field.Field.GetDBSideName(x))));
 
 				// Propagate the exclude
 				//
@@ -591,7 +593,7 @@ internal sealed class SelectQueryBuilder<TDocument, TSelect> : QueryBuilder<TDoc
 			stages[stageIndex].ProjectAfter.Add((stages[i].LookupAs, null, null));
 		}
 	}
-	private static void OutputProjections(List<BsonDocument> result, List<(string fromPath, string? toPath, BuilderField? builderField)> projectInfo)
+	private static void OutputProjections(List<BsonDocument> result, List<(string fromPath, string? toPath, QBField? builderField)> projectInfo)
 	{
 		BsonDocument? projection = null;
 		foreach (var projField in projectInfo.Where(x => x.toPath == null && x.builderField?.OptionalExclusion == true))

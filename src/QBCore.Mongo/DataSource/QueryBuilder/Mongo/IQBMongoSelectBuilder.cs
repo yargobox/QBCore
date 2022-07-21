@@ -2,50 +2,47 @@ using System.Linq.Expressions;
 
 namespace QBCore.DataSource.QueryBuilder.Mongo;
 
-public interface IQBMongoSelectBuilder<TDoc, TDto> : IQBSelectBuilder<TDoc, TDto>
+public interface IQBMongoSelectBuilder<TDoc, TSelect> : IQBBuilder<TDoc, TSelect>
 {
-	IQBMongoSelectBuilder<TDoc, TDto> Include<TRef>(Expression<Func<TDto, object?>> field, Expression<Func<TRef, object?>> refField);
-	IQBMongoSelectBuilder<TDoc, TDto> Include<TRef>(Expression<Func<TDto, object?>> field, string refAlias, Expression<Func<TRef, object?>> refField);
-	IQBMongoSelectBuilder<TDoc, TDto> Exclude(Expression<Func<TDto, object?>> field);
-	IQBMongoSelectBuilder<TDoc, TDto> Optional(Expression<Func<TDto, object?>> field);
+	Expression<Func<TSelect, object?>>? DateDeleteField { get; set; }
 
-	IQBMongoSelectBuilder<TDoc, TDto> SelectFrom(string tableName);
-	IQBMongoSelectBuilder<TDoc, TDto> SelectFrom(string alias, string tableName);
+	IQBMongoSelectBuilder<TDoc, TSelect> SelectFrom(string tableName);
+	IQBMongoSelectBuilder<TDoc, TSelect> SelectFrom(string alias, string tableName);
 
-	IQBMongoSelectBuilder<TDoc, TDto> LeftJoin<TRef>(string tableName);
-	IQBMongoSelectBuilder<TDoc, TDto> LeftJoin<TRef>(string alias, string tableName);
+	IQBMongoSelectBuilder<TDoc, TSelect> LeftJoin<TRef>(string tableName);
+	IQBMongoSelectBuilder<TDoc, TSelect> LeftJoin<TRef>(string alias, string tableName);
 
-	IQBMongoSelectBuilder<TDoc, TDto> Join<TRef>(string tableName);
-	IQBMongoSelectBuilder<TDoc, TDto> Join<TRef>(string alias, string tableName);
+	IQBMongoSelectBuilder<TDoc, TSelect> Join<TRef>(string tableName);
+	IQBMongoSelectBuilder<TDoc, TSelect> Join<TRef>(string alias, string tableName);
 
-	IQBMongoSelectBuilder<TDoc, TDto> CrossJoin<TRef>(string tableName);
-	IQBMongoSelectBuilder<TDoc, TDto> CrossJoin<TRef>(string alias, string tableName);
+	IQBMongoSelectBuilder<TDoc, TSelect> CrossJoin<TRef>(string tableName);
+	IQBMongoSelectBuilder<TDoc, TSelect> CrossJoin<TRef>(string alias, string tableName);
 
-	IQBMongoSelectBuilder<TDoc, TDto> Connect<TLocal, TRef>(Expression<Func<TLocal, object?>> field, Expression<Func<TRef, object?>> refField, FO operation);
-	IQBMongoSelectBuilder<TDoc, TDto> Connect<TLocal, TRef>(Expression<Func<TLocal, object?>> field, string refAlias, Expression<Func<TRef, object?>> refField, FO operation);
-	IQBMongoSelectBuilder<TDoc, TDto> Connect<TLocal, TRef>(string alias, Expression<Func<TLocal, object?>> field, Expression<Func<TRef, object?>> refField, FO operation);
-	IQBMongoSelectBuilder<TDoc, TDto> Connect<TLocal, TRef>(string alias, Expression<Func<TLocal, object?>> field, string refAlias, Expression<Func<TRef, object?>> refField, FO operation);
-	IQBMongoSelectBuilder<TDoc, TDto> Connect<TLocal>(Expression<Func<TLocal, object?>> field, object? constValue, FO operation);
-	IQBMongoSelectBuilder<TDoc, TDto> Connect<TLocal>(string alias, Expression<Func<TLocal, object?>> field, object? constValue, FO operation);
-	IQBMongoSelectBuilder<TDoc, TDto> Connect<TLocal>(Expression<Func<TLocal, object?>> field, FO operation, string paramName);
-	IQBMongoSelectBuilder<TDoc, TDto> Connect<TLocal>(string alias, Expression<Func<TLocal, object?>> field, FO operation, string paramName);
+	IQBMongoSelectBuilder<TDoc, TSelect> Connect<TLocal, TRef>(Expression<Func<TLocal, object?>> field, Expression<Func<TRef, object?>> refField, FO operation);
+	IQBMongoSelectBuilder<TDoc, TSelect> Connect<TLocal, TRef>(string alias, Expression<Func<TLocal, object?>> field, string refAlias, Expression<Func<TRef, object?>> refField, FO operation);
+	IQBMongoSelectBuilder<TDoc, TSelect> Connect<TLocal>(Expression<Func<TLocal, object?>> field, object? constValue, FO operation);
+	IQBMongoSelectBuilder<TDoc, TSelect> Connect<TLocal>(string alias, Expression<Func<TLocal, object?>> field, object? constValue, FO operation);
+	IQBMongoSelectBuilder<TDoc, TSelect> Connect<TLocal>(Expression<Func<TLocal, object?>> field, FO operation, string paramName);
+	IQBMongoSelectBuilder<TDoc, TSelect> Connect<TLocal>(string alias, Expression<Func<TLocal, object?>> field, FO operation, string paramName);
 
-	IQBMongoSelectBuilder<TDoc, TDto> Condition<TLocal, TRef>(Expression<Func<TLocal, object?>> field, Expression<Func<TRef, object?>> refField, FO operation);
-	IQBMongoSelectBuilder<TDoc, TDto> Condition<TLocal, TRef>(Expression<Func<TLocal, object?>> field, string refAlias, Expression<Func<TRef, object?>> refField, FO operation);
-	IQBMongoSelectBuilder<TDoc, TDto> Condition<TLocal, TRef>(string alias, Expression<Func<TLocal, object?>> field, Expression<Func<TRef, object?>> refField, FO operation);
-	IQBMongoSelectBuilder<TDoc, TDto> Condition<TLocal, TRef>(string alias, Expression<Func<TLocal, object?>> field, string refAlias, Expression<Func<TRef, object?>> refField, FO operation);
-	IQBMongoSelectBuilder<TDoc, TDto> Condition<TLocal>(Expression<Func<TLocal, object?>> field, object? constValue, FO operation);
-	IQBMongoSelectBuilder<TDoc, TDto> Condition<TLocal>(string alias, Expression<Func<TLocal, object?>> field, object? constValue, FO operation);
-	IQBMongoSelectBuilder<TDoc, TDto> Condition<TLocal>(Expression<Func<TLocal, object?>> field, FO operation, string paramName);
-	IQBMongoSelectBuilder<TDoc, TDto> Condition<TLocal>(string alias, Expression<Func<TLocal, object?>> field, FO operation, string paramName);
-	IQBMongoSelectBuilder<TDoc, TDto> Condition(Expression<Func<TDoc, object?>> field, object? constValue, FO operation);
-	IQBMongoSelectBuilder<TDoc, TDto> Condition(string alias, Expression<Func<TDoc, object?>> field, object? constValue, FO operation);
-	IQBMongoSelectBuilder<TDoc, TDto> Condition(Expression<Func<TDoc, object?>> field, FO operation, string paramName);
-	IQBMongoSelectBuilder<TDoc, TDto> Condition(string alias, Expression<Func<TDoc, object?>> field, FO operation, string paramName);
+	IQBMongoSelectBuilder<TDoc, TSelect> Condition<TLocal, TRef>(Expression<Func<TLocal, object?>> field, Expression<Func<TRef, object?>> refField, FO operation);
+	IQBMongoSelectBuilder<TDoc, TSelect> Condition<TLocal, TRef>(string alias, Expression<Func<TLocal, object?>> field, string refAlias, Expression<Func<TRef, object?>> refField, FO operation);
+	IQBMongoSelectBuilder<TDoc, TSelect> Condition<TLocal>(Expression<Func<TLocal, object?>> field, object? constValue, FO operation);
+	IQBMongoSelectBuilder<TDoc, TSelect> Condition<TLocal>(string alias, Expression<Func<TLocal, object?>> field, object? constValue, FO operation);
+	IQBMongoSelectBuilder<TDoc, TSelect> Condition<TLocal>(Expression<Func<TLocal, object?>> field, FO operation, string paramName);
+	IQBMongoSelectBuilder<TDoc, TSelect> Condition<TLocal>(string alias, Expression<Func<TLocal, object?>> field, FO operation, string paramName);
+	IQBMongoSelectBuilder<TDoc, TSelect> Condition(Expression<Func<TDoc, object?>> field, object? constValue, FO operation);
+	IQBMongoSelectBuilder<TDoc, TSelect> Condition(Expression<Func<TDoc, object?>> field, FO operation, string paramName);
 
-	IQBMongoSelectBuilder<TDoc, TDto> Begin();
-	IQBMongoSelectBuilder<TDoc, TDto> End();
+	IQBMongoSelectBuilder<TDoc, TSelect> Begin();
+	IQBMongoSelectBuilder<TDoc, TSelect> End();
 	
-	IQBMongoSelectBuilder<TDoc, TDto> And();
-	IQBMongoSelectBuilder<TDoc, TDto> Or();
+	IQBMongoSelectBuilder<TDoc, TSelect> And();
+	IQBMongoSelectBuilder<TDoc, TSelect> Or();
+
+	IQBMongoSelectBuilder<TDoc, TSelect> Include<TRef>(Expression<Func<TSelect, object?>> field, Expression<Func<TRef, object?>> refField);
+	IQBMongoSelectBuilder<TDoc, TSelect> Include<TRef>(Expression<Func<TSelect, object?>> field, string refAlias, Expression<Func<TRef, object?>> refField);
+	IQBMongoSelectBuilder<TDoc, TSelect> Exclude(Expression<Func<TSelect, object?>> field);
+	IQBMongoSelectBuilder<TDoc, TSelect> Optional(Expression<Func<TSelect, object?>> field);
+
 }

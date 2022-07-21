@@ -67,6 +67,38 @@ public abstract partial class DataSource<TKey, TDocument, TCreate, TSelect, TUpd
 	public IAsyncEnumerable<TSelect> SelectAsync(SoftDel mode = SoftDel.Actual, IReadOnlyCollection<IDSCondition>? conditions = null, IReadOnlyCollection<IDSSortOrder>? sortOrders = null, long? skip = null, int? take = null, DataSourceSelectOptions? options = null, CancellationToken cancellationToken = default(CancellationToken))
 	{
 		var queryBuilder = Definition.QBFactory.CreateQBSelect<TDocument, TSelect>(_dataContext);
+		var builder = queryBuilder.SelectBuilder;
+
+		if (Definition.Options.HasFlag(DataSourceOptions.SoftDelete))
+		{
+			if (builder.DateDeleteField == null)
+			{
+				throw new InvalidOperationException($"Incorrect definition of select query builder '{typeof(TSelect).ToPretty()}': option '{nameof(builder.DateDeleteField)}' is not set.");
+			}
+
+			if (mode == SoftDel.Actual)
+			{
+				builder.Condition(builder.DateDeleteField, null, FO.IsNull);
+			}
+			else if (mode == SoftDel.Deleted)
+			{
+				builder.Condition(builder.DateDeleteField, null, FO.IsNotNull);
+			}
+		}
+
+		if (conditions != null)
+		{
+			foreach (var cond in conditions)
+			{
+			}
+		}
+
+		if (sortOrders != null)
+		{
+			foreach (var sort in sortOrders)
+			{
+			}
+		}
 
 		return queryBuilder.SelectAsync(skip, take, options, cancellationToken);
 	}

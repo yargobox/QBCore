@@ -1,13 +1,13 @@
 namespace QBCore.DataSource.QueryBuilder;
 
-public class QBAggregation
+public record QBAggregation
 {
-	public string FieldName { get; }
-	public DSAggregationOperations Operation { get; }
+	public readonly FieldPath Field;
+	public readonly AggregationOperations Operation;
 
-	public QBAggregation(string fieldName, DSAggregationOperations operation)
+	public QBAggregation(FieldPath Field, AggregationOperations Operation)
 	{
-		FieldName = fieldName;
-		Operation = operation;
+		this.Field = Field;
+		this.Operation = Operation;
 	}
 }

@@ -46,7 +46,7 @@ public class DataSourceController<TKey, TDocument, TCreate, TSelect, TUpdate, TD
 	}
 
 	[HttpGet("{id}"), ActionName("get")]
-	public async Task<ActionResult<TSelect>> GetAsync([FromRoute, Required] TKey id)
+	public async Task<ActionResult<TSelect>> GetAsync([FromQuery, Required] TKey id)
 	{
 		Console.WriteLine(ControllerContext.ActionDescriptor.ActionName);
 		Console.WriteLine(string.Join(", ", ControllerContext.ActionDescriptor.RouteValues.Select(x => x.Key + " = " + x.Value)));
@@ -68,7 +68,7 @@ public class DataSourceController<TKey, TDocument, TCreate, TSelect, TUpdate, TD
 
 	[HttpPut("{id}"), ActionName("update")]
 	public async Task<ActionResult> UpdateAsync(
-		[FromRoute, Required] TKey id,
+		[FromQuery, Required] TKey id,
 		[FromBody] TUpdate model,
 		[FromQuery, Range(0, 1)] int? _dp)
 	{
@@ -80,7 +80,7 @@ public class DataSourceController<TKey, TDocument, TCreate, TSelect, TUpdate, TD
 
 	[HttpDelete("{id}"), ActionName("delete")]
 	public async Task<ActionResult> DeleteAsync(
-		[FromRoute, Required] TKey id,
+		[FromQuery, Required] TKey id,
 		[FromBody] TDelete? model)
 	{
 		Console.WriteLine(ControllerContext.ActionDescriptor.ActionName);
@@ -91,7 +91,7 @@ public class DataSourceController<TKey, TDocument, TCreate, TSelect, TUpdate, TD
 
 	[HttpPatch("{id}"), ActionName("restore")]
 	public async Task<ActionResult> RestoreAsync(
-		[FromRoute, Required] TKey id,
+		[FromQuery, Required] TKey id,
 		[FromBody] TRestore? model)
 	{
 		Console.WriteLine(ControllerContext.ActionDescriptor.ActionName);

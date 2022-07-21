@@ -7,7 +7,7 @@ public interface IDSAggregation
 {
 	Type ProjectionType { get; }
 	string FieldName { get; }
-	DSAggregationOperations Operation { get; }
+	AggregationOperations Operation { get; }
 	Origin ValueSource { get; }
 }
 
@@ -15,10 +15,10 @@ public class DSAggregation<TProjection> : IDSAggregation
 {
 	public Type ProjectionType => typeof(TProjection);
 	public string FieldName { get; }
-	public DSAggregationOperations Operation { get; }
+	public AggregationOperations Operation { get; }
 	public Origin ValueSource { get; }
 
-	public DSAggregation(Expression<Func<TProjection, object?>> field, DSAggregationOperations operation, Origin valueSource)
+	public DSAggregation(Expression<Func<TProjection, object?>> field, AggregationOperations operation, Origin valueSource)
 	{
 		FieldName = null!;//!!!GetMemberName(field);
 		Operation = operation;

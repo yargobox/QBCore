@@ -21,6 +21,8 @@ BsonSerializer.RegisterSerializer(new DateTimeOffsetSerializer(BsonType.String))
 //BsonSerializer.RegisterSerializer(new EnumSerializer<UserRoles>(BsonType.String));
 BsonSerializer.RegisterSerializer(new DecimalSerializer(BsonType.String));
 
+//ModelBinders.Binders.Add(typeof(int[]), new IntArrayModelBinder());
+
 var appBuilder = WebApplication.CreateBuilder(args);
 
 var builder = appBuilder.Services
@@ -31,6 +33,7 @@ var builder = appBuilder.Services
 		{
 			RoutePrefix = "api/"
 		});
+		
 	})
 	.AddApplicationPart(typeof(Example1.DAL.Entities.Brands.Brand).Assembly)
 	.AddApplicationPart(typeof(Example1.BLL.Services.BrandService).Assembly)
