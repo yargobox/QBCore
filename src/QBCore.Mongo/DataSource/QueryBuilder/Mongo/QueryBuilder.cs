@@ -144,7 +144,7 @@ internal abstract class QueryBuilder<TDocument, TProjection> : IQueryBuilder<TDo
 
 	#region BuildConditionTree
 
-	protected static BuiltCondition? BuildConditionTree(bool useExprFormat, IEnumerable<QBCondition> conditions, Func<string, FieldPath, string> getDBSideName, IReadOnlyDictionary<string, object?>? arguments)
+	protected static BuiltCondition? BuildConditionTree(bool useExprFormat, IEnumerable<QBCondition> conditions, Func<string, FieldPath, string> getDBSideName, IReadOnlyList<QBParameter> parameters)
 	{
 		BuiltCondition? filter = null;
 		bool moveNext = true;
@@ -157,33 +157,33 @@ internal abstract class QueryBuilder<TDocument, TProjection> : IQueryBuilder<TDo
 				{
 					if (e.Current.Parentheses > 0)
 					{
-						filter = BuildConditionTree(useExprFormat, e, ref moveNext, e.Current.Parentheses - 1, getDBSideName, arguments).filter;
+						filter = BuildConditionTree(useExprFormat, e, ref moveNext, e.Current.Parentheses - 1, getDBSideName, parameters).filter;
 					}
 					else
 					{
-						filter = new BuiltCondition(BuildCondition(useExprFormat, e.Current, getDBSideName, arguments), useExprFormat);
+						filter = new BuiltCondition(BuildCondition(useExprFormat, e.Current, getDBSideName, parameters), useExprFormat);
 					}
 				}
 				else if (e.Current.IsByOr)
 				{
 					if (e.Current.Parentheses > 0)
 					{
-						filter.AppendByOr(BuildConditionTree(useExprFormat, e, ref moveNext, e.Current.Parentheses - 1, getDBSideName, arguments).filter);
+						filter.AppendByOr(BuildConditionTree(useExprFormat, e, ref moveNext, e.Current.Parentheses - 1, getDBSideName, parameters).filter);
 					}
 					else
 					{
-						filter.AppendByOr(new BuiltCondition(BuildCondition(useExprFormat, e.Current, getDBSideName, arguments), useExprFormat));
+						filter.AppendByOr(new BuiltCondition(BuildCondition(useExprFormat, e.Current, getDBSideName, parameters), useExprFormat));
 					}
 				}
 				else
 				{
 					if (e.Current.Parentheses > 0)
 					{
-						filter.AppendByAnd(BuildConditionTree(useExprFormat, e, ref moveNext, e.Current.Parentheses - 1, getDBSideName, arguments).filter);
+						filter.AppendByAnd(BuildConditionTree(useExprFormat, e, ref moveNext, e.Current.Parentheses - 1, getDBSideName, parameters).filter);
 					}
 					else
 					{
-						filter.AppendByAnd(new BuiltCondition(BuildCondition(useExprFormat, e.Current, getDBSideName, arguments), useExprFormat));
+						filter.AppendByAnd(new BuiltCondition(BuildCondition(useExprFormat, e.Current, getDBSideName, parameters), useExprFormat));
 					}
 				}
 			}
@@ -191,13 +191,13 @@ internal abstract class QueryBuilder<TDocument, TProjection> : IQueryBuilder<TDo
 			return filter;
 		}
 	}
-	private static (BuiltCondition filter, int level) BuildConditionTree(bool useExprFormat, IEnumerator<QBCondition> e, ref bool moveNext, int parentheses, Func<string, FieldPath, string> getDBSideName, IReadOnlyDictionary<string, object?>? arguments)
+	private static (BuiltCondition filter, int level) BuildConditionTree(bool useExprFormat, IEnumerator<QBCondition> e, ref bool moveNext, int parentheses, Func<string, FieldPath, string> getDBSideName, IReadOnlyList<QBParameter> parameters)
 	{
 		BuiltCondition filter;
 
 		if (parentheses > 0)
 		{
-			var result = BuildConditionTree(useExprFormat, e, ref moveNext, parentheses - 1, getDBSideName, arguments);
+			var result = BuildConditionTree(useExprFormat, e, ref moveNext, parentheses - 1, getDBSideName, parameters);
 			filter = result.filter;
 			if (result.level < 0)
 			{
@@ -206,7 +206,7 @@ internal abstract class QueryBuilder<TDocument, TProjection> : IQueryBuilder<TDo
 		}
 		else
 		{
-			filter = new BuiltCondition(BuildCondition(useExprFormat, e.Current, getDBSideName, arguments), useExprFormat);
+			filter = new BuiltCondition(BuildCondition(useExprFormat, e.Current, getDBSideName, parameters), useExprFormat);
 		}
 
 		while (moveNext && (moveNext = e.MoveNext()))
@@ -215,7 +215,7 @@ internal abstract class QueryBuilder<TDocument, TProjection> : IQueryBuilder<TDo
 			{
 				if (e.Current.Parentheses > 0)
 				{
-					var result = BuildConditionTree(useExprFormat, e, ref moveNext, e.Current.Parentheses - 1, getDBSideName, arguments);
+					var result = BuildConditionTree(useExprFormat, e, ref moveNext, e.Current.Parentheses - 1, getDBSideName, parameters);
 					filter.AppendByOr(result.filter);
 					if (result.level < 0)
 					{
@@ -224,7 +224,7 @@ internal abstract class QueryBuilder<TDocument, TProjection> : IQueryBuilder<TDo
 				}
 				else
 				{
-					filter.AppendByOr(new BuiltCondition(BuildCondition(useExprFormat, e.Current, getDBSideName, arguments), useExprFormat));
+					filter.AppendByOr(new BuiltCondition(BuildCondition(useExprFormat, e.Current, getDBSideName, parameters), useExprFormat));
 					if (e.Current.Parentheses < 0)
 					{
 						return (filter, e.Current.Parentheses + 1);
@@ -235,7 +235,7 @@ internal abstract class QueryBuilder<TDocument, TProjection> : IQueryBuilder<TDo
 			{
 				if (e.Current.Parentheses > 0)
 				{
-					var result = BuildConditionTree(useExprFormat, e, ref moveNext, e.Current.Parentheses - 1, getDBSideName, arguments);
+					var result = BuildConditionTree(useExprFormat, e, ref moveNext, e.Current.Parentheses - 1, getDBSideName, parameters);
 					filter.AppendByAnd(result.filter);
 					if (result.level < 0)
 					{
@@ -244,7 +244,7 @@ internal abstract class QueryBuilder<TDocument, TProjection> : IQueryBuilder<TDo
 				}
 				else
 				{
-					filter.AppendByAnd(new BuiltCondition(BuildCondition(useExprFormat, e.Current, getDBSideName, arguments), useExprFormat));
+					filter.AppendByAnd(new BuiltCondition(BuildCondition(useExprFormat, e.Current, getDBSideName, parameters), useExprFormat));
 					if (e.Current.Parentheses < 0)
 					{
 						return (filter, e.Current.Parentheses + 1);
@@ -256,7 +256,7 @@ internal abstract class QueryBuilder<TDocument, TProjection> : IQueryBuilder<TDo
 		return (filter, 0);
 	}
 
-	private static BsonDocument BuildCondition(bool useExprFormat, QBCondition cond, Func<string, FieldPath, string> getDBSideName, IReadOnlyDictionary<string, object?>? arguments)
+	private static BsonDocument BuildCondition(bool useExprFormat, QBCondition cond, Func<string, FieldPath, string> getDBSideName, IReadOnlyList<QBParameter> parameters)
 	{
 		if (cond.IsOnField)
 		{
@@ -265,13 +265,18 @@ internal abstract class QueryBuilder<TDocument, TProjection> : IQueryBuilder<TDo
 		else if (cond.IsOnParam)
 		{
 			var paramName = (string)cond.Value!;
-			object? value;
-			if (arguments == null || !arguments.TryGetValue(paramName, out value))
+			var parameter = parameters.FirstOrDefault(x => x.Name == paramName);
+			if (parameter == null)
 			{
-				throw new InvalidOperationException($"Query builder parameter {paramName} is not set.");
+				throw new InvalidOperationException($"Query builder parameter '{paramName}' is not found.");
+			}
+			if (!parameter.HasValue)
+			{
+				throw new InvalidOperationException($"Query builder parameter '{paramName}' is not set.");
 			}
 
-			return MakeConditionOnConst(useExprFormat, cond, getDBSideName, value);
+			parameter.IsValueUsed = true;
+			return MakeConditionOnConst(useExprFormat, cond, getDBSideName, parameter.Value);
 		}
 		else if (cond.IsOnConst)
 		{

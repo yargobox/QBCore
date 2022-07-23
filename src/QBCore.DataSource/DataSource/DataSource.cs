@@ -100,7 +100,7 @@ public abstract partial class DataSource<TKey, TDocument, TCreate, TSelect, TUpd
 			}
 		}
 
-		return queryBuilder.SelectAsync(skip, take, options, cancellationToken);
+		return queryBuilder.SelectAsync(skip ?? 0, take ?? -1, options, cancellationToken);
 	}
 
 	public Task<TUpdate> UpdateAsync(TKey id, TUpdate document, IReadOnlyCollection<string>? modifiedFieldNames = null, DataSourceUpdateOptions? options = null, CancellationToken cancellationToken = default(CancellationToken))

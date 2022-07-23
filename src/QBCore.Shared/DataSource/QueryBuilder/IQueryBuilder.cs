@@ -34,7 +34,7 @@ public interface ISelectQueryBuilder<TDocument, TSelect> : IQueryBuilder<TDocume
 	IQBSelectBuilder<TDocument, TSelect> SelectBuilder { get; }
 	IQueryable<TDocument> AsQueryable(DataSourceQueryableOptions? options = null);
 	Task<long> CountAsync(DataSourceCountOptions? options = null, CancellationToken cancellationToken = default(CancellationToken));
-	IAsyncEnumerable<TSelect> SelectAsync(long? skip = null, int? take = null, DataSourceSelectOptions? options = null, CancellationToken cancellationToken = default(CancellationToken));
+	IDSAsyncEnumerable<TSelect> SelectAsync(long skip = 0L, int take = -1, DataSourceSelectOptions? options = null, CancellationToken cancellationToken = default(CancellationToken));
 }
 
 public interface IUpdateQueryBuilder<TDocument, TUpdate> : IQueryBuilder<TDocument, TUpdate>

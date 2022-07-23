@@ -20,7 +20,7 @@ internal sealed class QBBuilder<TDoc, TDto> :
 	public IReadOnlyList<QBCondition> Connects => _connects ?? BuilderEmptyLists.Conditions;
 	public IReadOnlyList<QBCondition> Conditions => _conditions ?? BuilderEmptyLists.Conditions;
 	public IReadOnlyList<QBField> Fields => _fields ?? BuilderEmptyLists.Fields;
-	public IReadOnlyList<QBParameter> Parameters => _parameters ?? (_parameters = new List<QBParameter>(3));
+	public IReadOnlyList<QBParameter> Parameters => _parameters ?? BuilderEmptyLists.Parameters;
 	public IReadOnlyList<QBSortOrder> SortOrders => _sortOrders ?? (_sortOrders = new List<QBSortOrder>(3));
 	public IReadOnlyList<QBAggregation> Aggregations => _aggregations ?? (_aggregations = new List<QBAggregation>(3));
 
@@ -521,6 +521,40 @@ internal sealed class QBBuilder<TDoc, TDto> :
 			_parentheses = 0;
 		}
 
+		if (flags.HasFlag(QBConditionFlags.OnParam))
+		{
+			var fieldPath = (flags.HasFlag(QBConditionFlags.IsConnect)
+					? _connects![_connects.Count - 1]
+					: _conditions![_conditions.Count - 1])
+				.Field;
+
+			AddParameter(paramName!, fieldPath.FieldType, fieldPath.IsNullable, System.Data.ParameterDirection.Input);
+		}
+
+		return this;
+	}
+
+	private QBBuilder<TDoc, TDto> AddParameter(string name, Type underlyingType, bool isNullable, System.Data.ParameterDirection direction)
+	{
+		if (_parameters == null)
+		{
+			_parameters = new List<QBParameter>(8);
+		}
+
+		var param = _parameters.FirstOrDefault(x => x.Name == name);
+		if (param != null)
+		{
+			if (param.UnderlyingType != underlyingType || param.IsNullable != isNullable || param.Direction != direction)
+			{
+				throw new InvalidOperationException($"Incorrect parameter definition of select query builder '{typeof(TDto).ToPretty()}': parameter '{name}' has already been added before with different properties");
+			}
+		}
+		else
+		{
+			IsNormalized = false;
+			_parameters.Add(new QBParameter(name, underlyingType, isNullable, direction));
+		}
+
 		return this;
 	}
 
@@ -890,7 +924,8 @@ internal sealed class QBBuilder<TDoc, TDto> :
 
 internal static class BuilderEmptyLists
 {
-	public static readonly List<QBContainer> Containers = new List<QBContainer>();
-	public static readonly List<QBCondition> Conditions = new List<QBCondition>();
-	public static readonly List<QBField> Fields = new List<QBField>();
+	public static readonly List<QBContainer> Containers = new List<QBContainer>(0);
+	public static readonly List<QBCondition> Conditions = new List<QBCondition>(0);
+	public static readonly List<QBField> Fields = new List<QBField>(0);
+	public static readonly List<QBParameter> Parameters = new List<QBParameter>(0);
 }

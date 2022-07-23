@@ -10,26 +10,8 @@ using QBCore.ObjectFactory;
 
 namespace QBCore.DataSource.QueryBuilder.Mongo;
 
-internal sealed class SelectQueryBuilder<TDocument, TSelect> : QueryBuilder<TDocument, TSelect>, ISelectQueryBuilder<TDocument, TSelect>
+internal sealed partial class SelectQueryBuilder<TDocument, TSelect> : QueryBuilder<TDocument, TSelect>, ISelectQueryBuilder<TDocument, TSelect>
 {
-	private sealed class StageInfo
-	{
-		public readonly QBContainer Container;
-		public string LookupAs;
-		public readonly List<List<QBCondition>> ConditionMap;
-		public readonly List<(string fromPath, string? toPath, QBField? builderField)> ProjectBefore;
-		public readonly List<(string fromPath, string? toPath, QBField? builderField)> ProjectAfter;
-
-		public StageInfo(QBContainer container)
-		{
-			Container = container;
-			LookupAs = "___" + container.Alias;
-			ConditionMap = new List<List<QBCondition>>();
-			ProjectBefore = new List<(string fromPath, string? toPath, QBField? builderField)>();
-			ProjectAfter = new List<(string fromPath, string? toPath, QBField? builderField)>();
-		}
-	}
-
 	public override QueryBuilderTypes QueryBuilderType => QueryBuilderTypes.Select;
 
 	public override Origin Source => new Origin(this.GetType());
@@ -89,26 +71,23 @@ internal sealed class SelectQueryBuilder<TDocument, TSelect> : QueryBuilder<TDoc
 		var aggrOptions = (AggregateOptions?)options?.NativeOptions;
 		var clientSessionHandle = (IClientSessionHandle?)options?.NativeClientSession;
 		_ = Collection;
-		var query = BuildSelectQuery(Builder, Builder.Containers, Builder.Connects, Builder.Conditions, Builder.Fields, null!);//!!!
+		var stages = BuildSelectPipelineStages(Builder.Containers, Builder.Connects, Builder.Conditions, Builder.Fields);
+		var query = BuildSelectQuery(stages, Builder.Parameters);
 
 		await Task.CompletedTask;
 		throw new NotImplementedException();
 		//return await Collection.CountDocumentsAsync(Builders<TDocument>.Filter.Empty, countOptions, cancellationToken);
 	}
 
-	public async IAsyncEnumerable<TSelect> SelectAsync(long? skip = null, int? take = null, DataSourceSelectOptions? options = null, [EnumeratorCancellation] CancellationToken cancellationToken = default(CancellationToken))
+	public async Task<IDSAsyncEnumerable<TSelect>> SelectAsync(long skip = 0L, int take = -1, DataSourceSelectOptions? options = null, CancellationToken cancellationToken = default(CancellationToken))
 	{
 		if (skip < 0)
 		{
 			throw new ArgumentException(nameof(skip));
 		}
-		if (take < 0)
+		if (options?.ObtainEOF == true && options.ObtainTotalCount)
 		{
-			throw new ArgumentException(nameof(take));
-		}
-		if (take == 0)
-		{
-			yield break;
+			throw new ArgumentException(nameof(options.ObtainEOF));
 		}
 		if (options?.NativeOptions != null && options.NativeOptions is not AggregateOptions)
 		{
@@ -118,108 +97,43 @@ internal sealed class SelectQueryBuilder<TDocument, TSelect> : QueryBuilder<TDoc
 		{
 			throw new ArgumentException(nameof(options.NativeClientSession));
 		}
-		if (options?.PreparedNativeQuery != null && options.PreparedNativeQuery is not List<BsonDocument>)
-		{
-			throw new ArgumentException(nameof(options.PreparedNativeQuery));
-		}
 
 		_ = Collection;
 
-		var aggrOptions = (AggregateOptions?)options?.NativeOptions;
+		var aggregateOptions = (AggregateOptions?)options?.NativeOptions;
 		var clientSessionHandle = (IClientSessionHandle?)options?.NativeClientSession;
-		var preparedQuery = (List<BsonDocument>?)options?.PreparedNativeQuery;
+		var stages = BuildSelectPipelineStages(Builder.Containers, Builder.Connects, Builder.Conditions, Builder.Fields);
+		var query = BuildSelectQuery(stages, Builder.Parameters);
 
-		List<BsonDocument> query;
-
-		if (preparedQuery != null)
+		if (skip > 0L)
 		{
-			var skipIndex = preparedQuery.FindLastIndex(x => x.Contains("$skip"));
-			var limitIndex = preparedQuery.FindLastIndex(x => x.Contains("$limit"));
-
-			if (skip != null)
-			{
-				if (skipIndex >= 0)
-				{
-					preparedQuery[skipIndex]["$skip"] = skip;
-				}
-				else if (limitIndex >= 0)
-				{
-					preparedQuery.Insert(limitIndex, new BsonDocument { { "$skip", skip } });
-				}
-				else
-				{
-					preparedQuery.Add(new BsonDocument { { "$skip", skip } });
-				}
-			}
-			else if (skipIndex >= 0)
-			{
-				preparedQuery.RemoveAt(skipIndex);
-			}
-
-			if (take != null)
-			{
-				if (limitIndex >= 0)
-				{
-					preparedQuery[limitIndex]["$limit"] = take;
-				}
-				else if (skipIndex >= 0)
-				{
-					preparedQuery.Insert(skipIndex + 1, new BsonDocument { { "$limit", take } });
-				}
-				else
-				{
-					preparedQuery.Add(new BsonDocument { { "$limit", take } });
-				}
-			}
-			else if (limitIndex >= 0)
-			{
-				preparedQuery.RemoveAt(limitIndex);
-			}
-
-			query = preparedQuery;
+			query.Add(new BsonDocument { { "$skip", skip } });
 		}
-		else
+		if (take >= 0)
 		{
-			query = BuildSelectQuery(Builder, Builder.Containers, Builder.Connects, Builder.Conditions, Builder.Fields, null!);//!!!
-
-			if (skip != null)
-			{
-				query.Add(new BsonDocument { { "$skip", skip } });
-			}
-			if (take != null)
-			{
-				query.Add(new BsonDocument { { "$limit", take } });
-			}
+			query.Add(new BsonDocument { { "$limit", take } });
 		}
 
-		if (options?.GetNativeQuery != null)
-		{
-			options.GetNativeQuery(query);
-		}
 		if (options?.GetQueryString != null)
 		{
 			options.GetQueryString(new BsonArray(query).ToString());
 		}
 
-		using (var cursor = clientSessionHandle == null
-			? await Collection.AggregateAsync<TSelect>(query, aggrOptions, cancellationToken)
-			: await Collection.AggregateAsync<TSelect>(clientSessionHandle, query, aggrOptions, cancellationToken))
-		{
-			while (await cursor.MoveNextAsync(cancellationToken).ConfigureAwait(false))
-			{
-				foreach (var doc in cursor.Current)
-				{
-					yield return doc;
-				}
-				cancellationToken.ThrowIfCancellationRequested();
-			}
-		}
+		return await Task.FromResult(new DSAsyncEnumerable(
+			collection: Collection,
+			query: query,
+			take: take,
+			skipIsGreaterThanZero: skip > 0L,
+			obtainEOF: options?.ObtainEOF == true,
+			obtainTotalCount: options?.ObtainTotalCount == true,
+			aggregateOptions: aggregateOptions,
+			clientSessionHandle: clientSessionHandle,
+			cancellationToken: cancellationToken
+		));
 	}
 
-	public static List<BsonDocument> BuildSelectQuery(QBBuilder<TDocument, TSelect> builder, IReadOnlyList<QBContainer> containers, IReadOnlyList<QBCondition> connects, IReadOnlyList<QBCondition> conditions, IReadOnlyList<QBField> fields, IReadOnlyDictionary<string, object?>? arguments)
+	private static List<StageInfo> BuildSelectPipelineStages(IReadOnlyList<QBContainer> containers, IReadOnlyList<QBCondition> connects, IReadOnlyList<QBCondition> conditions, IReadOnlyList<QBField> fields)
 	{
-		var result = new List<BsonDocument>();
-
 		// Add pipeline stages for each container and clear the first stage's LookupAs (it musn't be used)
 		//
 		var stages = new List<StageInfo>(containers.Select(x => new StageInfo(x)));
@@ -245,9 +159,12 @@ internal sealed class SelectQueryBuilder<TDocument, TSelect> : QueryBuilder<TDoc
 		//
 		FillPipelineStagesWithProjections(stages, fields);
 
-		// Pipelines
-		//
+		return stages;
+	}
 
+	private static List<BsonDocument> BuildSelectQuery(List<StageInfo> stages, IReadOnlyList<QBParameter> parameters)
+	{
+		var result = new List<BsonDocument>();
 		StageInfo stage;
 		QBCondition? firstConnect;
 		BsonDocument lookup;
@@ -330,8 +247,8 @@ internal sealed class SelectQueryBuilder<TDocument, TSelect> : QueryBuilder<TDoc
 						isExpr = true;
 					}
 
-					filter = filter?.AppendByAnd(BuildConditionTree(isExpr, conds.Where(x => x != firstConnect), getDBSideNameInsideLookup, arguments)!)
-								?? BuildConditionTree(isExpr, conds.Where(x => x != firstConnect), getDBSideNameInsideLookup, arguments);
+					filter = filter?.AppendByAnd(BuildConditionTree(isExpr, conds.Where(x => x != firstConnect), getDBSideNameInsideLookup, parameters)!)
+								?? BuildConditionTree(isExpr, conds.Where(x => x != firstConnect), getDBSideNameInsideLookup, parameters);
 				}
 				if (let != null)
 				{
@@ -368,8 +285,8 @@ internal sealed class SelectQueryBuilder<TDocument, TSelect> : QueryBuilder<TDoc
 				foreach (var conds in stage.ConditionMap.Where(x => !x.Any(xx => xx.IsConnect)))
 				{
 					isExpr = conds.Any(x => x.IsOnField);
-					filter = filter?.AppendByAnd(BuildConditionTree(isExpr, conds, getDBSideNameAfterLookup, arguments)!)
-								?? BuildConditionTree(isExpr, conds, getDBSideNameAfterLookup, arguments);
+					filter = filter?.AppendByAnd(BuildConditionTree(isExpr, conds, getDBSideNameAfterLookup, parameters)!)
+								?? BuildConditionTree(isExpr, conds, getDBSideNameAfterLookup, parameters);
 				}
 				if (filter != null)
 				{
@@ -441,15 +358,15 @@ internal sealed class SelectQueryBuilder<TDocument, TSelect> : QueryBuilder<TDoc
 		// Fill the includes and change the LookupAs names for the joining documents the result of which is directly projected into the field.
 		foreach (var field in fields.Where(x => x.IncludeOrExclude).OrderBy(x => x.RefAlias ?? string.Empty).ThenBy(x => x.RefField?.ElementCount ?? 0))
 		{
-			if (field.RefField?.ElementCount == 0)
+			stageIndex = stages.FindIndex(x => x.Container.Alias == field.RefAlias);
+
+			if (field.RefField != null && field.RefField.FieldType == stages[stageIndex].Container.DocumentType)
 			{
 				// project the joining document as the result field
-				stages.First(x => x.Container.Alias == field.RefAlias!).LookupAs = field.Field.DBSideName;
+				stages[stageIndex].LookupAs = field.Field.DBSideName;
 			}
 			else
 			{
-				stageIndex = stages.FindIndex(x => x.Container.Alias == field.RefAlias!);
-
 				path = string.Concat(
 					stages[stageIndex].LookupAs, ".",
 					field.RefField!.DBSideName
@@ -479,7 +396,7 @@ internal sealed class SelectQueryBuilder<TDocument, TSelect> : QueryBuilder<TDoc
 				// search in includes
 				x.IncludeOrExclude
 				// for the entire document: (store) => store
-				&& x.RefField?.ElementCount == 0
+				&& x.RefField!.FieldType == stages.First(xx => xx.Container.Alias == x.RefAlias).Container.DocumentType
 				// in this case our exclude must be a part of it: (sel) => sel.Store.LogoImg, (sel) => sel.Store
 				&& field.Field.FullName.StartsWith(x.Field.FullName)
 				&& field.Field.FullName.Length > x.Field.FullName.Length + 1
@@ -512,13 +429,14 @@ internal sealed class SelectQueryBuilder<TDocument, TSelect> : QueryBuilder<TDoc
 			}
 			else
 			{
-				path = string.Concat(stages.First(x => x.Container.Alias == joinedDoc.RefAlias!).LookupAs, ".",
+				stageIndex = stages.FindIndex(x => x.Container.Alias == joinedDoc.RefAlias!);
+
+				path = string.Concat(stages[stageIndex].LookupAs, ".",
 					string.Join(".", field.Field.Elements.Skip(joinedDoc.Field.ElementCount).Select(x => field.Field.GetDBSideName(x))));
 
 				// Propagate the exclude
 				//
 				var trueFullName = string.Join(".", field.Field.Elements.Skip(joinedDoc.Field.ElementCount).Select(x => x.Name));
-				stageIndex = stages.FindIndex(x => x.Container.Alias == joinedDoc.RefAlias!);
 				for (int i = stageIndex + 1; i < stages.Count; i++)
 				{
 					map = stages[i].ConditionMap;

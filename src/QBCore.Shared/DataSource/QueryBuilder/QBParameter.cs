@@ -26,12 +26,12 @@ public record QBParameter
 		set
 		{
 			HasValue = true;
-			HasValueUsed = false;
+			IsValueUsed = false;
 			_value = value;
 		}
 	}
 	public bool HasValue { get; set; }
-	public bool HasValueUsed { get; set; }
+	public bool IsValueUsed { get; set; }
 
 	public QBParameter(QBParamInfo param)
 		=> ParamInfo = param;
@@ -44,7 +44,7 @@ public record QBParameter
 	{
 		Value = null;
 		HasValue = false;
-		HasValueUsed = false;
+		IsValueUsed = false;
 	}
 }
 
