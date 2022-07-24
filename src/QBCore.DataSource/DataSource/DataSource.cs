@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using QBCore.Configuration;
 using QBCore.DataSource.Options;
 using QBCore.DataSource.QueryBuilder;
@@ -64,7 +65,7 @@ public abstract partial class DataSource<TKey, TDocument, TCreate, TSelect, TUpd
 		throw new NotImplementedException();
 	}
 
-	public IAsyncEnumerable<TSelect> SelectAsync(SoftDel mode = SoftDel.Actual, IReadOnlyCollection<IDSCondition>? conditions = null, IReadOnlyCollection<IDSSortOrder>? sortOrders = null, long? skip = null, int? take = null, DataSourceSelectOptions? options = null, CancellationToken cancellationToken = default(CancellationToken))
+	public async Task<IDSAsyncCursor<TSelect>> SelectAsync(SoftDel mode = SoftDel.Actual, IReadOnlyList<IDSCondition>? conditions = null, IReadOnlyList<IDSSortOrder>? sortOrders = null, long skip = 0, int take = -1, DataSourceSelectOptions? options = null, CancellationToken cancellationToken = default(CancellationToken))
 	{
 		var queryBuilder = Definition.QBFactory.CreateQBSelect<TDocument, TSelect>(_dataContext);
 		var builder = queryBuilder.SelectBuilder;
@@ -100,7 +101,7 @@ public abstract partial class DataSource<TKey, TDocument, TCreate, TSelect, TUpd
 			}
 		}
 
-		return queryBuilder.SelectAsync(skip ?? 0, take ?? -1, options, cancellationToken);
+		return await queryBuilder.SelectAsync(skip, take, options, cancellationToken).ConfigureAwait(false);
 	}
 
 	public Task<TUpdate> UpdateAsync(TKey id, TUpdate document, IReadOnlyCollection<string>? modifiedFieldNames = null, DataSourceUpdateOptions? options = null, CancellationToken cancellationToken = default(CancellationToken))

@@ -1,21 +1,26 @@
+using QBCore.DataSource.QueryBuilder;
+
 namespace QBCore.DataSource.Options;
 
 public class DataSourceOperationOptions
 {
 	public object? NativeOptions;
 	public object? NativeClientSession;
-	public Action<string>? GetQueryString;
+	public Action<string>? QueryStringCallback;
 }
 
 public class DataSourceCountOptions : DataSourceOperationOptions
 {
+	public object? NativeSelectQuery;
+	public long Skip;
+	public long CountNoMoreThan = -1;
 }
 public class DataSourceInsertOptions : DataSourceOperationOptions { }
 public class DataSourceQueryableOptions : DataSourceOperationOptions { }
 public class DataSourceSelectOptions : DataSourceOperationOptions
 {
-	public bool ObtainEOF;
-	public bool ObtainTotalCount;
+	public bool ObtainLastPageMarker;
+	public Action<object>? NativeSelectQueryCallback;
 }
 public class DataSourceUpdateOptions : DataSourceOperationOptions { }
 public class DataSourceDeleteOptions : DataSourceOperationOptions { }

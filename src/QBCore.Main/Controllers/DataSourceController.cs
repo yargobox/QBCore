@@ -1,6 +1,9 @@
 using System.ComponentModel.DataAnnotations;
+using System.Text.Json;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
+using QBCore.Controllers.Models;
 using QBCore.DataSource;
 using QBCore.DataSource.Options;
 
@@ -20,25 +23,47 @@ public class DataSourceController<TKey, TDocument, TCreate, TSelect, TUpdate, TD
 	}
 
 	[HttpGet, ActionName("index")]
-	public async Task<IActionResult> IndexAsync(
+	//[ProducesResponseType(typeof(DataSourceResponse<IAsyncEnumerable<object>>), StatusCodes.Status200OK)]
+	public async Task<ActionResult<DataSourceResponse<IAsyncEnumerable<TSelect>>>> IndexAsync(
 		[FromQuery, MaxLength(7)] string? _de,
 		[FromQuery, MaxLength(8192)] string? _fl,
 		[FromQuery, MaxLength(2048)] string? _so,
 		[FromQuery, Range(1, int.MaxValue)] int? _ps,
 		[FromQuery, Range(1, int.MaxValue)] int? _pn)
 	{
+		long skip = 0;
+		if (_ps != null)
+		{
+			if (_pn == null)
+			{
+				throw new ArgumentNullException(nameof(_pn));
+			}
+			skip = (long)_ps.Value * (_pn.Value - 1);
+		}
+		else if (_pn != null)
+		{
+			throw new ArgumentNullException(nameof(_ps));
+		}
+
+		var dataSourceResponse = new DataSourceResponse<TSelect>
+		{
+			PageSize = _ps ?? -1,
+			PageNumber = _pn ?? -1
+		};
+		var options = new DataSourceSelectOptions
+		{
+			QueryStringCallback = x => Console.WriteLine(x)//!!!
+		};
+
+		dataSourceResponse.Data = await (await _service.SelectAsync(SoftDel.Actual, null, null, skip, _pn ?? -1, options))
+			.ToListAsync((bool x) => Interlocked.Exchange(ref dataSourceResponse.IsLastPage, x ? 1 : 0));
+
+		return await Task.FromResult(Ok(dataSourceResponse));
+
 		/* 		var p = Request.Query["brand_id"].First();
 				var area = ControllerContext.ActionDescriptor.RouteValues["area"];
 				var actionName = ControllerContext.ActionDescriptor.ActionName;
 				var controllerName = ControllerContext.ActionDescriptor.ControllerName; */
-
-		var options = new DataSourceSelectOptions
-		{
-			GetQueryString = x => Console.WriteLine(x)//!!!
-		};
-		return await Task.FromResult(Ok(_service.SelectAsync(SoftDel.Actual, null, null, null, null, options)));
-
-
 /* 		Console.WriteLine(ControllerContext.ActionDescriptor.ActionName);
 		Console.WriteLine(string.Join(", ", ControllerContext.ActionDescriptor.RouteValues.Select(x => x.Key + " = " + x.Value)));
 		Console.WriteLine(string.Join(", ", Request.Query.Select(x => x.Key + " = " + x.Value)));

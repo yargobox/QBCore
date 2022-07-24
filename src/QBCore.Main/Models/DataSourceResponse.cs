@@ -2,17 +2,9 @@ namespace QBCore.Controllers.Models;
 
 public class DataSourceResponse<T>
 {
-	public long TotalRows { get; set; }
-	public int PageSize { get; set; }
-	public int PageNumber { get; set; }
-
-	public IEnumerable<T> Data { get; set; }
-
-	public DataSourceResponse(long totalRows, int pageSize, int pageNumber, IEnumerable<T> data)
-	{
-		TotalRows = totalRows;
-		PageSize = pageSize;
-		PageNumber = pageNumber;
-		Data = data;
-	}
+	public int PageSize = -1;
+	public int PageNumber = -1;
+	public IEnumerable<T>? Data;
+	public long TotalCount = -1;
+	public int IsLastPage = -1;
 }

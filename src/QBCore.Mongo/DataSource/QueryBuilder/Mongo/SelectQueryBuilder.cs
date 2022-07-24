@@ -58,44 +58,207 @@ internal sealed partial class SelectQueryBuilder<TDocument, TSelect> : QueryBuil
 		return Collection.AsQueryable((IClientSessionHandle?)options?.NativeClientSession, (AggregateOptions?)options?.NativeOptions);
 	}
 
-	public async Task<long> CountAsync(DataSourceCountOptions? options = null, CancellationToken cancellationToken = default)
+	public async Task<long> CountAsync(DataSourceCountOptions? options = null, CancellationToken cancellationToken = default(CancellationToken))
 	{
-		if (options?.NativeOptions != null && options.NativeOptions is not AggregateOptions)
+		if (options != null)
 		{
-			throw new ArgumentException(nameof(options.NativeOptions));
+			if (options.Skip < 0)
+			{
+				throw new ArgumentOutOfRangeException(nameof(options.Skip));
+			}
+			if (options.NativeOptions != null && options.NativeOptions is not AggregateOptions)
+			{
+				throw new ArgumentException(nameof(options.NativeOptions));
+			}
+			if (options.NativeClientSession != null && options.NativeClientSession is not IClientSessionHandle)
+			{
+				throw new ArgumentException(nameof(options.NativeClientSession));
+			}
+			if (options.NativeSelectQuery != null && options.NativeSelectQuery is not List<BsonDocument>)
+			{
+				throw new ArgumentException(nameof(options.NativeSelectQuery));
+			}
 		}
-		if (options?.NativeClientSession != null && options.NativeClientSession is not IClientSessionHandle)
-		{
-			throw new ArgumentException(nameof(options.NativeClientSession));
-		}
-		var aggrOptions = (AggregateOptions?)options?.NativeOptions;
-		var clientSessionHandle = (IClientSessionHandle?)options?.NativeClientSession;
-		_ = Collection;
-		var stages = BuildSelectPipelineStages(Builder.Containers, Builder.Connects, Builder.Conditions, Builder.Fields);
-		var query = BuildSelectQuery(stages, Builder.Parameters);
 
-		await Task.CompletedTask;
-		throw new NotImplementedException();
-		//return await Collection.CountDocumentsAsync(Builders<TDocument>.Filter.Empty, countOptions, cancellationToken);
+		_ = Collection;
+
+		var aggregateOptions = (AggregateOptions?)options?.NativeOptions;
+		var clientSessionHandle = (IClientSessionHandle?)options?.NativeClientSession;
+		var selectQuery = (List<BsonDocument>?)options?.NativeSelectQuery;
+		List<BsonDocument> query;
+		bool isCountQuery = false;
+
+		if (selectQuery != null)
+		{
+			// selecQuery is our counting aggregation query?
+			{
+				var lastElem = selectQuery.LastOrDefault();
+				if (lastElem != null && lastElem.BsonType == BsonType.Document && lastElem.Contains("$group"))
+				{
+					var groupElem = lastElem["$group"];
+					if (groupElem.BsonType == BsonType.Document && groupElem.AsBsonDocument.Contains("_id") && groupElem.AsBsonDocument["_id"] == BsonNull.Value)
+					{
+						if (groupElem.AsBsonDocument.Contains("n"))
+						{
+							var nElem = groupElem.AsBsonDocument["n"];
+							if (nElem.BsonType == BsonType.Document && nElem.AsBsonDocument.Contains("$sum"))
+							{
+								isCountQuery = nElem.AsBsonDocument["$sum"] == 1;
+							}
+						}
+					}
+				}
+			}
+
+			if (isCountQuery)
+			{
+				// update, remove, or insert $skip
+				var index = selectQuery.FindLastIndex(x => x.BsonType == BsonType.Document && x.Contains("$skip"));
+				if (index >= 0)
+				{
+					if (options?.Skip > 0)
+					{
+						selectQuery.ElementAt(index)["$skip"] = options.Skip;
+					}
+					else
+					{
+						selectQuery.RemoveAt(index);
+					}
+				}
+				else if (options?.Skip > 0)
+				{
+					index = selectQuery.FindLastIndex(x => x.BsonType == BsonType.Document && x.Contains("$limit"));
+					if (index < 0)
+					{
+						selectQuery.Insert(selectQuery.Count - 1, new BsonDocument { { "$skip", options.Skip } });
+					}
+					else
+					{
+						selectQuery.Insert(index, new BsonDocument { { "$skip", options.Skip } });
+					}
+				}
+
+				// update, remove, or insert $limit
+				index = selectQuery.FindLastIndex(x => x.BsonType == BsonType.Document && x.Contains("$limit"));
+				if (index >= 0)
+				{
+					if (options?.CountNoMoreThan >= 0)
+					{
+						selectQuery.ElementAt(index)["$limit"] = options.CountNoMoreThan;
+					}
+					else
+					{
+						selectQuery.RemoveAt(index);
+					}
+				}
+				else if (options?.CountNoMoreThan >= 0)
+				{
+					index = selectQuery.FindLastIndex(x => x.BsonType == BsonType.Document && x.Contains("$skip"));
+					if (index < 0)
+					{
+						selectQuery.Insert(selectQuery.Count - 1, new BsonDocument { { "$limit", options.CountNoMoreThan } });
+					}
+					else
+					{
+						selectQuery.Insert(index + 1, new BsonDocument { { "$limit", options.CountNoMoreThan } });
+					}
+				}
+			}
+			else
+			{
+				// remove $limit
+				var index = selectQuery.FindLastIndex(x => x.BsonType == BsonType.Document && x.Contains("$limit"));
+				if (index >= 0) selectQuery.RemoveAt(index);
+
+				// remove $skip
+				index = selectQuery.FindLastIndex(x => x.BsonType == BsonType.Document && x.Contains("$skip"));
+				selectQuery.RemoveAt(index);
+
+				// remove all $sort
+				while ((index = selectQuery.FindLastIndex(x => x.BsonType == BsonType.Document && x.Contains("$sort"))) >= 0)
+				{
+					selectQuery.RemoveAt(index);
+				}
+
+				// remove all last $project
+				for (var i = selectQuery.Count - 1; i >= 0; i = selectQuery.Count - 1)
+				{
+					var elem = selectQuery.ElementAt(i);
+					if (elem.BsonType == BsonType.Document && elem.Contains("$project"))
+					{
+						selectQuery.RemoveAt(i);
+						continue;
+					}
+					break;
+				}
+			}
+
+			query = selectQuery;
+		}
+		else
+		{
+			// build query from scratch
+			var stages = BuildSelectPipelineStages(Builder.Containers, Builder.Connects, Builder.Conditions, Builder.Fields);
+			
+			query = BuildSelectQuery(stages, Builder.Parameters);
+		}
+
+		if (!isCountQuery)
+		{
+			// add $skip and $limit
+			if (options != null)
+			{
+				if (options.Skip > 0)
+				{
+					query.Add(new BsonDocument { { "$skip", options.Skip } });
+				}
+				if (options.CountNoMoreThan >= 0)
+				{
+					query.Add(new BsonDocument { { "$limit", options.CountNoMoreThan } });
+				}
+			}
+
+			// add the counting aggregation
+			query.Add(new BsonDocument {
+							{ "$group", new BsonDocument {
+									{ "_id", BsonNull.Value },
+									{ "n", new BsonDocument {
+											{ "$sum", 1 }
+										}
+									}
+							} } });
+		}
+
+		if (options?.QueryStringCallback != null)
+		{
+			options.QueryStringCallback(new BsonArray(query).ToString());
+		}
+
+		using (var cursor = clientSessionHandle == null
+			? await Collection.AggregateAsync<TSelect>(query, aggregateOptions, cancellationToken)
+			: await Collection.AggregateAsync<TSelect>(clientSessionHandle, query, aggregateOptions, cancellationToken))
+		{
+			var bsonTotalCount = (await cursor.FirstAsync(cancellationToken)).ToBsonDocument();
+			return bsonTotalCount["n"].ToInt64();
+		}
 	}
 
-	public async Task<IDSAsyncEnumerable<TSelect>> SelectAsync(long skip = 0L, int take = -1, DataSourceSelectOptions? options = null, CancellationToken cancellationToken = default(CancellationToken))
+	public async Task<IDSAsyncCursor<TSelect>> SelectAsync(long skip = 0L, int take = -1, DataSourceSelectOptions? options = null, CancellationToken cancellationToken = default(CancellationToken))
 	{
 		if (skip < 0)
 		{
-			throw new ArgumentException(nameof(skip));
+			throw new ArgumentOutOfRangeException(nameof(skip));
 		}
-		if (options?.ObtainEOF == true && options.ObtainTotalCount)
+		if (options != null)
 		{
-			throw new ArgumentException(nameof(options.ObtainEOF));
-		}
-		if (options?.NativeOptions != null && options.NativeOptions is not AggregateOptions)
-		{
-			throw new ArgumentException(nameof(options.NativeOptions));
-		}
-		if (options?.NativeClientSession != null && options.NativeClientSession is not IClientSessionHandle)
-		{
-			throw new ArgumentException(nameof(options.NativeClientSession));
+			if (options.NativeOptions != null && options.NativeOptions is not AggregateOptions)
+			{
+				throw new ArgumentException(nameof(options.NativeOptions));
+			}
+			if (options.NativeClientSession != null && options.NativeClientSession is not IClientSessionHandle)
+			{
+				throw new ArgumentException(nameof(options.NativeClientSession));
+			}
 		}
 
 		_ = Collection;
@@ -111,25 +274,82 @@ internal sealed partial class SelectQueryBuilder<TDocument, TSelect> : QueryBuil
 		}
 		if (take >= 0)
 		{
-			query.Add(new BsonDocument { { "$limit", take } });
+			query.Add(new BsonDocument { { "$limit", (uint)take + (options?.ObtainLastPageMarker == true ? 1U : 0U) } });
 		}
 
-		if (options?.GetQueryString != null)
+		if (options != null)
 		{
-			options.GetQueryString(new BsonArray(query).ToString());
+			if (options.NativeSelectQueryCallback != null)
+			{
+				options.NativeSelectQueryCallback(query);
+			}
+			if (options.QueryStringCallback != null)
+			{
+				options.QueryStringCallback(new BsonArray(query).ToString());
+			}
 		}
 
-		return await Task.FromResult(new DSAsyncEnumerable(
-			collection: Collection,
-			query: query,
-			take: take,
-			skipIsGreaterThanZero: skip > 0L,
-			obtainEOF: options?.ObtainEOF == true,
-			obtainTotalCount: options?.ObtainTotalCount == true,
-			aggregateOptions: aggregateOptions,
-			clientSessionHandle: clientSessionHandle,
-			cancellationToken: cancellationToken
-		));
+		using (var cursor = clientSessionHandle == null
+			? await Collection.AggregateAsync<TSelect>(query, aggregateOptions, cancellationToken)
+			: await Collection.AggregateAsync<TSelect>(clientSessionHandle, query, aggregateOptions, cancellationToken))
+		{
+			if (options?.ObtainLastPageMarker == true)
+			{
+				return await Task.FromResult(new DSAsyncCursorWithLastPageMarker<TSelect>(cursor, take, cancellationToken));
+			}
+			else
+			{
+				return await Task.FromResult(new DSAsyncCursor<TSelect>(cursor, cancellationToken));
+			}
+		}
+	}
+
+	private async ValueTask<long> GetTotalCountAsync(List<BsonDocument> query, bool remainOrTotalCount, Action<string>? getQueryStringCallback, AggregateOptions? aggregateOptions, IClientSessionHandle? clientSessionHandle, CancellationToken cancellationToken)
+	{
+		var index = query.FindLastIndex(x => x.Contains("$limit"));
+		if (index >= 0)
+		{
+			query.RemoveAt(index);
+		}
+		if (!remainOrTotalCount)
+		{
+			index = query.FindLastIndex(x => x.Contains("$skip"));
+			if (index >= 0)
+			{
+				query.RemoveAt(index);
+			}
+		}
+		index = query.FindLastIndex(x => x.Contains("$sort"));
+		if (index >= 0)
+		{
+			query.RemoveAt(index);
+		}
+		while (query.LastOrDefault()?.Contains("$project") == true)
+		{
+			query.RemoveAt(query.Count - 1);
+		}
+
+		query.Add(new BsonDocument {
+						{ "$group", new BsonDocument {
+								{ "_id", BsonNull.Value },
+								{ "n", new BsonDocument {
+										{ "$sum", 1 }
+									}
+								}
+						} } });
+		
+		if (getQueryStringCallback != null)
+		{
+			getQueryStringCallback(new BsonArray(query).ToString());
+		}
+
+		using (var cursor = clientSessionHandle == null
+			? await Collection.AggregateAsync<TSelect>(query, aggregateOptions, cancellationToken)
+			: await Collection.AggregateAsync<TSelect>(clientSessionHandle, query, aggregateOptions, cancellationToken))
+		{
+			var bsonCount = (await cursor.FirstAsync(cancellationToken)).ToBsonDocument();
+			return bsonCount["n"].ToInt64();
+		}
 	}
 
 	private static List<StageInfo> BuildSelectPipelineStages(IReadOnlyList<QBContainer> containers, IReadOnlyList<QBCondition> connects, IReadOnlyList<QBCondition> conditions, IReadOnlyList<QBField> fields)

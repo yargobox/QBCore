@@ -26,12 +26,12 @@ public interface IDataSource<TKey, TDocument, TCreate, TSelect, TUpdate, TDelete
 		DataSourceSelectOptions? options = null,
 		CancellationToken cancellationToken = default(CancellationToken)
 	);
-	IAsyncEnumerable<TSelect> SelectAsync(
+	Task<IDSAsyncCursor<TSelect>> SelectAsync(
 		SoftDel mode = SoftDel.Actual,
-		IReadOnlyCollection<IDSCondition>? conditions = null,
-		IReadOnlyCollection<IDSSortOrder>? sortOrders = null,
-		long? skip = null,
-		int? take = null,
+		IReadOnlyList<IDSCondition>? conditions = null,
+		IReadOnlyList<IDSSortOrder>? sortOrders = null,
+		long skip = 0,
+		int take = -1,
 		DataSourceSelectOptions? options = null,
 		CancellationToken cancellationToken = default(CancellationToken)
 	);
