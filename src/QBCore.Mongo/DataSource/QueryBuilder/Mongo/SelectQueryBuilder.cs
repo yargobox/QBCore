@@ -3,15 +3,12 @@ using MongoDB.Bson.Serialization;
 using MongoDB.Driver;
 using QBCore.Configuration;
 using QBCore.DataSource.Options;
-using QBCore.ObjectFactory;
 
 namespace QBCore.DataSource.QueryBuilder.Mongo;
 
 internal sealed partial class SelectQueryBuilder<TDocument, TSelect> : QueryBuilder<TDocument, TSelect>, ISelectQueryBuilder<TDocument, TSelect>
 {
 	public override QueryBuilderTypes QueryBuilderType => QueryBuilderTypes.Select;
-
-	public override Origin Source => new Origin(this.GetType());
 
 	public IQBSelectBuilder<TDocument, TSelect> SelectBuilder => Builder;
 

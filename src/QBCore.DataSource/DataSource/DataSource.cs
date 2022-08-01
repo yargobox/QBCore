@@ -41,8 +41,6 @@ public abstract partial class DataSource<TKey, TDocument, TCreate, TSelect, TUpd
 
 	public IDSDefinition Definition { get; }
 
-	public Origin Source => throw new NotImplementedException();
-
 	public async Task<TKey> InsertAsync(
 		TCreate document,
 		IReadOnlyDictionary<string, object?>? arguments = null,

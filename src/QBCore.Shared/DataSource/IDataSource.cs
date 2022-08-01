@@ -1,9 +1,8 @@
 using QBCore.DataSource.Options;
-using QBCore.ObjectFactory;
 
 namespace QBCore.DataSource;
 
-public interface IDataSource : IOriginal
+public interface IDataSource
 {
 	IDSDefinition Definition { get; }
 }

@@ -5,7 +5,7 @@ using QBCore.ObjectFactory;
 
 namespace QBCore.DataSource.QueryBuilder;
 
-public interface IQueryBuilder : IOriginal
+public interface IQueryBuilder
 {
 	QueryBuilderTypes QueryBuilderType { get; }
 	Type DocumentType { get; }

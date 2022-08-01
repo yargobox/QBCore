@@ -5,7 +5,6 @@ using MongoDB.Bson.Serialization;
 using MongoDB.Driver;
 using QBCore.Configuration;
 using QBCore.Extensions.Text;
-using QBCore.ObjectFactory;
 
 namespace QBCore.DataSource.QueryBuilder.Mongo;
 
@@ -17,7 +16,6 @@ internal abstract class QueryBuilder<TDocument, TProjection> : IQueryBuilder<TDo
 	public Type DatabaseContextInterface => typeof(IMongoDbContext);
 	public IDataContext DataContext { get; }
 	public QBBuilder<TDocument, TProjection> Builder { get; }
-	public abstract Origin Source { get; }
 
 	protected IMongoDbContext _mongoDbContext;
 
