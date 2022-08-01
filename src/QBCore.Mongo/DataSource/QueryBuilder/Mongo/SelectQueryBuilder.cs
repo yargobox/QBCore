@@ -1,11 +1,8 @@
-using System.Runtime.CompilerServices;
 using MongoDB.Bson;
 using MongoDB.Bson.Serialization;
 using MongoDB.Driver;
 using QBCore.Configuration;
 using QBCore.DataSource.Options;
-using QBCore.Extensions.Collections.Generic;
-using QBCore.Extensions.Text;
 using QBCore.ObjectFactory;
 
 namespace QBCore.DataSource.QueryBuilder.Mongo;

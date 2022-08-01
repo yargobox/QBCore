@@ -55,7 +55,7 @@ public class DataSourceController<TKey, TDocument, TCreate, TSelect, TUpdate, TD
 			QueryStringCallback = x => Console.WriteLine(x)//!!!
 		};
 
-		dataSourceResponse.Data = await (await _service.SelectAsync(SoftDel.Actual, null, null, skip, _pn ?? -1, options))
+		dataSourceResponse.Data = await (await _service.SelectAsync(SoftDel.Actual, null, null, null, skip, _pn ?? -1, options))
 			.ToListAsync((bool x) => Interlocked.Exchange(ref dataSourceResponse.IsLastPage, x ? 1 : 0));
 
 		return await Task.FromResult(Ok(dataSourceResponse));
@@ -85,10 +85,18 @@ public class DataSourceController<TKey, TDocument, TCreate, TSelect, TUpdate, TD
 		[FromBody] TCreate model,
 		[FromQuery, Range(0, 1)] int? _dp)
 	{
-		Console.WriteLine(ControllerContext.ActionDescriptor.ActionName);
+		var options = new DataSourceInsertOptions
+		{
+			QueryStringCallback = x => Console.WriteLine(x)//!!!
+		};
+
+		var id = await _service.InsertAsync(model, null, options);
+		return CreatedAtAction(nameof(CreateAsync), new { id = id });
+
+/*		Console.WriteLine(ControllerContext.ActionDescriptor.ActionName);
 		Console.WriteLine(string.Join(", ", ControllerContext.ActionDescriptor.RouteValues.Select(x => x.Key + " = " + x.Value)));
 		Console.WriteLine(string.Join(", ", Request.Query.Select(x => x.Key + " = " + x.Value)));
-		return await Task.FromResult(CreatedAtAction(nameof(CreateAsync), new { id = default(TKey) }));
+		return await Task.FromResult(CreatedAtAction(nameof(CreateAsync), new { id = default(TKey) }));*/
 	}
 
 	[HttpPut("{id}"), ActionName("update")]

@@ -1,12 +1,9 @@
 using System.Collections;
-using System.Linq.Expressions;
-using System.Reflection;
 using System.Text.RegularExpressions;
 using MongoDB.Bson;
 using MongoDB.Bson.Serialization;
 using MongoDB.Driver;
 using QBCore.Configuration;
-using QBCore.Extensions.Linq.Expressions;
 using QBCore.Extensions.Text;
 using QBCore.ObjectFactory;
 
@@ -255,7 +252,6 @@ internal abstract class QueryBuilder<TDocument, TProjection> : IQueryBuilder<TDo
 
 		return (filter, 0);
 	}
-
 	private static BsonDocument BuildCondition(bool useExprFormat, QBCondition cond, Func<string, FieldPath, string> getDBSideName, IReadOnlyList<QBParameter> parameters)
 	{
 		if (cond.IsOnField)
@@ -289,6 +285,7 @@ internal abstract class QueryBuilder<TDocument, TProjection> : IQueryBuilder<TDo
 	}
 
 	#endregion
+
 	protected static BsonDocument MakeConditionOnConst(bool useExprFormat, QBCondition cond, Func<string, FieldPath, string> getDBSideName, object? paramValue = null)
 	{
 		if (!cond.IsOnParam && !cond.IsOnConst)
@@ -377,7 +374,6 @@ internal abstract class QueryBuilder<TDocument, TProjection> : IQueryBuilder<TDo
 				throw new NotSupportedException();
 		}
 	}
-
 	protected static BsonDocument MakeConditionOnField(bool rightIsVar, QBCondition cond, Func<string, FieldPath, string> getDBSideName)
 	{
 		if (!cond.IsOnField)

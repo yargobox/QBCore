@@ -20,6 +20,7 @@ public interface IQBBuilder
 
 public interface IQBBuilder<TDocument, TProjection> : IQBBuilder
 {
+	Expression<Func<TDocument, object?>>? IdField { get; set; }
 }
 
 public interface IQBInsertBuilder<TDocument, TCreate> : IQBBuilder<TDocument, TCreate>

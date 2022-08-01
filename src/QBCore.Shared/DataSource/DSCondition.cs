@@ -1,31 +1,41 @@
 using System.Linq.Expressions;
-using QBCore.Extensions.Linq.Expressions;
-using QBCore.ObjectFactory;
 
 namespace QBCore.DataSource;
 
-public interface IDSCondition
+public record DSCondition<TProjection>
 {
-	Type ProjectionType { get; }
-	string FieldName { get; }
-	FO Operation { get; }
-	object? Value { get; }
-	Origin ValueSource { get; }
-}
+	public readonly bool IsByOr;
+	public readonly int Parentheses;
+	public readonly Expression<Func<TProjection, object?>> Field;
+	public readonly FO Operation;
+	public readonly object? Value;
 
-public class DSCondition<TProjection> : IDSCondition
-{
-	public Type ProjectionType => typeof(TProjection);
-	public string FieldName { get; }
-	public FO Operation { get; }
-	public object? Value { get; }
-	public Origin ValueSource  { get; }
-
-	public DSCondition(Expression<Func<TProjection, object?>> field, FO operation, object? value, Origin valueSource)
+	public DSCondition(Expression<Func<TProjection, object?>> field, FO operation, object? value)
 	{
-		FieldName = field.GetMemberName();
+		Field = field;
 		Operation = operation;
 		Value = value;
-		ValueSource = valueSource;
+	}
+	public DSCondition(bool isByOr, Expression<Func<TProjection, object?>> field, FO operation, object? value)
+	{
+		IsByOr = isByOr;
+		Field = field;
+		Operation = operation;
+		Value = value;
+	}
+	public DSCondition(int parentheses, Expression<Func<TProjection, object?>> field, FO operation, object? value)
+	{
+		Parentheses = parentheses;
+		Field = field;
+		Operation = operation;
+		Value = value;
+	}
+	public DSCondition(bool isByOr, int parentheses, Expression<Func<TProjection, object?>> field, FO operation, object? value)
+	{
+		IsByOr = isByOr;
+		Parentheses = parentheses;
+		Field = field;
+		Operation = operation;
+		Value = value;
 	}
 }

@@ -5,6 +5,7 @@ namespace QBCore.DataSource.QueryBuilder.Mongo;
 
 internal sealed class QBBuilder<TDoc, TDto> :
 	IQBInsertBuilder<TDoc, TDto>,
+	IQBMongoInsertBuilder<TDoc, TDto>,
 	IQBSelectBuilder<TDoc, TDto>,
 	IQBMongoSelectBuilder<TDoc, TDto>,
 	IQBUpdateBuilder<TDoc, TDto>,
@@ -37,6 +38,16 @@ internal sealed class QBBuilder<TDoc, TDto> :
 	private bool? _isByOr;
 	private int _autoOpenedParentheses;
 
+	public Expression<Func<TDoc, object?>>? IdField
+	{
+		get => _idField;
+		set
+		{
+			if (_idField != null)
+				throw new InvalidOperationException($"Incorrect definition of select query builder '{typeof(TDto).ToPretty()}': option '{nameof(IdField)}' is already set.");
+			_idField = value;
+		}
+	}
 	public Expression<Func<TDoc, object?>>? DateCreateField
 	{
 		get => _dateCreateField;
@@ -94,6 +105,7 @@ internal sealed class QBBuilder<TDoc, TDto> :
 		set => ((IQBSelectBuilder<TDoc, TDto>)this).DateDeleteField = value;
 	}
 
+	private Expression<Func<TDoc, object?>>? _idField;
 	private Expression<Func<TDoc, object?>>? _dateCreateField;
 	private Expression<Func<TDoc, object?>>? _dateModifyField;
 	private Expression<Func<TDoc, object?>>? _dateUpdateField;
@@ -108,6 +120,10 @@ internal sealed class QBBuilder<TDoc, TDto> :
 		}
 
 		QueryBuilderType = queryBuilderType;
+
+		_idField =
+			typeof(TDoc).GetProperties().Where(x => x.IsDefined(typeof(DsIdAttribute), true)).FirstOrDefault()?.ToMemberExpression<TDoc>()
+			?? typeof(TDoc).GetFields().Where(x => x.IsDefined(typeof(DsIdAttribute), true)).FirstOrDefault()?.ToMemberExpression<TDoc>();
 
 		if (QueryBuilderType == QueryBuilderTypes.Select)
 		{
@@ -158,6 +174,7 @@ internal sealed class QBBuilder<TDoc, TDto> :
 		if (other._conditions != null) _conditions = new List<QBCondition>(other._conditions);
 		if (other._sortOrders != null) _sortOrders = new List<QBSortOrder>(other._sortOrders);
 		if (other._aggregations != null) _aggregations = new List<QBAggregation>(other._aggregations);
+		_idField = other._idField;
 		_dateCreateField = other._dateCreateField;
 		_dateUpdateField = other._dateUpdateField;
 		_dateModifyField = other._dateModifyField;

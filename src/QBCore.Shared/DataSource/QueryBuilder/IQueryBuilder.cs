@@ -21,9 +21,9 @@ public interface IQueryBuilder<TDocument, TProjection> : IQueryBuilder
 
 public interface IInsertQueryBuilder<TDocument, TCreate> : IQueryBuilder<TDocument, TCreate>
 {
-	Task<TCreate> InsertAsync(
+	IQBInsertBuilder<TDocument, TCreate> InsertBuilder { get; }
+	Task<object> InsertAsync(
 		TCreate document,
-		IReadOnlyCollection<QBArgument>? parameters = null,
 		DataSourceInsertOptions? options = null,
 		CancellationToken cancellationToken = default(CancellationToken)
 	);

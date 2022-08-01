@@ -209,11 +209,11 @@ public class MongoQBFactory : IQueryBuilderFactory
 		var setupAction =
 		(
 			_builderMethods?.InsertBuilder != null
-				? _builderMethods.InsertBuilder as Action<IQBInsertBuilder<TDocument, TCreate>>
-				: FactoryHelper.FindBuilder<IQBInsertBuilder<TDocument, TCreate>>(typeof(TCreate), null)
-					?? FactoryHelper.FindBuilder<IQBInsertBuilder<TDocument, TCreate>>(DataSourceConcrete, null)
+				? _builderMethods.InsertBuilder as Action<IQBMongoInsertBuilder<TDocument, TCreate>>
+				: FactoryHelper.FindBuilder<IQBMongoInsertBuilder<TDocument, TCreate>>(typeof(TCreate), null)
+					?? FactoryHelper.FindBuilder<IQBMongoInsertBuilder<TDocument, TCreate>>(DataSourceConcrete, null)
 		)
-		?? throw new InvalidOperationException($"Datasource {DataSourceConcrete.ToPretty()} does not have a query builder setup {typeof(IQBInsertBuilder<TDocument, TCreate>).ToPretty()}.");
+		?? throw new InvalidOperationException($"Datasource {DataSourceConcrete.ToPretty()} does not have a query builder setup {typeof(IQBMongoInsertBuilder<TDocument, TCreate>).ToPretty()}.");
 
 		var setup = new QBBuilder<TDocument, TCreate>(QueryBuilderTypes.Insert);
 		setupAction(setup);

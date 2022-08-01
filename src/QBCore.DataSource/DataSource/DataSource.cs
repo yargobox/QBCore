@@ -1,7 +1,5 @@
-using System.Runtime.CompilerServices;
 using QBCore.Configuration;
 using QBCore.DataSource.Options;
-using QBCore.DataSource.QueryBuilder;
 using QBCore.Extensions.Threading.Tasks;
 using QBCore.ObjectFactory;
 
@@ -45,30 +43,85 @@ public abstract partial class DataSource<TKey, TDocument, TCreate, TSelect, TUpd
 
 	public Origin Source => throw new NotImplementedException();
 
-	public Task<TCreate> InsertAsync(TCreate document, DataSourceInsertOptions? options = null, CancellationToken cancellationToken = default(CancellationToken))
+	public async Task<TKey> InsertAsync(
+		TCreate document,
+		IReadOnlyDictionary<string, object?>? arguments = null,
+		DataSourceInsertOptions? options = null,
+		CancellationToken cancellationToken = default(CancellationToken))
+	{
+		if (!Definition.Options.HasFlag(DataSourceOptions.CanInsert))
+		{
+			throw new InvalidOperationException($"DataSource {Definition.Name} does not support the insert operation.");
+		}
+
+		var qb = Definition.QBFactory.CreateQBInsert<TDocument, TCreate>(_dataContext);
+		var builder = qb.InsertBuilder;
+
+		object? value;
+		foreach (var param in builder.Parameters)
+		{
+			param.ResetValue();
+			if (arguments != null && arguments.TryGetValue(param.Name, out value))
+			{
+				param.Value = value;
+			}
+		}
+
+		if (!builder.IsNormalized)
+		{
+			builder.Normalize();
+		}
+
+		return (TKey) await qb.InsertAsync(document, options, cancellationToken).ConfigureAwait(false);
+	}
+
+	public Task<IEnumerable<KeyValuePair<string, object?>>> AggregateAsync(
+		IReadOnlyCollection<IDSAggregation> aggregations,
+		SoftDel mode = SoftDel.Actual,
+		IReadOnlyCollection<DSCondition<TSelect>>? conditions = null,
+		IReadOnlyDictionary<string, object?>? arguments = null,
+		DataSourceSelectOptions? options = null,
+		CancellationToken cancellationToken = default(CancellationToken))
 	{
 		throw new NotImplementedException();
 	}
 
-	public Task<IEnumerable<KeyValuePair<string, object?>>> AggregateAsync(IReadOnlyCollection<IDSAggregation> aggregations, SoftDel mode = SoftDel.Actual, IReadOnlyCollection<IDSCondition>? conditions = null, DataSourceSelectOptions? options = null, CancellationToken cancellationToken = default(CancellationToken))
+	public Task<long> CountAsync(
+		SoftDel mode = SoftDel.Actual,
+		IReadOnlyList<DSCondition<TSelect>>? conditions = null,
+		IReadOnlyDictionary<string, object?>? arguments = null,
+		DataSourceCountOptions? options = null,
+		CancellationToken cancellationToken = default(CancellationToken))
 	{
 		throw new NotImplementedException();
 	}
 
-	public Task<long> CountAsync(SoftDel mode = SoftDel.Actual, IReadOnlyCollection<IDSCondition>? conditions = null, DataSourceCountOptions? options = null, CancellationToken cancellationToken = default(CancellationToken))
+	public Task<TSelect> SelectAsync(
+		TKey id,
+		DataSourceSelectOptions? options = null,
+		IReadOnlyDictionary<string, object?>? arguments = null,
+		CancellationToken cancellationToken = default(CancellationToken))
 	{
 		throw new NotImplementedException();
 	}
 
-	public Task<TSelect> SelectAsync(TKey id, DataSourceSelectOptions? options = null, CancellationToken cancellationToken = default(CancellationToken))
+	public async Task<IDSAsyncCursor<TSelect>> SelectAsync(
+		SoftDel mode = SoftDel.Actual,
+		IReadOnlyList<DSCondition<TSelect>>? conditions = null,
+		IReadOnlyList<DSSortOrder<TSelect>>? sortOrders = null,
+		IReadOnlyDictionary<string, object?>? arguments = null,
+		long skip = 0,
+		int take = -1,
+		DataSourceSelectOptions? options = null,
+		CancellationToken cancellationToken = default(CancellationToken))
 	{
-		throw new NotImplementedException();
-	}
+		if (!Definition.Options.HasFlag(DataSourceOptions.CanSelect))
+		{
+			throw new InvalidOperationException($"DataSource {Definition.Name} does not support the select operation.");
+		}
 
-	public async Task<IDSAsyncCursor<TSelect>> SelectAsync(SoftDel mode = SoftDel.Actual, IReadOnlyList<IDSCondition>? conditions = null, IReadOnlyList<IDSSortOrder>? sortOrders = null, long skip = 0, int take = -1, DataSourceSelectOptions? options = null, CancellationToken cancellationToken = default(CancellationToken))
-	{
-		var queryBuilder = Definition.QBFactory.CreateQBSelect<TDocument, TSelect>(_dataContext);
-		var builder = queryBuilder.SelectBuilder;
+		var qb = Definition.QBFactory.CreateQBSelect<TDocument, TSelect>(_dataContext);
+		var builder = qb.SelectBuilder;
 
 		if (Definition.Options.HasFlag(DataSourceOptions.SoftDelete))
 		{
@@ -89,47 +142,111 @@ public abstract partial class DataSource<TKey, TDocument, TCreate, TSelect, TUpd
 
 		if (conditions != null)
 		{
+			var rootAlias = builder.Containers.First().Alias;
 			foreach (var cond in conditions)
 			{
+				if (cond.IsByOr)
+				{
+					builder.Or();
+				}
+				
+				for (int i = 0; i < cond.Parentheses; i++)
+				{
+					builder.Begin();
+				}
+				
+				builder.Condition<TSelect>(rootAlias, cond.Field, cond.Value, cond.Operation);
+				
+				for (int i = cond.Parentheses; i < 0; i++)
+				{
+					builder.End();
+				}
 			}
 		}
 
-		if (sortOrders != null)
+		if (sortOrders != null)//!!!
 		{
 			foreach (var sort in sortOrders)
 			{
 			}
 		}
 
-		return await queryBuilder.SelectAsync(skip, take, options, cancellationToken).ConfigureAwait(false);
+		object? value;
+		foreach (var param in builder.Parameters)
+		{
+			param.ResetValue();
+			if (arguments != null && arguments.TryGetValue(param.Name, out value))
+			{
+				param.Value = value;
+			}
+		}
+
+		if (!builder.IsNormalized)
+		{
+			builder.Normalize();
+		}
+
+		return await qb.SelectAsync(skip, take, options, cancellationToken).ConfigureAwait(false);
 	}
 
-	public Task<TUpdate> UpdateAsync(TKey id, TUpdate document, IReadOnlyCollection<string>? modifiedFieldNames = null, DataSourceUpdateOptions? options = null, CancellationToken cancellationToken = default(CancellationToken))
+	public Task<TUpdate> UpdateAsync(
+		TKey id,
+		TUpdate document,
+		IReadOnlyCollection<string>? modifiedFieldNames = null,
+		DataSourceUpdateOptions? options = null,
+		CancellationToken cancellationToken = default(CancellationToken)
+	)
 	{
 		throw new NotImplementedException();
 	}
 
-	public Task<TUpdate> UpdateAsync(TUpdate document, IReadOnlyCollection<IDSCondition> conditions, IReadOnlyCollection<string>? modifiedFieldNames = null, DataSourceUpdateOptions? options = null, CancellationToken cancellationToken = default(CancellationToken))
+	public Task<TUpdate> UpdateAsync(
+		TUpdate document,
+		IReadOnlyList<DSCondition<TSelect>> conditions,
+		IReadOnlyCollection<string>? modifiedFieldNames = null,
+		DataSourceUpdateOptions? options = null,
+		CancellationToken cancellationToken = default(CancellationToken)
+	)
 	{
 		throw new NotImplementedException();
 	}
 
-	public Task DeleteAsync(TKey id, TDelete document, DataSourceDeleteOptions? options = null, CancellationToken cancellationToken = default(CancellationToken))
+	public Task DeleteAsync(
+		TKey id,
+		TDelete document,
+		DataSourceDeleteOptions? options = null,
+		CancellationToken cancellationToken = default(CancellationToken)
+	)
 	{
 		throw new NotImplementedException();
 	}
 
-	public Task DeleteAsync(TDelete document, IReadOnlyCollection<IDSCondition> conditions, DataSourceDeleteOptions? options = null, CancellationToken cancellationToken = default(CancellationToken))
+	public Task DeleteAsync(
+		TDelete document,
+		IReadOnlyList<DSCondition<TSelect>> conditions,
+		DataSourceDeleteOptions? options = null,
+		CancellationToken cancellationToken = default(CancellationToken)
+	)
 	{
 		throw new NotImplementedException();
 	}
 
-	public Task RestoreAsync(TKey id, TRestore document, DataSourceRestoreOptions? options = null, CancellationToken cancellationToken = default(CancellationToken))
+	public Task RestoreAsync(
+		TKey id,
+		TRestore document,
+		DataSourceRestoreOptions? options = null,
+		CancellationToken cancellationToken = default(CancellationToken)
+	)
 	{
 		throw new NotImplementedException();
 	}
 
-	public Task RestoreAsync(TRestore document, IReadOnlyCollection<IDSCondition> conditions, DataSourceRestoreOptions? options = null, CancellationToken cancellationToken = default(CancellationToken))
+	public Task RestoreAsync(
+		TRestore document,
+		IReadOnlyList<DSCondition<TSelect>> conditions,
+		DataSourceRestoreOptions? options = null,
+		CancellationToken cancellationToken = default(CancellationToken)
+	)
 	{
 		throw new NotImplementedException();
 	}

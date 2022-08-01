@@ -1,28 +1,15 @@
 using System.Linq.Expressions;
-using QBCore.Extensions.Linq.Expressions;
-using QBCore.ObjectFactory;
 
 namespace QBCore.DataSource;
 
-public interface IDSSortOrder
+public record DSSortOrder<TProjection>
 {
-	Type ProjectionType { get; }
-	string FieldName { get; }
-	public bool Descending { get; }
-	Origin ValueSource { get; }
-}
+	public readonly Expression<Func<TProjection, object?>> Field;
+	public readonly bool Descending;
 
-public class DSSortOrder<TProjection> : IDSSortOrder
-{
-	public Type ProjectionType => typeof(TProjection);
-	public string FieldName { get; }
-	public bool Descending { get; }
-	public Origin ValueSource { get; }
-
-	public DSSortOrder(Expression<Func<TProjection, object?>> field, bool descending, Origin valueSource)
+	public DSSortOrder(Expression<Func<TProjection, object?>> field, bool descending = false)
 	{
-		FieldName = field.GetMemberName();
+		Field = field;
 		Descending = descending;
-		ValueSource = valueSource;
 	}
 }

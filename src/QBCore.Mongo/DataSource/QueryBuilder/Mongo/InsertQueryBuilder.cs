@@ -10,14 +10,15 @@ internal sealed class InsertQueryBuilder<TDocument, TCreate> : QueryBuilder<TDoc
 
 	public override Origin Source => new Origin(this.GetType());
 
+	public IQBInsertBuilder<TDocument, TCreate> InsertBuilder => Builder;
+
 	public InsertQueryBuilder(QBBuilder<TDocument, TCreate> building, IDataContext dataContext)
 		: base(building, dataContext)
 	{
 	}
 
-	public Task<TCreate> InsertAsync(
+	public Task<object> InsertAsync(
 		TCreate document,
-		IReadOnlyCollection<QBArgument>? parameters = null,
 		DataSourceInsertOptions? options = null,
 		CancellationToken cancellationToken = default(CancellationToken)
 	)
