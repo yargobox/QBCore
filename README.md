@@ -1,6 +1,6 @@
 # QBCore
 
-QBCore is short for **Q**uery **B**uilder **Core**. This is an attempt to bring the stateful DS/CDS-based application to a stateless analogy.
+QBCore is short for **Q**uery **B**uilder **Core**. This is an attempt to bring the stateful DS/CDS-based application to a stateless analogy. It is an R&D project aimed at developing a platform for business process automation that allows writing code in a more descriptive way, but less than low-code platforms do. Such an approach would avoid the limitations that low-code and no-code platforms have, but could significantly increase the speed of developing solutions based on it. A challenging part is developing a generic query builder layer that can work with both relational and document databases, and allows using EF, MongoDB C#/.NET Driver, or just .NET Data Provider.
 
 ## API
 
