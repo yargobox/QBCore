@@ -3,18 +3,9 @@ using QBCore.Extensions.Linq;
 
 namespace QBCore.DataSource.QueryBuilder.Mongo;
 
-internal sealed class QBBuilder<TDoc, TDto> :
-	IQBInsertBuilder<TDoc, TDto>,
-	IQBMongoInsertBuilder<TDoc, TDto>,
-	IQBSelectBuilder<TDoc, TDto>,
-	IQBMongoSelectBuilder<TDoc, TDto>,
-	IQBUpdateBuilder<TDoc, TDto>,
-	IQBDeleteBuilder<TDoc, TDto>,
-	IQBSoftDelBuilder<TDoc, TDto>,
-	IQBRestoreBuilder<TDoc, TDto>,
-	ICloneable
+internal sealed class QBSelectBuilder<TDoc, TDto> : IQBSelectBuilder<TDoc, TDto>, IQBMongoSelectBuilder<TDoc, TDto>, ICloneable
 {
-	public QueryBuilderTypes QueryBuilderType { get; }
+	public QueryBuilderTypes QueryBuilderType => QueryBuilderTypes.Select;
 	public bool IsNormalized { get; private set; }
 
 	public IReadOnlyList<QBContainer> Containers => _containers;
@@ -48,47 +39,7 @@ internal sealed class QBBuilder<TDoc, TDto> :
 			_idField = value;
 		}
 	}
-	public Expression<Func<TDoc, object?>>? DateCreateField
-	{
-		get => _dateCreateField;
-		set
-		{
-			if (_dateCreateField != null)
-				throw new InvalidOperationException($"Incorrect definition of select query builder '{typeof(TDto).ToPretty()}': option '{nameof(DateCreateField)}' is already set.");
-			_dateCreateField = value;
-		}
-	}
-	public Expression<Func<TDoc, object?>>? DateUpdateField
-	{
-		get => _dateUpdateField;
-		set
-		{
-			if (_dateUpdateField != null)
-				throw new InvalidOperationException($"Incorrect definition of select query builder '{typeof(TDto).ToPretty()}': option '{nameof(DateUpdateField)}' is already set.");
-			_dateUpdateField = value;
-		}
-	}
-	public Expression<Func<TDoc, object?>>? DateModifyField
-	{
-		get => _dateModifyField;
-		set
-		{
-			if (_dateModifyField != null)
-				throw new InvalidOperationException($"Incorrect definition of select query builder '{typeof(TDto).ToPretty()}': option '{nameof(DateModifyField)}' is already set.");
-			_dateModifyField = value;
-		}
-	}
-	public Expression<Func<TDoc, object?>>? DateDeleteField
-	{
-		get => _dateDeleteField;
-		set
-		{
-			if (_dateDeleteField != null)
-				throw new InvalidOperationException($"Incorrect definition of select query builder '{typeof(TDto).ToPretty()}': option '{nameof(DateDeleteField)}' is already set.");
-			_dateDeleteField = value;
-		}
-	}
-	Expression<Func<TDto, object?>>? IQBSelectBuilder<TDoc, TDto>.DateDeleteField
+	public Expression<Func<TDto, object?>>? DateDeleteField
 	{
 		get => _dateDeleteSelField;
 		set
@@ -98,70 +49,27 @@ internal sealed class QBBuilder<TDoc, TDto> :
 			_dateDeleteSelField = value;
 		}
 	}
-
 	Expression<Func<TDto, object?>>? IQBMongoSelectBuilder<TDoc, TDto>.DateDeleteField
 	{
-		get => ((IQBSelectBuilder<TDoc, TDto>)this).DateDeleteField;
-		set => ((IQBSelectBuilder<TDoc, TDto>)this).DateDeleteField = value;
+		get => this.DateDeleteField;
+		set => this.DateDeleteField = value;
 	}
 
 	private Expression<Func<TDoc, object?>>? _idField;
-	private Expression<Func<TDoc, object?>>? _dateCreateField;
-	private Expression<Func<TDoc, object?>>? _dateModifyField;
-	private Expression<Func<TDoc, object?>>? _dateUpdateField;
-	private Expression<Func<TDoc, object?>>? _dateDeleteField;
 	private Expression<Func<TDto, object?>>? _dateDeleteSelField;
 
-	public QBBuilder(QueryBuilderTypes queryBuilderType)
+	public QBSelectBuilder()
 	{
-		if (queryBuilderType == QueryBuilderTypes.None)
-		{
-			throw new ArgumentException(nameof(queryBuilderType));
-		}
-
-		QueryBuilderType = queryBuilderType;
-
 		_idField =
-			typeof(TDoc).GetProperties().Where(x => x.IsDefined(typeof(DsIdAttribute), true)).FirstOrDefault()?.ToMemberExpression<TDoc>()
-			?? typeof(TDoc).GetFields().Where(x => x.IsDefined(typeof(DsIdAttribute), true)).FirstOrDefault()?.ToMemberExpression<TDoc>();
+			typeof(TDoc).GetProperties().Where(x => x.IsDefined(typeof(DeIdAttribute), true)).FirstOrDefault()?.ToMemberExpression<TDoc>()
+			?? typeof(TDoc).GetFields().Where(x => x.IsDefined(typeof(DeIdAttribute), true)).FirstOrDefault()?.ToMemberExpression<TDoc>();
 
-		if (QueryBuilderType == QueryBuilderTypes.Select)
-		{
-			_dateDeleteSelField =
-				typeof(TDto).GetProperties().Where(x => x.IsDefined(typeof(DsDeletedAttribute), true)).FirstOrDefault()?.ToMemberExpression<TDto>()
-				?? typeof(TDto).GetFields().Where(x => x.IsDefined(typeof(DsDeletedAttribute), true)).FirstOrDefault()?.ToMemberExpression<TDto>();
-		}
-		else if (QueryBuilderType == QueryBuilderTypes.Insert)
-		{
-			_dateCreateField =
-				typeof(TDoc).GetProperties().Where(x => x.IsDefined(typeof(DsCreatedAttribute), true)).FirstOrDefault()?.ToMemberExpression<TDoc>()
-				?? typeof(TDoc).GetFields().Where(x => x.IsDefined(typeof(DsCreatedAttribute), true)).FirstOrDefault()?.ToMemberExpression<TDoc>();
-
-			DateModifyField =
-				typeof(TDoc).GetProperties().Where(x => x.IsDefined(typeof(DsModifiedAttribute), true)).FirstOrDefault()?.ToMemberExpression<TDoc>()
-				?? typeof(TDoc).GetFields().Where(x => x.IsDefined(typeof(DsModifiedAttribute), true)).FirstOrDefault()?.ToMemberExpression<TDoc>();
-		}
-		else if (QueryBuilderType == QueryBuilderTypes.Update)
-		{
-			_dateUpdateField =
-				typeof(TDoc).GetProperties().Where(x => x.IsDefined(typeof(DsUpdatedAttribute), true)).FirstOrDefault()?.ToMemberExpression<TDoc>()
-				?? typeof(TDoc).GetFields().Where(x => x.IsDefined(typeof(DsUpdatedAttribute), true)).FirstOrDefault()?.ToMemberExpression<TDoc>();
-
-			DateModifyField =
-				typeof(TDoc).GetProperties().Where(x => x.IsDefined(typeof(DsModifiedAttribute), true)).FirstOrDefault()?.ToMemberExpression<TDoc>()
-				?? typeof(TDoc).GetFields().Where(x => x.IsDefined(typeof(DsModifiedAttribute), true)).FirstOrDefault()?.ToMemberExpression<TDoc>();
-		}
-		else if (QueryBuilderType == QueryBuilderTypes.SoftDel || QueryBuilderType == QueryBuilderTypes.Restore)
-		{
-			_dateDeleteField =
-				typeof(TDoc).GetProperties().Where(x => x.IsDefined(typeof(DsDeletedAttribute), true)).FirstOrDefault()?.ToMemberExpression<TDoc>()
-				?? typeof(TDoc).GetFields().Where(x => x.IsDefined(typeof(DsDeletedAttribute), true)).FirstOrDefault()?.ToMemberExpression<TDoc>();
-		}
+		_dateDeleteSelField =
+			typeof(TDto).GetProperties().Where(x => x.IsDefined(typeof(DeDeletedAttribute), true)).FirstOrDefault()?.ToMemberExpression<TDto>()
+			?? typeof(TDto).GetFields().Where(x => x.IsDefined(typeof(DeDeletedAttribute), true)).FirstOrDefault()?.ToMemberExpression<TDto>();
 	}
-	public QBBuilder(QBBuilder<TDoc, TDto> other)
+	public QBSelectBuilder(QBSelectBuilder<TDoc, TDto> other)
 	{
-		QueryBuilderType = other.QueryBuilderType;
-
 		if (!(IsNormalized = other.IsNormalized))
 		{
 			other.Normalize();
@@ -175,24 +83,18 @@ internal sealed class QBBuilder<TDoc, TDto> :
 		if (other._sortOrders != null) _sortOrders = new List<QBSortOrder>(other._sortOrders);
 		if (other._aggregations != null) _aggregations = new List<QBAggregation>(other._aggregations);
 		_idField = other._idField;
-		_dateCreateField = other._dateCreateField;
-		_dateUpdateField = other._dateUpdateField;
-		_dateModifyField = other._dateModifyField;
-		_dateDeleteField = other._dateDeleteField;
 		_dateDeleteSelField = other._dateDeleteSelField;
 	}
-	public object Clone() => new QBBuilder<TDoc, TDto>(this);
+	public object Clone() => new QBSelectBuilder<TDoc, TDto>(this);
 
 	public void Normalize()
 	{
 		if (IsNormalized) return;
-
-		if (QueryBuilderType == QueryBuilderTypes.Select) NormalizeSelect();
-
+		NormalizeInternal();
 		IsNormalized = true;
 	}
 
-	private void NormalizeSelect()
+	private void NormalizeInternal()
 	{
 		if (_isByOr != null || _parentheses > 0)
 		{
@@ -301,7 +203,7 @@ internal sealed class QBBuilder<TDoc, TDto> :
 		}
 	}
 
-	private QBBuilder<TDoc, TDto> AddContainer(
+	private QBSelectBuilder<TDoc, TDto> AddContainer(
 		Type documentType,
 		string alias,
 		string dbSideName,
@@ -339,7 +241,7 @@ internal sealed class QBBuilder<TDoc, TDto> :
 		return this;
 	}
 
-	private QBBuilder<TDoc, TDto> AddCondition<TLocal, TRef>(
+	private QBSelectBuilder<TDoc, TDto> AddCondition<TLocal, TRef>(
 		QBConditionFlags flags,
 		string? alias,
 		Expression<Func<TLocal, object?>> field,
@@ -551,7 +453,7 @@ internal sealed class QBBuilder<TDoc, TDto> :
 		return this;
 	}
 
-	private QBBuilder<TDoc, TDto> AddParameter(string name, Type underlyingType, bool isNullable, System.Data.ParameterDirection direction)
+	private QBSelectBuilder<TDoc, TDto> AddParameter(string name, Type underlyingType, bool isNullable, System.Data.ParameterDirection direction)
 	{
 		if (_parameters == null)
 		{
@@ -575,7 +477,7 @@ internal sealed class QBBuilder<TDoc, TDto> :
 		return this;
 	}
 
-	private QBBuilder<TDoc, TDto> AddInclude<TRef>(Expression<Func<TDto, object?>> field, string? refAlias, Expression<Func<TRef, object?>> refField)
+	private QBSelectBuilder<TDoc, TDto> AddInclude<TRef>(Expression<Func<TDto, object?>> field, string? refAlias, Expression<Func<TRef, object?>> refField)
 	{
 		if (_isByOr != null || _parentheses > 0)
 		{
@@ -624,7 +526,7 @@ internal sealed class QBBuilder<TDoc, TDto> :
 		return this;
 	}
 	
-	private QBBuilder<TDoc, TDto> AddExclude(Expression<Func<TDto, object?>> field, bool optional)
+	private QBSelectBuilder<TDoc, TDto> AddExclude(Expression<Func<TDto, object?>> field, bool optional)
 	{
 		if (_isByOr != null || _parentheses > 0)
 		{
@@ -945,4 +847,6 @@ internal static class BuilderEmptyLists
 	public static readonly List<QBCondition> Conditions = new List<QBCondition>(0);
 	public static readonly List<QBField> Fields = new List<QBField>(0);
 	public static readonly List<QBParameter> Parameters = new List<QBParameter>(0);
+	public static readonly List<QBSortOrder> SortOrders = new List<QBSortOrder>(0);
+	public static readonly List<QBAggregation> Aggregations = new List<QBAggregation>(0);
 }

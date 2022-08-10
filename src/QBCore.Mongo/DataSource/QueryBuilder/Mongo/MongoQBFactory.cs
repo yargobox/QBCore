@@ -215,11 +215,11 @@ public class MongoQBFactory : IQueryBuilderFactory
 		)
 		?? throw new InvalidOperationException($"Datasource {DataSourceConcrete.ToPretty()} does not have a query builder setup {typeof(IQBMongoInsertBuilder<TDocument, TCreate>).ToPretty()}.");
 
-		var setup = new QBBuilder<TDocument, TCreate>(QueryBuilderTypes.Insert);
+		var setup = new QBInsertBuilder<TDocument, TCreate>();
 		setupAction(setup);
 		setup.Normalize();
 
-		return (IDataContext dataContext) => new InsertQueryBuilder<TDocument, TCreate>(new QBBuilder<TDocument, TCreate>(setup), dataContext);
+		return (IDataContext dataContext) => new InsertQueryBuilder<TDocument, TCreate>(new QBInsertBuilder<TDocument, TCreate>(setup), dataContext);
 	}
 	private Func<IDataContext, ISelectQueryBuilder<TDocument, TSelect>> MakeSelectFactoryMethod<TDocument, TSelect>()
 	{
@@ -232,78 +232,78 @@ public class MongoQBFactory : IQueryBuilderFactory
 		)
 		?? throw new InvalidOperationException($"Datasource {DataSourceConcrete.ToPretty()} does not have a query builder setup {typeof(IQBMongoSelectBuilder<TDocument, TSelect>).ToPretty()}.");
 
-		var setup = new QBBuilder<TDocument, TSelect>(QueryBuilderTypes.Select);
+		var setup = new QBSelectBuilder<TDocument, TSelect>();
 		setupAction(setup);
 		setup.Normalize();
 
-		return (IDataContext dataContext) => new SelectQueryBuilder<TDocument, TSelect>(new QBBuilder<TDocument, TSelect>(setup), dataContext);
+		return (IDataContext dataContext) => new SelectQueryBuilder<TDocument, TSelect>(new QBSelectBuilder<TDocument, TSelect>(setup), dataContext);
 	}
 	private Func<IDataContext, IUpdateQueryBuilder<TDocument, TUpdate>> MakeUpdateFactoryMethod<TDocument, TUpdate>()
 	{
 		var setupAction =
 		(
 			_builderMethods?.UpdateBuilder != null
-				? _builderMethods.UpdateBuilder as Action<IQBUpdateBuilder<TDocument, TUpdate>>
-				: FactoryHelper.FindBuilder<IQBUpdateBuilder<TDocument, TUpdate>>(typeof(TUpdate), null)
-					?? FactoryHelper.FindBuilder<IQBUpdateBuilder<TDocument, TUpdate>>(DataSourceConcrete, null)
+				? _builderMethods.UpdateBuilder as Action<IQBMongoUpdateBuilder<TDocument, TUpdate>>
+				: FactoryHelper.FindBuilder<IQBMongoUpdateBuilder<TDocument, TUpdate>>(typeof(TUpdate), null)
+					?? FactoryHelper.FindBuilder<IQBMongoUpdateBuilder<TDocument, TUpdate>>(DataSourceConcrete, null)
 		)
-		?? throw new InvalidOperationException($"Datasource {DataSourceConcrete.ToPretty()} does not have a query builder setup {typeof(IQBUpdateBuilder<TDocument, TUpdate>).ToPretty()}.");
+		?? throw new InvalidOperationException($"Datasource {DataSourceConcrete.ToPretty()} does not have a query builder setup {typeof(IQBMongoUpdateBuilder<TDocument, TUpdate>).ToPretty()}.");
 
-		var setup = new QBBuilder<TDocument, TUpdate>(QueryBuilderTypes.Update);
+		var setup = new QBUpdateBuilder<TDocument, TUpdate>();
 		setupAction(setup);
 		setup.Normalize();
 
-		return (IDataContext dataContext) => new UpdateQueryBuilder<TDocument, TUpdate>(new QBBuilder<TDocument, TUpdate>(setup), dataContext);
+		return (IDataContext dataContext) => new UpdateQueryBuilder<TDocument, TUpdate>(new QBUpdateBuilder<TDocument, TUpdate>(setup), dataContext);
 	}
 	private Func<IDataContext, IDeleteQueryBuilder<TDocument, TDelete>> MakeDeleteFactoryMethod<TDocument, TDelete>()
 	{
 		var setupAction =
 		(
 			_builderMethods?.DeleteBuilder != null
-				? _builderMethods.DeleteBuilder as Action<IQBDeleteBuilder<TDocument, TDelete>>
-				: FactoryHelper.FindBuilder<IQBDeleteBuilder<TDocument, TDelete>>(typeof(TDelete), null)
-					?? FactoryHelper.FindBuilder<IQBDeleteBuilder<TDocument, TDelete>>(DataSourceConcrete, null)
+				? _builderMethods.DeleteBuilder as Action<IQBMongoDeleteBuilder<TDocument, TDelete>>
+				: FactoryHelper.FindBuilder<IQBMongoDeleteBuilder<TDocument, TDelete>>(typeof(TDelete), null)
+					?? FactoryHelper.FindBuilder<IQBMongoDeleteBuilder<TDocument, TDelete>>(DataSourceConcrete, null)
 		)
-		?? throw new InvalidOperationException($"Datasource {DataSourceConcrete.ToPretty()} does not have a query builder setup {typeof(IQBDeleteBuilder<TDocument, TDelete>).ToPretty()}.");
+		?? throw new InvalidOperationException($"Datasource {DataSourceConcrete.ToPretty()} does not have a query builder setup {typeof(IQBMongoDeleteBuilder<TDocument, TDelete>).ToPretty()}.");
 
-		var setup = new QBBuilder<TDocument, TDelete>(QueryBuilderTypes.Delete);
+		var setup = new QBDeleteBuilder<TDocument, TDelete>();
 		setupAction(setup);
 		setup.Normalize();
 
-		return (IDataContext dataContext) => new DeleteQueryBuilder<TDocument, TDelete>(new QBBuilder<TDocument, TDelete>(setup), dataContext);
+		return (IDataContext dataContext) => new DeleteQueryBuilder<TDocument, TDelete>(new QBDeleteBuilder<TDocument, TDelete>(setup), dataContext);
 	}
 	private Func<IDataContext, IDeleteQueryBuilder<TDocument, TDelete>> MakeSoftDelFactoryMethod<TDocument, TDelete>()
 	{
 		var setupAction =
 		(
 			_builderMethods?.SoftDelBuilder != null
-				? _builderMethods.SoftDelBuilder as Action<IQBSoftDelBuilder<TDocument, TDelete>>
-				: FactoryHelper.FindBuilder<IQBSoftDelBuilder<TDocument, TDelete>>(typeof(TDelete), null)
-					?? FactoryHelper.FindBuilder<IQBSoftDelBuilder<TDocument, TDelete>>(DataSourceConcrete, null)
+				? _builderMethods.SoftDelBuilder as Action<IQBMongoSoftDelBuilder<TDocument, TDelete>>
+				: FactoryHelper.FindBuilder<IQBMongoSoftDelBuilder<TDocument, TDelete>>(typeof(TDelete), null)
+					?? FactoryHelper.FindBuilder<IQBMongoSoftDelBuilder<TDocument, TDelete>>(DataSourceConcrete, null)
 		)
-		?? throw new InvalidOperationException($"Datasource {DataSourceConcrete.ToPretty()} does not have a query builder setup {typeof(IQBSoftDelBuilder<TDocument, TDelete>).ToPretty()}.");
+		?? throw new InvalidOperationException($"Datasource {DataSourceConcrete.ToPretty()} does not have a query builder setup {typeof(IQBMongoSoftDelBuilder<TDocument, TDelete>).ToPretty()}.");
 
-		var setup = new QBBuilder<TDocument, TDelete>(QueryBuilderTypes.SoftDel);
+		var setup = new QBSoftDelBuilder<TDocument, TDelete>();
 		setupAction(setup);
 		setup.Normalize();
 
-		return (IDataContext dataContext) => new SoftDelQueryBuilder<TDocument, TDelete>(new QBBuilder<TDocument, TDelete>(setup), dataContext);
+		return (IDataContext dataContext) => new SoftDelQueryBuilder<TDocument, TDelete>(new QBSoftDelBuilder<TDocument, TDelete>(setup), dataContext);
 	}
 	private Func<IDataContext, IRestoreQueryBuilder<TDocument, TRestore>> MakeRestoreFactoryMethod<TDocument, TRestore>()
 	{
 		var setupAction =
 		(
 			_builderMethods?.RestoreBuilder != null
-				? _builderMethods.RestoreBuilder as Action<IQBRestoreBuilder<TDocument, TRestore>>
-				: FactoryHelper.FindBuilder<IQBRestoreBuilder<TDocument, TRestore>>(typeof(TRestore), null)
-					?? FactoryHelper.FindBuilder<IQBRestoreBuilder<TDocument, TRestore>>(DataSourceConcrete, null)
+				? _builderMethods.RestoreBuilder as Action<IQBMongoRestoreBuilder<TDocument, TRestore>>
+				: FactoryHelper.FindBuilder<IQBMongoRestoreBuilder<TDocument, TRestore>>(typeof(TRestore), null)
+					?? FactoryHelper.FindBuilder<IQBMongoRestoreBuilder<TDocument, TRestore>>(DataSourceConcrete, null)
 		)
-		?? throw new InvalidOperationException($"Datasource {DataSourceConcrete.ToPretty()} does not have a query builder setup {typeof(IQBRestoreBuilder<TDocument, TRestore>).ToPretty()}.");
+		?? throw new InvalidOperationException($"Datasource {DataSourceConcrete.ToPretty()} does not have a query builder setup {typeof(IQBMongoRestoreBuilder<TDocument, TRestore>).ToPretty()}.");
 
-		var setup = new QBBuilder<TDocument, TRestore>(QueryBuilderTypes.Restore);
+		var setup = new QBRestoreBuilder<TDocument, TRestore>();
 		setupAction(setup);
 		setup.Normalize();
 
-		return (IDataContext dataContext) => new RestoreQueryBuilder<TDocument, TRestore>(new QBBuilder<TDocument, TRestore>(setup), dataContext);
+		return (IDataContext dataContext) => new RestoreQueryBuilder<TDocument, TRestore>(new QBRestoreBuilder<TDocument, TRestore>(setup), dataContext);
 	}
 }

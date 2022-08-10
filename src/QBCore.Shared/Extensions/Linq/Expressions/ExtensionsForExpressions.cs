@@ -1,5 +1,6 @@
 using System.Linq.Expressions;
 using System.Reflection;
+using QBCore.Extensions.Reflection;
 
 namespace QBCore.Extensions.Linq.Expressions;
 
@@ -9,7 +10,7 @@ public static class ExtensionsForExpressions
 	{
 		var currentExpression = memberSelector.Body;
 
-		while (true)
+		for (; ; )
 		{
 			switch (currentExpression.NodeType)
 			{
@@ -133,7 +134,6 @@ public static class ExtensionsForExpressions
 					currentExpression = ((InvocationExpression)currentExpression).Expression;
 					break;
 				case ExpressionType.ArrayLength:
-					throw new ArgumentException("Wrong member selector: " + memberSelector.ToString());
 				default:
 					throw new ArgumentException("Wrong member selector: " + memberSelector.ToString());
 			}
@@ -145,5 +145,337 @@ L_EXIT_WHILE:
 		}
 		list.Reverse();
 		return list.ToArray();
+	}
+
+	public static Expression<Func<object, object?>> MakeCommonGetter(this PropertyInfo propertyInfo)
+	{
+		if (propertyInfo == null)
+		{
+			throw new ArgumentNullException(nameof(propertyInfo));
+		}
+
+		var getMethodInfo = propertyInfo.GetMethod;
+		if (getMethodInfo == null)
+		{
+			throw new InvalidOperationException($"The property '{propertyInfo.PropertyType.FullName} {propertyInfo.Name}' of class '{propertyInfo.DeclaringType?.FullName}' has no 'get' accessor.");
+		}
+
+		var documentParameter = Expression.Parameter(typeof(object), "item");
+		var memberSelector = Expression.Lambda<Func<object, object?>>(
+			Expression.Convert(
+				Expression.MakeMemberAccess(
+					Expression.Convert(documentParameter, propertyInfo.DeclaringType!),
+					propertyInfo
+				),
+				typeof(object)
+			),
+			documentParameter
+		);
+
+		return memberSelector;
+	}
+	public static Expression<Func<object, object?>> MakeCommonGetter(this FieldInfo fieldInfo)
+	{
+		if (fieldInfo == null)
+		{
+			throw new ArgumentNullException(nameof(fieldInfo));
+		}
+
+		var documentParameter = Expression.Parameter(typeof(object), "item");
+		var memberSelector = Expression.Lambda<Func<object, object?>>(
+			Expression.Convert(
+				Expression.MakeMemberAccess(
+					Expression.Convert(documentParameter, fieldInfo.DeclaringType!),
+					fieldInfo
+				),
+				typeof(object)
+			),
+			documentParameter
+		);
+
+		return memberSelector;
+	}
+	public static Expression<Action<object, object?>>? MakeCommonSetter(this PropertyInfo propertyInfo)
+	{
+		if (propertyInfo == null)
+		{
+			throw new ArgumentNullException(nameof(propertyInfo));
+		}
+
+		var setMethodInfo = propertyInfo.SetMethod;
+		if (setMethodInfo == null)
+		{
+			return null;
+		}
+
+		var documentParameter = Expression.Parameter(typeof(object), "item");
+		var valueParameter = Expression.Parameter(typeof(object), "value");
+		var memberSelector = Expression.Lambda<Action<object, object?>>(
+			Expression.Call(
+				Expression.Convert(documentParameter,propertyInfo.DeclaringType!),
+				setMethodInfo,
+				Expression.Convert(valueParameter, propertyInfo.PropertyType)
+			),
+			documentParameter,
+			valueParameter
+		);
+
+		return memberSelector;
+	}
+	public static Expression<Action<object, object?>>? MakeCommonSetter(this FieldInfo fieldInfo)
+	{
+		if (fieldInfo == null)
+		{
+			throw new ArgumentNullException(nameof(fieldInfo));
+		}
+
+		if (fieldInfo.IsInitOnly)
+		{
+			return null;
+		}
+
+		var documentParameter = Expression.Parameter(typeof(object), "item");
+		var valueParameter = Expression.Parameter(typeof(object), "value");
+		var field = Expression.Field(Expression.Convert(documentParameter, fieldInfo.DeclaringType!), fieldInfo);
+		var value = Expression.Convert(valueParameter, fieldInfo.FieldType);
+		var body = Expression.Assign(field, value);
+
+		return Expression.Lambda<Action<object, object?>>(body, documentParameter, valueParameter);
+	}
+	public static Expression<Action<object, object?>>? MakeCommonSetter(this LambdaExpression memberSelector)
+	{
+		var stack = new List<Expression>(MemberSelectorToExpressions(memberSelector));
+		stack.Reverse();
+
+		var documentParameter = Expression.Parameter(typeof(object), "item");
+		Expression navigator = stack.First().Type != typeof(object)
+			? Expression.Convert(documentParameter, stack.First().Type)
+			: documentParameter;
+		var valueParameter = Expression.Parameter(typeof(object), "value");
+		Expression currentExpression;
+
+		for (int i = 1; i < stack.Count; i++)
+		{
+			currentExpression = stack[i];
+			switch (currentExpression.NodeType)
+			{
+				case ExpressionType.MemberAccess:
+					{
+						var memberExpression = (MemberExpression)currentExpression;
+
+						if (i + 1 < stack.Count && stack.Skip(i + 1).OfType<MemberExpression>().Any())
+						{
+							navigator = Expression.MakeMemberAccess(navigator, memberExpression.Member);
+						}
+						else
+						{
+							if (memberExpression.Member is FieldInfo fieldInfo)
+							{
+								if (fieldInfo.IsInitOnly)
+								{
+									return null;
+								}
+
+								var field = Expression.Field(navigator, fieldInfo);
+								var value = Expression.Convert(valueParameter, fieldInfo.FieldType);
+								var body = Expression.Assign(field, value);
+								return Expression.Lambda<Action<object, object?>>(body, documentParameter, valueParameter);
+							}
+							else if (memberExpression.Member is PropertyInfo propertyInfo)
+							{
+								var setMethodInfo = propertyInfo.SetMethod;
+								if (setMethodInfo == null)
+								{
+									return null;
+								}
+
+								var value = Expression.Convert(valueParameter, propertyInfo.PropertyType);
+								var body = Expression.Call(navigator, setMethodInfo, value);
+								return Expression.Lambda<Action<object, object?>>(body, documentParameter, valueParameter);
+							}
+						}
+						break;
+					}
+				case ExpressionType.Convert:
+				case ExpressionType.ConvertChecked:
+					break;
+				case ExpressionType.Invoke:
+					var invocationExpression = (InvocationExpression)currentExpression;
+					navigator = Expression.Invoke(invocationExpression, navigator);
+					break;
+				case ExpressionType.Parameter:
+				case ExpressionType.Call:
+				default: throw new ArgumentException("Wrong member selector: " + memberSelector.ToString());
+			}
+		}
+		throw new ArgumentException("Wrong member selector: " + memberSelector.ToString());
+	}
+	public static Expression<Action<T, object?>>? MakeSetter<T>(this Expression<Func<T, object?>> memberSelector)
+	{
+		var stack = new List<Expression>(MemberSelectorToExpressions(memberSelector));
+		stack.Reverse();
+
+		var documentParameter = (ParameterExpression)stack.First();
+		Expression navigator = documentParameter;
+		var valueParameter = Expression.Parameter(typeof(object), "value");
+		Expression currentExpression;
+
+		for (int i = 1; i < stack.Count; i++)
+		{
+			currentExpression = stack[i];
+			switch (currentExpression.NodeType)
+			{
+				case ExpressionType.MemberAccess:
+					{
+						var memberExpression = (MemberExpression)currentExpression;
+
+						if (i + 1 < stack.Count && stack.Skip(i + 1).OfType<MemberExpression>().Any())
+						{
+							navigator = Expression.MakeMemberAccess(navigator, memberExpression.Member);
+						}
+						else
+						{
+							if (memberExpression.Member is FieldInfo fieldInfo)
+							{
+								if (fieldInfo.IsInitOnly)
+								{
+									return null;
+								}
+
+								var field = Expression.Field(navigator, fieldInfo);
+								var value = Expression.Convert(valueParameter, fieldInfo.FieldType);
+								var body = Expression.Assign(field, value);
+								return Expression.Lambda<Action<T, object?>>(body, documentParameter, valueParameter);
+							}
+							else if (memberExpression.Member is PropertyInfo propertyInfo)
+							{
+								var setMethodInfo = propertyInfo.SetMethod;
+								if (setMethodInfo == null)
+								{
+									return null;
+								}
+
+								var value = Expression.Convert(valueParameter, propertyInfo.PropertyType);
+								var body = Expression.Call(navigator, setMethodInfo, value);
+								return Expression.Lambda<Action<T, object?>>(body, documentParameter, valueParameter);
+							}
+						}
+						break;
+					}
+				case ExpressionType.Convert:
+				case ExpressionType.ConvertChecked:
+					break;
+				case ExpressionType.Invoke:
+					var invocationExpression = (InvocationExpression)currentExpression;
+					navigator = Expression.Invoke(invocationExpression, navigator);
+					break;
+				case ExpressionType.Parameter:
+				case ExpressionType.Call:
+				default: throw new ArgumentException("Wrong member selector: " + memberSelector.ToString());
+			}
+		}
+		throw new ArgumentException("Wrong member selector: " + memberSelector.ToString());
+	}
+	public static Expression<Action<T, TField>>? MakeSpecificSetter<T, TField>(this Expression<Func<T, TField>> memberSelector)
+	{
+		var stack = new List<Expression>(MemberSelectorToExpressions(memberSelector));
+		stack.Reverse();
+
+		var documentParameter = (ParameterExpression)stack.First();
+		Expression navigator = documentParameter;
+		var valueParameter = Expression.Parameter(typeof(TField), "value");
+		Expression currentExpression;
+
+		for (int i = 1; i < stack.Count; i++)
+		{
+			currentExpression = stack[i];
+			switch (currentExpression.NodeType)
+			{
+				case ExpressionType.MemberAccess:
+					{
+						var memberExpression = (MemberExpression)currentExpression;
+
+						if (i + 1 < stack.Count && stack.Skip(i + 1).OfType<MemberExpression>().Any())
+						{
+							navigator = Expression.MakeMemberAccess(navigator, memberExpression.Member);
+						}
+						else
+						{
+							if (memberExpression.Member is FieldInfo fieldInfo)
+							{
+								if (fieldInfo.IsInitOnly)
+								{
+									return null;
+								}
+
+								var field = Expression.Field(navigator, fieldInfo);
+								var body = Expression.Assign(field, valueParameter);
+								return Expression.Lambda<Action<T, TField>>(body, documentParameter, valueParameter);
+							}
+							else if (memberExpression.Member is PropertyInfo propertyInfo)
+							{
+								var setMethodInfo = propertyInfo.SetMethod;
+								if (setMethodInfo == null)
+								{
+									return null;
+								}
+
+								var body = Expression.Call(navigator, setMethodInfo, valueParameter);
+								return Expression.Lambda<Action<T, TField>>(body, documentParameter, valueParameter);
+							}
+						}
+						break;
+					}
+				case ExpressionType.Convert:
+				case ExpressionType.ConvertChecked:
+					break;
+				case ExpressionType.Invoke:
+					var invocationExpression = (InvocationExpression)currentExpression;
+					navigator = Expression.Invoke(invocationExpression, navigator);
+					break;
+				case ExpressionType.Parameter:
+				case ExpressionType.Call:
+				default: throw new ArgumentException("Wrong member selector: " + memberSelector.ToString());
+			}
+		}
+		throw new ArgumentException("Wrong member selector: " + memberSelector.ToString());
+	}
+
+	private static IEnumerable<Expression> MemberSelectorToExpressions(this LambdaExpression memberSelector)
+	{
+		if (memberSelector == null)
+		{
+			throw new ArgumentNullException(nameof(memberSelector));
+		}
+
+		var currentExpression = memberSelector.Body;
+		for (; ; )
+		{
+			yield return currentExpression;
+
+			switch (currentExpression.NodeType)
+			{
+				case ExpressionType.Parameter: yield break;
+				case ExpressionType.MemberAccess:
+					{
+						var memberExpression = (MemberExpression)currentExpression;
+						if (memberExpression.Expression?.NodeType == ExpressionType.MemberAccess)
+						{
+							currentExpression = memberExpression.Expression;
+							break;
+						}
+						else if (memberExpression.Expression?.NodeType == ExpressionType.Parameter)
+						{
+							currentExpression = memberExpression.Expression;
+							break;
+						}
+						yield break;
+					}
+				case ExpressionType.Convert:
+				case ExpressionType.ConvertChecked: currentExpression = ((UnaryExpression)currentExpression).Operand; break;
+				case ExpressionType.Invoke: currentExpression = ((InvocationExpression)currentExpression).Expression; break;
+				default: throw new ArgumentException("Wrong member selector: " + memberSelector.ToString());
+			}
+		}
 	}
 }

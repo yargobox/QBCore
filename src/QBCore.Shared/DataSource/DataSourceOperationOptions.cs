@@ -1,5 +1,3 @@
-using QBCore.DataSource.QueryBuilder;
-
 namespace QBCore.DataSource.Options;
 
 public class DataSourceOperationOptions
@@ -7,7 +5,10 @@ public class DataSourceOperationOptions
 	public object? NativeOptions;
 	public object? NativeClientSession;
 	public Action<string>? QueryStringCallback;
+	public Func<string, Task>? QueryStringAsyncCallback;
 }
+
+public class DataSourceIdGeneratorOptions : DataSourceOperationOptions { }
 
 public class DataSourceCountOptions : DataSourceOperationOptions
 {

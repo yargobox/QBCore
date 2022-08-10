@@ -6,7 +6,7 @@ internal sealed class DeleteQueryBuilder<TDocument, TDelete> : QueryBuilder<TDoc
 {
 	public override QueryBuilderTypes QueryBuilderType => QueryBuilderTypes.Delete;
 
-	public DeleteQueryBuilder(QBBuilder<TDocument, TDelete> building, IDataContext dataContext)
+	public DeleteQueryBuilder(QBDeleteBuilder<TDocument, TDelete> building, IDataContext dataContext)
 		: base(building, dataContext)
 	{
 	}

@@ -10,9 +10,9 @@ internal sealed partial class SelectQueryBuilder<TDocument, TSelect> : QueryBuil
 {
 	public override QueryBuilderTypes QueryBuilderType => QueryBuilderTypes.Select;
 
-	public IQBSelectBuilder<TDocument, TSelect> SelectBuilder => Builder;
+	public IQBSelectBuilder<TDocument, TSelect> SelectBuilder => (IQBSelectBuilder<TDocument, TSelect>)Builder;
 
-	public SelectQueryBuilder(QBBuilder<TDocument, TSelect> building, IDataContext dataContext)
+	public SelectQueryBuilder(QBSelectBuilder<TDocument, TSelect> building, IDataContext dataContext)
 		: base(building, dataContext)
 	{
 	}
@@ -223,7 +223,11 @@ internal sealed partial class SelectQueryBuilder<TDocument, TSelect> : QueryBuil
 							} } });
 		}
 
-		if (options?.QueryStringCallback != null)
+		if (options?.QueryStringAsyncCallback != null)
+		{
+			await options.QueryStringAsyncCallback(new BsonArray(query).ToString()).ConfigureAwait(false);
+		}
+		else if (options?.QueryStringCallback != null)
 		{
 			options.QueryStringCallback(new BsonArray(query).ToString());
 		}
@@ -277,7 +281,11 @@ internal sealed partial class SelectQueryBuilder<TDocument, TSelect> : QueryBuil
 			{
 				options.NativeSelectQueryCallback(query);
 			}
-			if (options.QueryStringCallback != null)
+			if (options.QueryStringAsyncCallback != null)
+			{
+				await options.QueryStringAsyncCallback(new BsonArray(query).ToString()).ConfigureAwait(false);
+			}
+			else if (options.QueryStringCallback != null)
 			{
 				options.QueryStringCallback(new BsonArray(query).ToString());
 			}
@@ -295,54 +303,6 @@ internal sealed partial class SelectQueryBuilder<TDocument, TSelect> : QueryBuil
 			{
 				return await Task.FromResult(new DSAsyncCursor<TSelect>(cursor, cancellationToken));
 			}
-		}
-	}
-
-	private async ValueTask<long> GetTotalCountAsync(List<BsonDocument> query, bool remainOrTotalCount, Action<string>? getQueryStringCallback, AggregateOptions? aggregateOptions, IClientSessionHandle? clientSessionHandle, CancellationToken cancellationToken)
-	{
-		var index = query.FindLastIndex(x => x.Contains("$limit"));
-		if (index >= 0)
-		{
-			query.RemoveAt(index);
-		}
-		if (!remainOrTotalCount)
-		{
-			index = query.FindLastIndex(x => x.Contains("$skip"));
-			if (index >= 0)
-			{
-				query.RemoveAt(index);
-			}
-		}
-		index = query.FindLastIndex(x => x.Contains("$sort"));
-		if (index >= 0)
-		{
-			query.RemoveAt(index);
-		}
-		while (query.LastOrDefault()?.Contains("$project") == true)
-		{
-			query.RemoveAt(query.Count - 1);
-		}
-
-		query.Add(new BsonDocument {
-						{ "$group", new BsonDocument {
-								{ "_id", BsonNull.Value },
-								{ "n", new BsonDocument {
-										{ "$sum", 1 }
-									}
-								}
-						} } });
-		
-		if (getQueryStringCallback != null)
-		{
-			getQueryStringCallback(new BsonArray(query).ToString());
-		}
-
-		using (var cursor = clientSessionHandle == null
-			? await Collection.AggregateAsync<TSelect>(query, aggregateOptions, cancellationToken)
-			: await Collection.AggregateAsync<TSelect>(clientSessionHandle, query, aggregateOptions, cancellationToken))
-		{
-			var bsonCount = (await cursor.FirstAsync(cancellationToken)).ToBsonDocument();
-			return bsonCount["n"].ToInt64();
 		}
 	}
 

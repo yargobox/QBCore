@@ -7,7 +7,7 @@ internal sealed class UpdateQueryBuilder<TDocument, TUpdate> : QueryBuilder<TDoc
 {
 	public override QueryBuilderTypes QueryBuilderType => QueryBuilderTypes.Update;
 
-	public UpdateQueryBuilder(QBBuilder<TDocument, TUpdate> building, IDataContext dataContext)
+	public UpdateQueryBuilder(QBUpdateBuilder<TDocument, TUpdate> building, IDataContext dataContext)
 		: base(building, dataContext)
 	{
 	}

@@ -15,7 +15,7 @@ internal abstract class QueryBuilder<TDocument, TProjection> : IQueryBuilder<TDo
 	public Type ProjectionType => typeof(TProjection);
 	public Type DatabaseContextInterface => typeof(IMongoDbContext);
 	public IDataContext DataContext { get; }
-	public QBBuilder<TDocument, TProjection> Builder { get; }
+	public IQBBuilder<TDocument, TProjection> Builder { get; }
 
 	protected IMongoDbContext _mongoDbContext;
 
@@ -47,7 +47,7 @@ internal abstract class QueryBuilder<TDocument, TProjection> : IQueryBuilder<TDo
 
 	#endregion
 
-	public QueryBuilder(QBBuilder<TDocument, TProjection> builder, IDataContext dataContext)
+	public QueryBuilder(IQBBuilder<TDocument, TProjection> builder, IDataContext dataContext)
 	{
 		if (builder == null)
 		{
@@ -100,7 +100,7 @@ internal abstract class QueryBuilder<TDocument, TProjection> : IQueryBuilder<TDo
 				continue;
 			}
 
-			QBBuilder<TDocument, TProjection>.TrimParentheses(conds);
+			QBSelectBuilder<TDocument, TProjection>.TrimParentheses(conds);
 
 			first = conds[0].Parentheses;
 			splitIndex = -1;

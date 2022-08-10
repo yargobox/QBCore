@@ -6,7 +6,7 @@ internal sealed class SoftDelQueryBuilder<TDocument, TDelete> : QueryBuilder<TDo
 {
 	public override QueryBuilderTypes QueryBuilderType => QueryBuilderTypes.SoftDel;
 
-	public SoftDelQueryBuilder(QBBuilder<TDocument, TDelete> building, IDataContext dataContext)
+	public SoftDelQueryBuilder(QBSoftDelBuilder<TDocument, TDelete> building, IDataContext dataContext)
 		: base(building, dataContext)
 	{
 	}

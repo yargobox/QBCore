@@ -1,3 +1,4 @@
+using System.Data;
 using System.Linq.Expressions;
 
 namespace QBCore.DataSource.QueryBuilder;
@@ -5,9 +6,6 @@ namespace QBCore.DataSource.QueryBuilder;
 public interface IQBBuilder
 {
 	QueryBuilderTypes QueryBuilderType { get; }
-	bool IsNormalized { get; }
-
-	void Normalize();
 
 	IReadOnlyList<QBContainer> Containers { get; }
 	IReadOnlyList<QBCondition> Connects { get; }
@@ -16,17 +14,36 @@ public interface IQBBuilder
 	IReadOnlyList<QBParameter> Parameters { get; }
 	IReadOnlyList<QBSortOrder> SortOrders { get; }
 	IReadOnlyList<QBAggregation> Aggregations { get; }
+
+	bool IsNormalized { get; }
+
+	void Normalize();
 }
 
 public interface IQBBuilder<TDocument, TProjection> : IQBBuilder
 {
 	Expression<Func<TDocument, object?>>? IdField { get; set; }
+	Func<TDocument, object?>? IdGetter { get; }
+	Action<TDocument, object?>? IdSetter { get; }
 }
 
 public interface IQBInsertBuilder<TDocument, TCreate> : IQBBuilder<TDocument, TCreate>
 {
+	Func<IDSIdGenerator>? CustomIdGenerator { get; set; }
 	Expression<Func<TDocument, object?>>? DateCreateField { get; set; }
+	Func<TDocument, object?>? DateCreateGetter { get; }
+	Action<TDocument, object?>? DateCreateSetter { get; }
 	Expression<Func<TDocument, object?>>? DateModifyField { get; set; }
+	Func<TDocument, object?>? DateModifyGetter { get; }
+	Action<TDocument, object?>? DateModifySetter { get; }
+
+	IQBInsertBuilder<TDocument, TCreate> InsertTo(string tableName);
+	IQBInsertBuilder<TDocument, TCreate> ExecProcedure(string tableName);
+	IQBInsertBuilder<TDocument, TCreate> AutoBindParameters();
+	IQBInsertBuilder<TDocument, TCreate> BindParameter(Expression<Func<TCreate, object?>> field, ParameterDirection direction, bool isErrorCode = false);
+	IQBInsertBuilder<TDocument, TCreate> BindParameter(string name, Type underlyingType, bool isNullable, ParameterDirection direction, bool isErrorCode = false);
+	IQBInsertBuilder<TDocument, TCreate> BindReturnValueToErrorCode();
+	IQBInsertBuilder<TDocument, TCreate> BindParameterToErrorMessage(string name);
 }
 
 public interface IQBSelectBuilder<TDocument, TSelect> : IQBBuilder<TDocument, TSelect>

@@ -6,7 +6,7 @@ internal sealed class RestoreQueryBuilder<TDocument, TRestore> : QueryBuilder<TD
 {
 	public override QueryBuilderTypes QueryBuilderType => QueryBuilderTypes.Restore;
 
-	public RestoreQueryBuilder(QBBuilder<TDocument, TRestore> building, IDataContext dataContext)
+	public RestoreQueryBuilder(QBRestoreBuilder<TDocument, TRestore> building, IDataContext dataContext)
 		: base(building, dataContext)
 	{
 	}

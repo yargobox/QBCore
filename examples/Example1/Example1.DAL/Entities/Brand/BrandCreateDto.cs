@@ -1,6 +1,4 @@
-using System.ComponentModel.DataAnnotations;
-using QBCore.DataSource;
-using QBCore.DataSource.QueryBuilder;
+using QBCore.DataSource.QueryBuilder.Mongo;
 
 namespace Example1.DAL.Entities.Brands;
 
@@ -8,7 +6,7 @@ public class BrandCreateDto
 {
 	public string? Name { get; set; }
 
-	public static void Builder(IQBInsertBuilder<Brand, BrandCreateDto> builder)
+	public static void Builder(IQBMongoInsertBuilder<Brand, BrandCreateDto> builder)
 	{
 		//builder.InsertToTable("brands");
 	}
