@@ -1,13 +1,13 @@
 namespace QBCore.DataSource;
 
 /// <summary>
-/// Datasource attribute to configure its API controller
+/// DataSource attribute to configure its API controller
 /// </summary>
 [AttributeUsage(AttributeTargets.Class, Inherited = false, AllowMultiple = false)]
 public class DsApiControllerAttribute : Attribute
 {
 	/// <summary>
-	/// Datasource controller name
+	/// DataSource controller name
 	/// </summary>
 	/// <remarks>
 	/// You can use the placeholders "[DS]" or "[DS:guessPlural]" to specify the name of the datasource or its plural form, respectively.

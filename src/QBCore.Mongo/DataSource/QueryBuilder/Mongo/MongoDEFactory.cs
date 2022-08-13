@@ -2,11 +2,17 @@ using System.Linq.Expressions;
 using QBCore.Extensions.Linq.Expressions;
 using QBCore.ObjectFactory;
 
-namespace QBCore.DataSource;
+namespace QBCore.DataSource.QueryBuilder.Mongo;
 
-internal sealed class DataEntryBuilder : IDataEntryBuilder
+public class MongoDEFactory : IDEBuilder
 {
-	public IDataEntry Build<TDocument>(string fieldName)
+	private static readonly IDEBuilder _defaultInstance = new MongoDEFactory();
+	
+	public static IDEBuilder Default => _defaultInstance;
+
+	protected MongoDEFactory() { }
+
+	public DataEntry Build<TDocument>(string fieldName)
 	{
 		if (fieldName == null)
 		{
@@ -18,7 +24,7 @@ internal sealed class DataEntryBuilder : IDataEntryBuilder
 			?? throw new KeyNotFoundException($"Document '{typeof(TDocument).ToPretty()}' does not have data entry '{fieldName}'.");
 	}
 
-	public IDataEntry Build<TDocument, TField>(string fieldName)
+	public DataEntry Build<TDocument, TField>(string fieldName)
 	{
 		if (fieldName == null)
 		{
@@ -37,7 +43,7 @@ internal sealed class DataEntryBuilder : IDataEntryBuilder
 		return dataEntry;
 	}
 
-	public IDataEntry Build<TDocument>(LambdaExpression memberSelector)
+	public DataEntry Build<TDocument>(LambdaExpression memberSelector)
 	{
 		if (memberSelector == null)
 		{
@@ -50,7 +56,7 @@ internal sealed class DataEntryBuilder : IDataEntryBuilder
 			?? throw new KeyNotFoundException($"Document '{typeof(TDocument).ToPretty()}' does not have data entry '{fieldName}'.");
 	}
 
-	public IDataEntry Build<TDocument, TField>(Expression<Func<TDocument, TField>> memberSelector)
+	public DataEntry Build<TDocument, TField>(Expression<Func<TDocument, TField>> memberSelector)
 	{
 		if (memberSelector == null)
 		{
@@ -70,13 +76,13 @@ internal sealed class DataEntryBuilder : IDataEntryBuilder
 		return dataEntry;
 	}
 
-	private static IDSDocument GetDSDocument(Type documentType)
+	private static IDSDocumentInfo GetDSDocument(Type documentType)
 	{
-		var doc = StaticFactory.DocumentsPool.GetValueOrDefault(documentType);
+		var doc = StaticFactory.Documents.GetValueOrDefault(documentType);
 		if (doc == null)
 		{
 			doc = new DSDocument(documentType);
-			var registry = (IFactoryObjectRegistry<Type, IDSDocument>)StaticFactory.DocumentsPool;
+			var registry = (IFactoryObjectRegistry<Type, IDSDocumentInfo>)StaticFactory.Documents;
 			registry.RegisterObject(documentType, doc);
 		}
 		return doc;

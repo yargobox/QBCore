@@ -11,16 +11,16 @@ public abstract class FieldPath
 	public sealed record Element
 	{
 		public readonly string Name;
-		public readonly Type ElementType;
+		public readonly Type DataEntryType;
 		public readonly bool IsNullable;
-		public readonly Type DeclaringType;
+		public readonly Type DocumentType;
 
 		public Element(string name, Type elementType, bool isNullable, Type declaringType)
 		{
 			Name = name;
-			ElementType = elementType;
+			DataEntryType = elementType;
 			IsNullable = isNullable;
-			DeclaringType = declaringType;
+			DocumentType = declaringType;
 		}
 	}
 
@@ -31,9 +31,9 @@ public abstract class FieldPath
 
 	public string Name => _last.Name;
 	public string FullName => _fullName;
-	public Type FieldType => _last.ElementType;
+	public Type FieldType => _last.DataEntryType;
 	public bool IsNullable => _last.IsNullable;
-	public Type DeclaringType => _last.DeclaringType;
+	public Type DeclaringType => _last.DocumentType;
 	public string DBSideName
 	{
 		get
@@ -126,5 +126,5 @@ public abstract class FieldPath
 	}
 
 	protected abstract string GetDBSideName(Type declaringType, string propertyOrFieldName);
-	public string GetDBSideName(Element elem) => GetDBSideName(elem.DeclaringType, elem.Name);
+	public string GetDBSideName(Element elem) => GetDBSideName(elem.DocumentType, elem.Name);
 }

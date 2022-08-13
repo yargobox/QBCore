@@ -25,6 +25,7 @@ public record AddQBCoreOptions
 	public Func<AssemblyPart, bool> AssemblyPartSelector { get; set; } = _ => true;
 	public Func<Assembly, bool> AssemblySelector { get; set; } = _ => true;
 	public Func<Type, bool> TypeSelector { get; set; } = _ => true;
+	public Func<Type, bool> DocumentExclusionSelector { get; set; } = _ => false;
 	public Func<Type, bool> DataSourceSelector { get; set; } = type
 		=> type.IsClass && !type.IsAbstract && !type.IsGenericType && !type.IsGenericTypeDefinition && type.GetSubclassOf(typeof(DataSource<,,,,,,,>)) != null;
 	public Func<Type, bool> ComplexDataSourceSelector { get; set; } = type
@@ -119,6 +120,8 @@ public static class AddQBCoreExtensions
 		IsAddQBCoreCalled = true;
 
 		var atypes = (types as Type[]) ?? types.ToArray();
+
+		DataSourceDocuments.DocumentExclusionSelector = options.DocumentExclusionSelector;
 
 #if DEBUG
 		foreach (var type in types.Where(x => options.DataSourceSelector(x)))

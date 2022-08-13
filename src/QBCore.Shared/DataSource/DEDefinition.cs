@@ -1,18 +1,11 @@
 using System.Linq.Expressions;
+using QBCore.DataSource.QueryBuilder;
 
 namespace QBCore.DataSource;
 
-public interface IDataEntryBuilder
-{
-	IDataEntry Build<TDocument>(string fieldName);
-	IDataEntry Build<TDocument, TField>(string fieldName);
-	IDataEntry Build<TDocument>(LambdaExpression memberSelector);
-	IDataEntry Build<TDocument, TField>(Expression<Func<TDocument, TField>> memberSelector);
-}
-
 public abstract class DEDefinition<TDocument>
 {
-	public abstract IDataEntry ToDataEntry(IDataEntryBuilder builder);
+	public abstract DataEntry ToDataEntry(IDEBuilder builder);
 
 	public static implicit operator DEDefinition<TDocument>(string fieldName)
 	{
@@ -27,7 +20,7 @@ public abstract class DEDefinition<TDocument>
 
 public abstract class DEDefinition<TDocument, TField>
 {
-	public abstract IDataEntry ToDataEntry(IDataEntryBuilder builder);
+	public abstract DataEntry ToDataEntry(IDEBuilder builder);
 
 	public static implicit operator DEDefinition<TDocument, TField>(string fieldName)
 	{
@@ -69,7 +62,7 @@ public sealed class ExpressionDEDefinition<TDocument> : DEDefinition<TDocument>
 		_memberSelector = memberSelector;
 	}
 
-	public override IDataEntry ToDataEntry(IDataEntryBuilder builder)
+	public override DataEntry ToDataEntry(IDEBuilder builder)
 	{
 		if (builder == null)
 		{
@@ -96,7 +89,7 @@ public sealed class ExpressionDEDefinition<TDocument, TField> : DEDefinition<TDo
 		_memberSelector = memberSelector;
 	}
 
-	public override IDataEntry ToDataEntry(IDataEntryBuilder builder)
+	public override DataEntry ToDataEntry(IDEBuilder builder)
 	{
 		if (builder == null)
 		{
@@ -123,7 +116,7 @@ public sealed class StringDEDefinition<TDocument> : DEDefinition<TDocument>
 		_fieldName = fieldName;
 	}
 
-	public override IDataEntry ToDataEntry(IDataEntryBuilder builder)
+	public override DataEntry ToDataEntry(IDEBuilder builder)
 	{
 		if (builder == null)
 		{
@@ -150,7 +143,7 @@ public sealed class StringDEDefinition<TDocument, TField> : DEDefinition<TDocume
 		_fieldName = fieldName;
 	}
 
-	public override IDataEntry ToDataEntry(IDataEntryBuilder builder)
+	public override DataEntry ToDataEntry(IDEBuilder builder)
 	{
 		if (builder == null)
 		{
@@ -177,5 +170,5 @@ internal class UntypedDEDefinitionAdapter<TDocument, TField> : DEDefinition<TDoc
 		_adaptee = adaptee;
 	}
 
-	public override IDataEntry ToDataEntry(IDataEntryBuilder builder) => _adaptee.ToDataEntry(builder);
+	public override DataEntry ToDataEntry(IDEBuilder builder) => _adaptee.ToDataEntry(builder);
 }

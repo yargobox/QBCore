@@ -83,6 +83,18 @@ public static class ExtensionsForReflection
 		}
 	}
 
+	public static IEnumerable<Type> GetInterfacesOf(this Type @this, Type test)
+	{
+		if (test.IsGenericTypeDefinition)
+		{
+			return @this.GetInterfaces().Where(i => i.IsGenericType && i.GetGenericTypeDefinition() == test);
+		}
+		else
+		{
+			return @this.GetInterfaces().Where(i => i == test);
+		}
+	}
+
 	public static Type GetUnderlyingSystemType(this Type type)
 	{
 		if (type.IsGenericType)

@@ -4,10 +4,10 @@ namespace QBCore.DataSource;
 
 public abstract class ComplexDataSource<TComplexDataSource> : IComplexDataSource where TComplexDataSource : notnull, IComplexDataSource
 {
-	public ICDSDefinition Definition { get; }
+	public ICDSInfo CDSInfo { get; }
 
 	public ComplexDataSource()
 	{
-		Definition = StaticFactory.ComplexDataSources[typeof(TComplexDataSource)];
+		CDSInfo = StaticFactory.ComplexDataSources[typeof(TComplexDataSource)];
 	}
 }

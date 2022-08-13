@@ -28,18 +28,18 @@ public abstract partial class DataSource<TKey, TDocument, TCreate, TSelect, TUpd
 
 	public DataSource(IServiceProvider serviceProvider, IDataContextProvider dataContextProvider)
 	{
-		Definition = StaticFactory.DataSources[typeof(TDataSource)];
+		DSInfo = StaticFactory.DataSources[typeof(TDataSource)];
 		_serviceProvider = serviceProvider;
-		_dataContext = dataContextProvider.GetContext(Definition.QBFactory.DatabaseContextInterface, Definition.DataContextName);
+		_dataContext = dataContextProvider.GetContext(DSInfo.QBFactory.DatabaseContextInterface, DSInfo.DataContextName);
 
-		if (Definition.ListenerFactory != null)
+		if (DSInfo.ListenerFactory != null)
 		{
-			_listener = (DataSourceListener<TKey, TDocument, TCreate, TSelect, TUpdate, TDelete, TRestore>) Definition.ListenerFactory(_serviceProvider);
+			_listener = (DataSourceListener<TKey, TDocument, TCreate, TSelect, TUpdate, TDelete, TRestore>) DSInfo.ListenerFactory(_serviceProvider);
 			AsyncHelper.RunSync(async () => await _listener.OnAttachAsync(this));
 		}
 	}
 
-	public IDSDefinition Definition { get; }
+	public IDSInfo DSInfo { get; }
 
 	public async Task<TKey> InsertAsync(
 		TCreate document,
@@ -47,12 +47,12 @@ public abstract partial class DataSource<TKey, TDocument, TCreate, TSelect, TUpd
 		DataSourceInsertOptions? options = null,
 		CancellationToken cancellationToken = default(CancellationToken))
 	{
-		if (!Definition.Options.HasFlag(DataSourceOptions.CanInsert))
+		if (!DSInfo.Options.HasFlag(DataSourceOptions.CanInsert))
 		{
-			throw new InvalidOperationException($"DataSource {Definition.Name} does not support the insert operation.");
+			throw new InvalidOperationException($"DataSource {DSInfo.Name} does not support the insert operation.");
 		}
 
-		var qb = Definition.QBFactory.CreateQBInsert<TDocument, TCreate>(_dataContext);
+		var qb = DSInfo.QBFactory.CreateQBInsert<TDocument, TCreate>(_dataContext);
 		var builder = qb.InsertBuilder;
 
 		object? value;
@@ -113,15 +113,15 @@ public abstract partial class DataSource<TKey, TDocument, TCreate, TSelect, TUpd
 		DataSourceSelectOptions? options = null,
 		CancellationToken cancellationToken = default(CancellationToken))
 	{
-		if (!Definition.Options.HasFlag(DataSourceOptions.CanSelect))
+		if (!DSInfo.Options.HasFlag(DataSourceOptions.CanSelect))
 		{
-			throw new InvalidOperationException($"DataSource {Definition.Name} does not support the select operation.");
+			throw new InvalidOperationException($"DataSource {DSInfo.Name} does not support the select operation.");
 		}
 
-		var qb = Definition.QBFactory.CreateQBSelect<TDocument, TSelect>(_dataContext);
+		var qb = DSInfo.QBFactory.CreateQBSelect<TDocument, TSelect>(_dataContext);
 		var builder = qb.SelectBuilder;
 
-		if (Definition.Options.HasFlag(DataSourceOptions.SoftDelete))
+		if (DSInfo.Options.HasFlag(DataSourceOptions.SoftDelete))
 		{
 			if (builder.DateDeleteField == null)
 			{

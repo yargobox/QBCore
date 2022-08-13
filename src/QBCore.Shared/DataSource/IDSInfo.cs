@@ -2,7 +2,7 @@ using QBCore.DataSource.QueryBuilder;
 
 namespace QBCore.DataSource;
 
-public interface IDSDefinition
+public interface IDSInfo
 {
 	string Name { get; }
 

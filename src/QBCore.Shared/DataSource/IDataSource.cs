@@ -4,7 +4,7 @@ namespace QBCore.DataSource;
 
 public interface IDataSource
 {
-	IDSDefinition Definition { get; }
+	IDSInfo DSInfo { get; }
 }
 
 public interface IDataSource<TKey, TDocument, TCreate, TSelect, TUpdate, TDelete, TRestore> : IDataSource

@@ -3,12 +3,11 @@ using Example1.DAL.Entities.Brands;
 using QBCore.Configuration;
 using QBCore.DataSource;
 using QBCore.DataSource.QueryBuilder;
-using QBCore.DataSource.QueryBuilder.Mongo;
 
 namespace Example1.BLL.Services;
 
 [DsApiController]
-[DataSource("brand", typeof(MongoQBFactory), DataSourceOptions.SoftDelete, Listener = typeof(BrandServiceListener))]
+[DataSource("brand", typeof(MongoDataLayer), DataSourceOptions.SoftDelete, Listener = typeof(BrandServiceListener))]
 public sealed class BrandService : DataSource<int?, Brand, BrandCreateDto, BrandSelectDto, BrandUpdateDto, SoftDelDto, SoftDelDto, BrandService>
 {
 	public BrandService(IServiceProvider serviceProvider, IDataContextProvider dataContextProvider) : base(serviceProvider, dataContextProvider) { }
@@ -18,7 +17,7 @@ public sealed class BrandService : DataSource<int?, Brand, BrandCreateDto, Brand
 		//builder.Name = "[DS]";
 		//builder.Options |= DataSourceOptions.SoftDelete | DataSourceOptions.CanInsert | DataSourceOptions.CanSelect;
 		//builder.DataContextName = "default";
-		//builder.QBFactory = typeof(MongoQBFactory);
+		//builder.DataLayer = typeof(MongoDataLayer);
 		//builder.IsAutoController = true;
 		//builder.ControllerName = "[DS:guessPlural]";
 		//builder.IsServiceSingleton = false;

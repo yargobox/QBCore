@@ -1,12 +1,13 @@
 using System.Reflection;
 using QBCore.DataSource.QueryBuilder;
 using QBCore.Extensions.ComponentModel;
+using QBCore.Extensions.Linq;
 using QBCore.Extensions.Text;
 using QBCore.ObjectFactory;
 
 namespace QBCore.DataSource;
 
-internal sealed class DSDefinition : IDSDefinition
+internal sealed class DSInfo : IDSInfo
 {
 	public string Name { get; }
 
@@ -37,7 +38,7 @@ internal sealed class DSDefinition : IDSDefinition
 	internal static readonly string[] ReservedNames = { "area", "controller", "action", "page", "filter", "cell", "id" };
 	internal const DataSourceOptions AllDSOperations = DataSourceOptions.CanInsert | DataSourceOptions.CanSelect | DataSourceOptions.CanUpdate | DataSourceOptions.CanDelete | DataSourceOptions.CanRestore;
 
-	public DSDefinition(Type dataSourceConcrete)
+	public DSInfo(Type dataSourceConcrete)
 	{
 		if (!dataSourceConcrete.IsClass || dataSourceConcrete.IsAbstract || dataSourceConcrete.IsGenericType || dataSourceConcrete.IsGenericTypeDefinition
 				|| dataSourceConcrete.GetSubclassOf(typeof(DataSource<,,,,,,,>)) == null || Nullable.GetUnderlyingType(dataSourceConcrete) != null)
@@ -73,7 +74,7 @@ internal sealed class DSDefinition : IDSDefinition
 			building.Listener = dataSourceAttr.Listener;
 			building.IsServiceSingleton = dataSourceAttr.IsServiceSingleton;
 			building.ServiceInterface = dataSourceAttr.ServiceInterface;
-			building.QBFactory = dataSourceAttr.QBFactory;
+			building.DataLayer = dataSourceAttr.DataLayer;
 		}
 
 		// Load fields from [DsApiController]
@@ -141,14 +142,14 @@ internal sealed class DSDefinition : IDSDefinition
 			(Options.HasFlag(DataSourceOptions.CanDelete) && DeleteDocument == typeof(NotSupported)) ||
 			(Options.HasFlag(DataSourceOptions.CanRestore) && RestoreDocument == typeof(NotSupported)))
 		{
-			throw new InvalidOperationException($"Datasource {DataSourceConcrete.ToPretty()} operation cannot be set on type '{nameof(NotSupported)}'.");
+			throw new InvalidOperationException($"DataSource {DataSourceConcrete.ToPretty()} operation cannot be set on type '{nameof(NotSupported)}'.");
 		}
 
 		// Validate options
 		//
 		if ((Options & AllDSOperations) == DataSourceOptions.None)
 		{
-			throw new InvalidOperationException($"Datasource {DataSourceConcrete.ToPretty()} must have at least one supported operation.");
+			throw new InvalidOperationException($"DataSource {DataSourceConcrete.ToPretty()} must have at least one supported operation.");
 		}
 
 		if ((Options.HasFlag(DataSourceOptions.RefreshAfterInsert) && !Options.HasFlag(DataSourceOptions.CanInsert))
@@ -156,13 +157,13 @@ internal sealed class DSDefinition : IDSDefinition
 			|| (Options.HasFlag(DataSourceOptions.RefreshAfterDelete) && !Options.HasFlag(DataSourceOptions.CanDelete))
 			|| (Options.HasFlag(DataSourceOptions.RefreshAfterRestore) && !Options.HasFlag(DataSourceOptions.CanRestore)))
 		{
-			throw new InvalidOperationException($"Datasource {DataSourceConcrete.ToPretty()} cannot be refreshed after the operation if the operation itself is not supported.");
+			throw new InvalidOperationException($"DataSource {DataSourceConcrete.ToPretty()} cannot be refreshed after the operation if the operation itself is not supported.");
 		}
 
 		if (Options.HasFlag(DataSourceOptions.CompositeId | DataSourceOptions.CompoundId)
 			|| Options.HasFlag(DataSourceOptions.SingleRecord | DataSourceOptions.FewRecords))
 		{
-			throw new InvalidOperationException($"Datasource {DataSourceConcrete.ToPretty()} is configured inproperly.");
+			throw new InvalidOperationException($"DataSource {DataSourceConcrete.ToPretty()} is configured inproperly.");
 		}
 
 		// DataContextName
@@ -230,40 +231,54 @@ internal sealed class DSDefinition : IDSDefinition
 			DataSourceService = TryFindDataSourceServiceInterfaceType() ?? DataSourceConcrete;
 		}
 
-		if (building.QBFactory == null)
+		// Get DataSource's data layer info
+		//
+		if (building.DataLayer == null)
 		{
-			throw new InvalidOperationException($"Datasource {DataSourceConcrete.ToPretty()} must have a query builder factory.");
+			throw new InvalidOperationException($"DataSource {DataSourceConcrete.ToPretty()} must have a specified data layer.");
 		}
-		if (!typeof(IQueryBuilderFactory).IsAssignableFrom(building.QBFactory))
+		if (building.DataLayer.GetInterfaceOf(typeof(IDataLayerInfo)) == null)
 		{
-			throw new InvalidOperationException($"Invalid query builder factory {building.QBFactory.ToPretty()}.");
+			throw new InvalidOperationException($"Invalid data layer specified '{building.DataLayer.ToPretty()}'.");
+		}
+		var dataLayer = (IDataLayerInfo?)
+			building.DataLayer.GetProperty("Default", BindingFlags.Static | BindingFlags.Public | BindingFlags.GetProperty)
+			?.GetMethod?.Invoke(null, null)
+			?? throw new InvalidOperationException($"Invalid data layer specified '{building.DataLayer.ToPretty()}'.");
+
+		// Register DataSource's document types, including nested ones.
+		//
+		foreach (var documntType in
+			DSDocumentInfo.GetReferencingTypes(CreateDocument, dataLayer.IsDocumentType, true)
+			.Next(DSDocumentInfo.GetReferencingTypes(SelectDocument, dataLayer.IsDocumentType, true))
+			.Next(DSDocumentInfo.GetReferencingTypes(UpdateDocument, dataLayer.IsDocumentType, true))
+			.Next(DSDocumentInfo.GetReferencingTypes(DeleteDocument, dataLayer.IsDocumentType, true))
+			.Next(DSDocumentInfo.GetReferencingTypes(RestoreDocument, dataLayer.IsDocumentType, true))
+			.Distinct()
+		)
+		{
+			// a new var for each type to do not mess up with types in the lambda expression below
+			var type = documntType;
+			DataSourceDocuments.GetOrRegister(type, x => new LazyObject<DSDocumentInfo>(() => dataLayer.CreateDocumentInfo(type)));
 		}
 
-		var ctor = building.QBFactory
-			.GetConstructors(BindingFlags.Public | BindingFlags.Instance)
-			.Where(x => IsSupportedQBFactoryCtorParams(x.GetParameters()))
-			.FirstOrDefault()
-			?? throw new InvalidOperationException($"Invalid query builder factory {building.QBFactory.ToPretty()}.");
-
-		QBFactory = (IQueryBuilderFactory) ctor.Invoke(new object?[]
-		{
+		// Create a query builder factory
+		//
+		QBFactory = dataLayer.CreateQBFactory(
 			DataSourceConcrete,
 			Options,
-			new QBBuilderMethodRefs
-			{
-				InsertBuilder = building.InsertBuilder,
-				SelectBuilder = building.SelectBuilder,
-				UpdateBuilder = building.UpdateBuilder,
-				DeleteBuilder = building.DeleteBuilder,
-				SoftDelBuilder = building.SoftDelBuilder,
-				RestoreBuilder = building.RestoreBuilder
-			},
+			building.InsertBuilder,
+			building.SelectBuilder,
+			building.UpdateBuilder,
+			building.DeleteBuilder,
+			building.SoftDelBuilder,
+			building.RestoreBuilder,
 #if DEBUG
 			false
 #else
 			true
 #endif
-		});
+		);
 
 		// Listener
 		//
@@ -282,13 +297,6 @@ internal sealed class DSDefinition : IDSDefinition
 		}
 		return fromClassName;
 	}
-
-	private static bool IsSupportedQBFactoryCtorParams(ParameterInfo[] paramInfos)
-		=> paramInfos.Length == 4
-			&& paramInfos[0].ParameterType == typeof(Type)
-			&& paramInfos[1].ParameterType == typeof(DataSourceOptions)
-			&& paramInfos[2].ParameterType == typeof(QBBuilderMethodRefs)
-			&& paramInfos[3].ParameterType == typeof(bool);
 
 	private Type? TryFindDataSourceServiceInterfaceType()
 	{
@@ -327,7 +335,7 @@ internal sealed class DSDefinition : IDSDefinition
 		var ctors = listener.GetConstructors(BindingFlags.Instance | BindingFlags.Public);
 		if (ctors.Length != 1)
 		{
-			throw new InvalidOperationException($"Datasource listener {listener.ToPretty()} must have a single public constructor.");
+			throw new InvalidOperationException($"DataSource listener {listener.ToPretty()} must have a single public constructor.");
 		}
 
 		var ctor = ctors[0];

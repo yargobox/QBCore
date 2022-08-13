@@ -8,7 +8,7 @@ using QBCore.DataSource.QueryBuilder;
 namespace Example1.BLL.Services;
 
 [DsApiController]
-[DataSource("product", typeof(MongoQBFactory), DataSourceOptions.SoftDelete)]
+[DataSource("product", typeof(MongoDataLayer), DataSourceOptions.SoftDelete)]
 public sealed class ProductService : DataSource<int?, Product, ProductCreateDto, ProductSelectDto, ProductUpdateDto, SoftDelDto, SoftDelDto, OrderService>
 {
 	public ProductService(IServiceProvider serviceProvider, IDataContextProvider dataContextProvider) : base(serviceProvider, dataContextProvider) { }
