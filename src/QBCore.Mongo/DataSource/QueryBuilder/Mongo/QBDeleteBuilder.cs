@@ -1,12 +1,15 @@
 using System.Data;
 using System.Linq.Expressions;
 using QBCore.Extensions.Linq;
+using QBCore.ObjectFactory;
 
 namespace QBCore.DataSource.QueryBuilder.Mongo;
 
 internal sealed class QBDeleteBuilder<TDoc, TDto> : IQBDeleteBuilder<TDoc, TDto>, IQBMongoDeleteBuilder<TDoc, TDto>, ICloneable
 {
 	public QueryBuilderTypes QueryBuilderType => QueryBuilderTypes.Delete;
+	public DSDocumentInfo DocumentInfo => _documentInfo;
+	public DSDocumentInfo? ProjectionInfo => _projectionInfo;
 	public bool IsNormalized { get; private set; }
 
 	public IReadOnlyList<QBContainer> Containers => _containers;
@@ -17,7 +20,9 @@ internal sealed class QBDeleteBuilder<TDoc, TDto> : IQBDeleteBuilder<TDoc, TDto>
 	public IReadOnlyList<QBSortOrder> SortOrders => _sortOrders ?? (_sortOrders = new List<QBSortOrder>(3));
 	public IReadOnlyList<QBAggregation> Aggregations => _aggregations ?? (_aggregations = new List<QBAggregation>(3));
 
-	private readonly List<QBContainer> _containers = new List<QBContainer>(3);
+	private readonly DSDocumentInfo _documentInfo;
+	private readonly DSDocumentInfo? _projectionInfo;
+	private readonly List<QBContainer> _containers;
 	private List<QBField>? _fields;
 	private List<QBCondition>? _connects;
 	private List<QBCondition>? _conditions;
@@ -25,24 +30,11 @@ internal sealed class QBDeleteBuilder<TDoc, TDto> : IQBDeleteBuilder<TDoc, TDto>
 	private List<QBSortOrder>? _sortOrders;
 	private List<QBAggregation>? _aggregations;
 
-	public Expression<Func<TDoc, object?>>? IdField
-	{
-		get => _idField;
-		set
-		{
-			if (_idField != null)
-				throw new InvalidOperationException($"Incorrect definition of delete query builder '{typeof(TDto).ToPretty()}': option '{nameof(IdField)}' is already set.");
-			_idField = value;
-		}
-	}
-
-	private Expression<Func<TDoc, object?>>? _idField;
-
 	public QBDeleteBuilder()
 	{
-		_idField =
-			typeof(TDoc).GetProperties().Where(x => x.IsDefined(typeof(DeIdAttribute), true)).FirstOrDefault()?.ToMemberExpression<TDoc>()
-			?? typeof(TDoc).GetFields().Where(x => x.IsDefined(typeof(DeIdAttribute), true)).FirstOrDefault()?.ToMemberExpression<TDoc>();
+		_documentInfo = StaticFactory.Documents[typeof(TDoc)].Value;
+		_projectionInfo = StaticFactory.Documents.GetValueOrDefault(typeof(TDoc))?.Value;
+		_containers = new List<QBContainer>(1);
 	}
 	public QBDeleteBuilder(QBDeleteBuilder<TDoc, TDto> other)
 	{
@@ -51,6 +43,8 @@ internal sealed class QBDeleteBuilder<TDoc, TDto> : IQBDeleteBuilder<TDoc, TDto>
 			other.Normalize();
 		}
 
+		_documentInfo = other._documentInfo;
+		_projectionInfo = other._projectionInfo;
 		_containers = new List<QBContainer>(other._containers);
 		if (other._fields != null) _fields = new List<QBField>(other._fields);
 		if (other._parameters != null) _parameters = new List<QBParameter>(other._parameters);
@@ -58,7 +52,6 @@ internal sealed class QBDeleteBuilder<TDoc, TDto> : IQBDeleteBuilder<TDoc, TDto>
 		if (other._conditions != null) _conditions = new List<QBCondition>(other._conditions);
 		if (other._sortOrders != null) _sortOrders = new List<QBSortOrder>(other._sortOrders);
 		if (other._aggregations != null) _aggregations = new List<QBAggregation>(other._aggregations);
-		_idField = other._idField;
 	}
 	public object Clone() => new QBDeleteBuilder<TDoc, TDto>(this);
 

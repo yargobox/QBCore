@@ -349,24 +349,24 @@ internal sealed partial class SelectQueryBuilder<TDocument, TSelect> : QueryBuil
 
 		// Declare func to get DB-side field names. They are depend on 'stages' and 'stageIndex'
 		int stageIndex = 0;
-		var getDBSideNameInsideLookup = string (string alias, FieldPath fieldPath) =>
+		var getDBSideNameInsideLookup = string (string alias, DataEntryPath fieldPath) =>
 		{
 			var trueAlias = stages.Take(stageIndex).FirstOrDefault(x => x.Container.Alias == alias)?.LookupAs;
 			if (trueAlias == null)
 			{
 				if (stages[stageIndex].Container.Alias == alias)
 				{
-					return fieldPath.DBSideName;
+					return fieldPath.GetDBSideName();
 				}
 				throw new KeyNotFoundException($"Collection '{alias}' is not yet defined at this stage.");
 			}
 			else if (trueAlias.Length == 0)
 			{
-				return fieldPath.DBSideName;
+				return fieldPath.GetDBSideName();
 			}
-			return string.Concat(trueAlias, ".", fieldPath.DBSideName);
+			return string.Concat(trueAlias, ".", fieldPath.GetDBSideName());
 		};
-		var getDBSideNameAfterLookup = string (string alias, FieldPath fieldPath) =>
+		var getDBSideNameAfterLookup = string (string alias, DataEntryPath fieldPath) =>
 		{
 			var trueAlias = stages.Take(stageIndex + 1).FirstOrDefault(x => x.Container.Alias == alias)?.LookupAs;
 			if (trueAlias == null)
@@ -375,9 +375,9 @@ internal sealed partial class SelectQueryBuilder<TDocument, TSelect> : QueryBuil
 			}
 			else if (trueAlias.Length == 0)
 			{
-				return fieldPath.DBSideName;
+				return fieldPath.GetDBSideName();
 			}
-			return string.Concat(trueAlias, ".", fieldPath.DBSideName);
+			return string.Concat(trueAlias, ".", fieldPath.GetDBSideName());
 		};
 
 		for ( ; stageIndex < stages.Count; stageIndex++)
@@ -397,7 +397,7 @@ internal sealed partial class SelectQueryBuilder<TDocument, TSelect> : QueryBuil
 				{
 					firstConnect = stage.ConditionMap.First().First(x => x.IsConnectOnField);
 
-					lookup["foreignField"] = firstConnect.Field.DBSideName;
+					lookup["foreignField"] = firstConnect.Field.GetDBSideName();
 					lookup["localField"] = getDBSideNameInsideLookup(firstConnect.RefAlias!, firstConnect.RefField!);
 				}
 				else
@@ -530,20 +530,20 @@ internal sealed partial class SelectQueryBuilder<TDocument, TSelect> : QueryBuil
 		int stageIndex;
 
 		// Fill the includes and change the LookupAs names for the joining documents the result of which is directly projected into the field.
-		foreach (var field in fields.Where(x => x.IncludeOrExclude).OrderBy(x => x.RefAlias ?? string.Empty).ThenBy(x => x.RefField?.ElementCount ?? 0))
+		foreach (var field in fields.Where(x => x.IncludeOrExclude).OrderBy(x => x.RefAlias ?? string.Empty).ThenBy(x => x.RefField?.Count ?? 0))
 		{
 			stageIndex = stages.FindIndex(x => x.Container.Alias == field.RefAlias);
 
-			if (field.RefField != null && field.RefField.FieldType == stages[stageIndex].Container.DocumentType)
+			if (field.RefField != null && field.RefField.DataEntryType == stages[stageIndex].Container.DocumentType)
 			{
 				// project the joining document as the result field
-				stages[stageIndex].LookupAs = field.Field.DBSideName;
+				stages[stageIndex].LookupAs = field.Field.GetDBSideName();
 			}
 			else
 			{
 				path = string.Concat(
 					stages[stageIndex].LookupAs, ".",
-					field.RefField!.DBSideName
+					field.RefField!.GetDBSideName()
 				);
 
 				// Propagate the include to the pipeline stage using the dependencies on conditions and the include fields.
@@ -559,7 +559,7 @@ internal sealed partial class SelectQueryBuilder<TDocument, TSelect> : QueryBuil
 						stageIndex = i;
 					}
 				}
-				stages[stageIndex].ProjectAfter.Add((path, field.Field.DBSideName, field));
+				stages[stageIndex].ProjectAfter.Add((path, field.Field.GetDBSideName(), field));
 			}
 		}
 
@@ -570,7 +570,7 @@ internal sealed partial class SelectQueryBuilder<TDocument, TSelect> : QueryBuil
 				// search in includes
 				x.IncludeOrExclude
 				// for the entire document: (store) => store
-				&& x.RefField!.FieldType == stages.First(xx => xx.Container.Alias == x.RefAlias).Container.DocumentType
+				&& x.RefField!.DataEntryType == stages.First(xx => xx.Container.Alias == x.RefAlias).Container.DocumentType
 				// in this case our exclude must be a part of it: (sel) => sel.Store.LogoImg, (sel) => sel.Store
 				&& field.Field.FullName.StartsWith(x.Field.FullName)
 				&& field.Field.FullName.Length > x.Field.FullName.Length + 1
@@ -578,7 +578,7 @@ internal sealed partial class SelectQueryBuilder<TDocument, TSelect> : QueryBuil
 			);
 			if (joinedDoc == null)
 			{
-				path = field.Field.DBSideName;
+				path = field.Field.GetDBSideName();
 
 				// Propagate the exclude
 				//
@@ -606,11 +606,11 @@ internal sealed partial class SelectQueryBuilder<TDocument, TSelect> : QueryBuil
 				stageIndex = stages.FindIndex(x => x.Container.Alias == joinedDoc.RefAlias!);
 
 				path = string.Concat(stages[stageIndex].LookupAs, ".",
-					string.Join(".", field.Field.Elements.Skip(joinedDoc.Field.ElementCount).Select(x => field.Field.GetDBSideName(x))));
+					string.Join(".", field.Field.Skip(joinedDoc.Field.Count).Select(x => field.Field.Cast<MongoDataEntry>().Select(x => x.DBSideName))));
 
 				// Propagate the exclude
 				//
-				var trueFullName = string.Join(".", field.Field.Elements.Skip(joinedDoc.Field.ElementCount).Select(x => x.Name));
+				var trueFullName = string.Join(".", field.Field.Skip(joinedDoc.Field.Count).Select(x => x.Name));
 				for (int i = stageIndex + 1; i < stages.Count; i++)
 				{
 					map = stages[i].ConditionMap;
@@ -697,7 +697,7 @@ internal sealed partial class SelectQueryBuilder<TDocument, TSelect> : QueryBuil
 
 			eqStmt.Add(new BsonDocument { { "$type", "$" + projField.fromPath } });
 			
-			if (projField.builderField!.Field.FieldType == typeof(string))
+			if (projField.builderField!.Field.DataEntryType == typeof(string))
 			{
 				eqStmt.Add("string");
 

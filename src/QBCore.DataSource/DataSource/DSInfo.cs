@@ -248,19 +248,11 @@ internal sealed class DSInfo : IDSInfo
 
 		// Register DataSource's document types, including nested ones.
 		//
-		foreach (var documntType in
-			DSDocumentInfo.GetReferencingTypes(CreateDocument, dataLayer.IsDocumentType, true)
-			.Next(DSDocumentInfo.GetReferencingTypes(SelectDocument, dataLayer.IsDocumentType, true))
-			.Next(DSDocumentInfo.GetReferencingTypes(UpdateDocument, dataLayer.IsDocumentType, true))
-			.Next(DSDocumentInfo.GetReferencingTypes(DeleteDocument, dataLayer.IsDocumentType, true))
-			.Next(DSDocumentInfo.GetReferencingTypes(RestoreDocument, dataLayer.IsDocumentType, true))
-			.Distinct()
-		)
-		{
-			// a new var for each type to do not mess up with types in the lambda expression below
-			var type = documntType;
-			DataSourceDocuments.GetOrRegister(type, x => new LazyObject<DSDocumentInfo>(() => dataLayer.CreateDocumentInfo(type)));
-		}
+		if (CreateDocument != typeof(NotSupported)) DataSourceDocuments.GetOrRegister(CreateDocument, dataLayer);
+		if (SelectDocument != typeof(NotSupported)) DataSourceDocuments.GetOrRegister(SelectDocument, dataLayer);
+		if (UpdateDocument != typeof(NotSupported)) DataSourceDocuments.GetOrRegister(UpdateDocument, dataLayer);
+		if (DeleteDocument != typeof(NotSupported)) DataSourceDocuments.GetOrRegister(DeleteDocument, dataLayer);
+		if (RestoreDocument != typeof(NotSupported)) DataSourceDocuments.GetOrRegister(RestoreDocument, dataLayer);
 
 		// Create a query builder factory
 		//

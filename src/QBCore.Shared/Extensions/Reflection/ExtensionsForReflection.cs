@@ -252,4 +252,42 @@ public static class ExtensionsForReflection
 			return Expression.Lambda<Func<T, object?>>(convertExpression, parameterExpression);
 		}
 	}
+
+	public static Type GetPropertyOrFieldType(this MemberInfo memberInfo)
+	{
+		if (memberInfo is PropertyInfo propertyInfo)
+		{
+			return propertyInfo.PropertyType;
+		}
+		else if (memberInfo is FieldInfo fieldInfo)
+		{
+			return fieldInfo.FieldType;
+		}
+
+		if (memberInfo == null)
+		{
+			throw new ArgumentNullException(nameof(memberInfo));
+		}
+		throw new ArgumentException(nameof(memberInfo));
+	}
+
+	public static Type GetPropertyOrFieldDeclaringType(this MemberInfo memberInfo)
+	{
+		if (memberInfo is PropertyInfo propertyInfo)
+		{
+			return propertyInfo.DeclaringType!;
+		}
+		else if (memberInfo is FieldInfo fieldInfo)
+		{
+			return fieldInfo.DeclaringType!;
+		}
+
+		if (memberInfo == null)
+		{
+			throw new ArgumentNullException(nameof(memberInfo));
+		}
+		throw new ArgumentException(nameof(memberInfo));
+	}
+
+	public static object? GetDefaultValue(this Type type) => type.IsValueType ? Activator.CreateInstance(type) : null;
 }

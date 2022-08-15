@@ -98,6 +98,10 @@ public abstract class DSDocumentInfo
 			{
 				flags |= DataEntryFlags.IdField;
 			}
+			if (propertyInfo.IsDefined(typeof(DeReadOnlyAttribute), true))
+			{
+				flags |= DataEntryFlags.ReadOnly;
+			}
 			if (propertyInfo.IsDefined(typeof(DeCreatedAttribute), true))
 			{
 				flags |= DataEntryFlags.DateCreatedField;
@@ -142,6 +146,10 @@ public abstract class DSDocumentInfo
 			{
 				flags |= DataEntryFlags.IdField;
 			}
+			if (fieldInfo.IsDefined(typeof(DeReadOnlyAttribute), true))
+			{
+				flags |= DataEntryFlags.ReadOnly;
+			}
 			if (fieldInfo.IsDefined(typeof(DeCreatedAttribute), true))
 			{
 				flags |= DataEntryFlags.DateCreatedField;
@@ -169,76 +177,6 @@ public abstract class DSDocumentInfo
 			}
 
 			yield return (fieldInfo, flags);
-		}
-	}
-
-	public static IEnumerable<Type> GetReferencingTypes(Type documentType, Func<Type, bool> documentTypesSelector, bool includeThisOne = false)
-	{
-		if (documentType == null)
-		{
-			throw new ArgumentNullException(nameof(documentType));
-		}
-		if (documentTypesSelector == null)
-		{
-			throw new ArgumentNullException(nameof(documentTypesSelector));
-		}
-
-		if (!documentTypesSelector(documentType))
-		{
-			return Enumerable.Empty<Type>();
-		}
-
-		var pool = new Dictionary<Type, bool>();
-		if (includeThisOne)
-		{
-			pool.Add(documentType, true);
-		}
-
-		GetReferencingTypes(documentType, documentTypesSelector, pool);
-
-		return pool.Where(x => x.Value).Select(x => x.Key);
-	}
-
-	private static void GetReferencingTypes(Type documentType, Func<Type, bool> documentTypesSelector, Dictionary<Type, bool> pool)
-	{
-		bool isDocumentType;
-		Type type;
-
-		foreach (var candidate in DSDocumentInfo.GetDataEntryCandidates(documentType))
-		{
-			if (candidate.memberInfo is PropertyInfo propertyInfo)
-			{
-				type = propertyInfo.PropertyType;
-			}
-			else if (candidate.memberInfo is FieldInfo fieldInfo)
-			{
-				type = fieldInfo.FieldType;
-			}
-			else
-			{
-				continue;
-			}
-
-			isDocumentType = documentTypesSelector(type);
-			if (pool.TryAdd(type, isDocumentType))
-			{
-				if (isDocumentType)
-				{
-					GetReferencingTypes(type, documentTypesSelector, pool);
-				}
-				else
-				{
-					foreach (var genericEnumerable in type.GetInterfacesOf(typeof(IEnumerable<>)))
-					{
-						type = genericEnumerable.GetGenericArguments()[0];
-						isDocumentType = documentTypesSelector(type);
-						if (pool.TryAdd(type, isDocumentType) && isDocumentType)
-						{
-							GetReferencingTypes(type, documentTypesSelector, pool);
-						}
-					}
-				}
-			}
 		}
 	}
 }

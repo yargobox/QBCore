@@ -4,8 +4,6 @@ namespace QBCore.DataSource.QueryBuilder.Mongo;
 
 public interface IQBMongoSelectBuilder<TDoc, TSelect> : IQBBuilder<TDoc, TSelect>
 {
-	Expression<Func<TSelect, object?>>? DateDeleteField { get; set; }
-
 	IQBMongoSelectBuilder<TDoc, TSelect> SelectFrom(string tableName);
 	IQBMongoSelectBuilder<TDoc, TSelect> SelectFrom(string alias, string tableName);
 

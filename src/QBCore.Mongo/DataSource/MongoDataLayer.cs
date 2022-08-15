@@ -1,7 +1,7 @@
 using System.Collections;
-using System.Reflection;
 using System.Text.RegularExpressions;
 using MongoDB.Bson;
+using QBCore.Configuration;
 using QBCore.DataSource.QueryBuilder;
 using QBCore.DataSource.QueryBuilder.Mongo;
 
@@ -12,6 +12,7 @@ public sealed class MongoDataLayer : IDataLayerInfo
 	public static readonly IDataLayerInfo Default = new MongoDataLayer();
 
 	public string Name => "Mongo";
+	public Type DatabaseContextInterface => typeof(IMongoDbContext);
 	public Func<Type, bool> IsDocumentType { get; set; }
 
 	private MongoDataLayer()

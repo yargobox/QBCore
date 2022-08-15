@@ -5,6 +5,7 @@ namespace QBCore.DataSource;
 public interface IDataLayerInfo
 {
 	string Name { get; }
+	Type DatabaseContextInterface { get; }
 	Func<Type, bool> IsDocumentType { get; set; }
 
 	DSDocumentInfo CreateDocumentInfo(Type documentType);

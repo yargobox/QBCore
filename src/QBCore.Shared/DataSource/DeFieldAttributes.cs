@@ -16,6 +16,11 @@ public class DeIdAttribute : Attribute
 }
 
 [AttributeUsage(AttributeTargets.Property | AttributeTargets.Field, Inherited = true)]
+public class DeReadOnlyAttribute : Attribute
+{
+}
+
+[AttributeUsage(AttributeTargets.Property | AttributeTargets.Field, Inherited = true)]
 public class DeForeignIdAttribute : Attribute
 {
 }

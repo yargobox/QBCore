@@ -7,7 +7,7 @@ namespace QBCore.DataSource.QueryBuilder.Mongo;
 internal class MongoQBFactory : IQueryBuilderFactory
 {
 	public Type DataSourceConcrete { get; }
-	public Type DatabaseContextInterface => typeof(IMongoDbContext);
+	public IDataLayerInfo DataLayer => MongoDataLayer.Default;
 	public QueryBuilderTypes SupportedQueryBuilders { get; }
 
 	private Delegate? _insertBuilderMethod;

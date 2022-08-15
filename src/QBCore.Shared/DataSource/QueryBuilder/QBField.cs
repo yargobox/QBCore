@@ -5,14 +5,14 @@ namespace QBCore.DataSource.QueryBuilder;
 [DebuggerDisplay("{DebuggerDisplay,nq}")]
 public record QBField
 {
-	public readonly FieldPath Field;
+	public readonly DataEntryPath Field;
 	public readonly string? RefAlias;
-	public readonly FieldPath? RefField;
+	public readonly DataEntryPath? RefField;
 	public readonly bool OptionalExclusion;
 
 	public bool IncludeOrExclude => RefAlias != null;
 
-	public QBField(FieldPath Field, string? RefAlias, FieldPath? RefField, bool OptionalExclusion)
+	public QBField(DataEntryPath Field, string? RefAlias, DataEntryPath? RefField, bool OptionalExclusion)
 	{
 		this.Field = Field;
 		this.RefAlias = RefAlias;

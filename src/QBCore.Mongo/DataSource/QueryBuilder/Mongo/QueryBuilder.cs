@@ -12,10 +12,12 @@ internal abstract class QueryBuilder<TDocument, TProjection> : IQueryBuilder<TDo
 {
 	public abstract QueryBuilderTypes QueryBuilderType { get; }
 	public Type DocumentType => typeof(TDocument);
+	public DSDocumentInfo DocumentInfo => Builder.DocumentInfo;
 	public Type ProjectionType => typeof(TProjection);
-	public Type DatabaseContextInterface => typeof(IMongoDbContext);
+	public DSDocumentInfo? ProjectionInfo => Builder.ProjectionInfo;
+	public Type DatabaseContextInterfaceType => typeof(IMongoDbContext);
 	public IDataContext DataContext { get; }
-	public IQBBuilder<TDocument, TProjection> Builder { get; }
+	public QBBuilder<TDocument, TProjection> Builder { get; }
 
 	protected IMongoDbContext _mongoDbContext;
 
@@ -139,7 +141,7 @@ internal abstract class QueryBuilder<TDocument, TProjection> : IQueryBuilder<TDo
 
 	#region BuildConditionTree
 
-	protected static BuiltCondition? BuildConditionTree(bool useExprFormat, IEnumerable<QBCondition> conditions, Func<string, FieldPath, string> getDBSideName, IReadOnlyList<QBParameter> parameters)
+	protected static BuiltCondition? BuildConditionTree(bool useExprFormat, IEnumerable<QBCondition> conditions, Func<string, DataEntryPath, string> getDBSideName, IReadOnlyList<QBParameter> parameters)
 	{
 		BuiltCondition? filter = null;
 		bool moveNext = true;
@@ -186,7 +188,7 @@ internal abstract class QueryBuilder<TDocument, TProjection> : IQueryBuilder<TDo
 			return filter;
 		}
 	}
-	private static (BuiltCondition filter, int level) BuildConditionTree(bool useExprFormat, IEnumerator<QBCondition> e, ref bool moveNext, int parentheses, Func<string, FieldPath, string> getDBSideName, IReadOnlyList<QBParameter> parameters)
+	private static (BuiltCondition filter, int level) BuildConditionTree(bool useExprFormat, IEnumerator<QBCondition> e, ref bool moveNext, int parentheses, Func<string, DataEntryPath, string> getDBSideName, IReadOnlyList<QBParameter> parameters)
 	{
 		BuiltCondition filter;
 
@@ -250,7 +252,7 @@ internal abstract class QueryBuilder<TDocument, TProjection> : IQueryBuilder<TDo
 
 		return (filter, 0);
 	}
-	private static BsonDocument BuildCondition(bool useExprFormat, QBCondition cond, Func<string, FieldPath, string> getDBSideName, IReadOnlyList<QBParameter> parameters)
+	private static BsonDocument BuildCondition(bool useExprFormat, QBCondition cond, Func<string, DataEntryPath, string> getDBSideName, IReadOnlyList<QBParameter> parameters)
 	{
 		if (cond.IsOnField)
 		{
@@ -284,7 +286,7 @@ internal abstract class QueryBuilder<TDocument, TProjection> : IQueryBuilder<TDo
 
 	#endregion
 
-	protected static BsonDocument MakeConditionOnConst(bool useExprFormat, QBCondition cond, Func<string, FieldPath, string> getDBSideName, object? paramValue = null)
+	protected static BsonDocument MakeConditionOnConst(bool useExprFormat, QBCondition cond, Func<string, DataEntryPath, string> getDBSideName, object? paramValue = null)
 	{
 		if (!cond.IsOnParam && !cond.IsOnConst)
 		{
@@ -372,7 +374,7 @@ internal abstract class QueryBuilder<TDocument, TProjection> : IQueryBuilder<TDo
 				throw new NotSupportedException();
 		}
 	}
-	protected static BsonDocument MakeConditionOnField(bool rightIsVar, QBCondition cond, Func<string, FieldPath, string> getDBSideName)
+	protected static BsonDocument MakeConditionOnField(bool rightIsVar, QBCondition cond, Func<string, DataEntryPath, string> getDBSideName)
 	{
 		if (!cond.IsOnField)
 		{

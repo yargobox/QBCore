@@ -18,11 +18,11 @@ public record QBConditionInfo
 	public readonly QBConditionFlags Flags;
 
 	public readonly string Alias;
-	public readonly FieldPath Field;
+	public readonly DataEntryPath Field;
 	public readonly Type FieldUnderlyingType;
 
 	public readonly string? RefAlias;
-	public readonly FieldPath? RefField;
+	public readonly DataEntryPath? RefField;
 	public readonly Type? RefFieldUnderlyingType;
 
 	public readonly object? Value;
@@ -31,9 +31,9 @@ public record QBConditionInfo
 	public QBConditionInfo(
 		QBConditionFlags flags,
 		string alias,
-		FieldPath field,
+		DataEntryPath field,
 		string? refAlias,
-		FieldPath? refField,
+		DataEntryPath? refField,
 		object? value,
 		FO operation)
 	{
@@ -45,8 +45,8 @@ public record QBConditionInfo
 		Value = value;
 		Operation = operation;
 
-		FieldUnderlyingType = Field.FieldType.GetUnderlyingSystemType();
-		RefFieldUnderlyingType = RefField?.FieldType.GetUnderlyingSystemType();
+		FieldUnderlyingType = Field.DataEntryType.GetUnderlyingSystemType();
+		RefFieldUnderlyingType = RefField?.DataEntryType.GetUnderlyingSystemType();
 	}
 }
 
@@ -57,11 +57,11 @@ public record QBCondition
 	public int Parentheses;
 
 	public string Alias => ConditionInfo.Alias;
-	public FieldPath Field => ConditionInfo.Field;
+	public DataEntryPath Field => ConditionInfo.Field;
 	public Type FieldUnderlyingType => ConditionInfo.FieldUnderlyingType;
 
 	public string? RefAlias => ConditionInfo.RefAlias;
-	public FieldPath? RefField => ConditionInfo.RefField;
+	public DataEntryPath? RefField => ConditionInfo.RefField;
 	public Type? RefFieldUnderlyingType => ConditionInfo.RefFieldUnderlyingType;
 
 	public object? Value => ConditionInfo.Value;
@@ -80,15 +80,15 @@ public record QBCondition
 	public string FieldPath => Field.FullName;
 	public string? RefFieldPath => RefField?.FullName;
 
-	public Type FieldType => Field.FieldType;
-	public Type? RefFieldType => RefField?.FieldType;
+	public Type FieldType => Field.DataEntryType;
+	public Type? RefFieldType => RefField?.DataEntryType;
 
-	public Type FieldDeclaringType => Field.DeclaringType;
-	public Type? RefFieldDeclaringType => RefField?.DeclaringType;
+	public Type FieldDeclaringType => Field.DocumentType;
+	public Type? RefFieldDeclaringType => RefField?.DocumentType;
 
 	public QBCondition(QBConditionInfo conditionInfo)
 		=> ConditionInfo = conditionInfo;
-	public QBCondition(QBConditionFlags flags, string alias, FieldPath field, string? refAlias, FieldPath? refField, object? value, FO operation)
+	public QBCondition(QBConditionFlags flags, string alias, DataEntryPath field, string? refAlias, DataEntryPath? refField, object? value, FO operation)
 		=> ConditionInfo = new QBConditionInfo(flags, alias, field, refAlias, refField, value, operation);
 
 	protected string DebuggerDisplay

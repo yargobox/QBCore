@@ -30,7 +30,7 @@ public abstract partial class DataSource<TKey, TDocument, TCreate, TSelect, TUpd
 	{
 		DSInfo = StaticFactory.DataSources[typeof(TDataSource)];
 		_serviceProvider = serviceProvider;
-		_dataContext = dataContextProvider.GetContext(DSInfo.QBFactory.DatabaseContextInterface, DSInfo.DataContextName);
+		_dataContext = dataContextProvider.GetContext(DSInfo.QBFactory.DataLayer.DatabaseContextInterface, DSInfo.DataContextName);
 
 		if (DSInfo.ListenerFactory != null)
 		{

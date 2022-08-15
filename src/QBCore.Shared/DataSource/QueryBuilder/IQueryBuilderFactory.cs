@@ -4,8 +4,9 @@ namespace QBCore.DataSource.QueryBuilder;
 
 public interface IQueryBuilderFactory
 {
+	IDataLayerInfo DataLayer { get; }
+
 	Type DataSourceConcrete { get; }
-	Type DatabaseContextInterface { get; }
 	QueryBuilderTypes SupportedQueryBuilders { get; }
 
 	IInsertQueryBuilder<TDocument, TCreate> CreateQBInsert<TDocument, TCreate>(IDataContext dataContext);

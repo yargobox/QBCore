@@ -16,7 +16,10 @@ public class DataSourceCountOptions : DataSourceOperationOptions
 	public long Skip;
 	public long CountNoMoreThan = -1;
 }
-public class DataSourceInsertOptions : DataSourceOperationOptions { }
+public class DataSourceInsertOptions : DataSourceOperationOptions
+{
+	public DataSourceIdGeneratorOptions? GeneratorOptions;
+}
 public class DataSourceQueryableOptions : DataSourceOperationOptions { }
 public class DataSourceSelectOptions : DataSourceOperationOptions
 {
