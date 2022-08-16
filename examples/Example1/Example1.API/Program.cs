@@ -37,13 +37,17 @@ var builder = appBuilder.Services
 	})
 	.AddApplicationPart(typeof(Example1.DAL.Entities.Brands.Brand).Assembly)
 	.AddApplicationPart(typeof(Example1.BLL.Services.BrandService).Assembly)
-	.AddQBCore()
+	.AddQBCore(options => { })
 	.ConfigureApplicationPartManager(partManager =>
 	{
 		partManager.FeatureProviders.Add(new DataSourceControllerFeatureProvider());
 	});
 
 builder.Services
+	.AddAutoMapper(config =>
+	{
+		config.AddProfile(new DataSourceMappings((source, dest) => true));
+	})
 	.Configure<MongoDbSettings>(appBuilder.Configuration.GetSection(nameof(MongoDbSettings)))
 	.Configure<SqlDbSettings>(appBuilder.Configuration.GetSection(nameof(SqlDbSettings)))
 	.AddSingleton<IDataContextProvider, DataContextProvider>()

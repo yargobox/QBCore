@@ -5,6 +5,8 @@ namespace QBCore.DataSource;
 
 public static class DataSourceDocuments
 {
+	public static IFactoryObjectDictionary<Type, Lazy<DSDocumentInfo>> Collection => StaticFactory.Documents;
+
 	private static Func<Type, bool> _documentExclusionSelector = _ => false;
 
 	public static Func<Type, bool> DocumentExclusionSelector
@@ -21,12 +23,12 @@ public static class DataSourceDocuments
 		}
 	}
 
-	public static DSDocumentInfo GetOrRegister(Type documentType, IDataLayerInfo dataLayer)
+	public static Lazy<DSDocumentInfo> GetOrRegister(Type documentType, IDataLayerInfo dataLayer)
 		=> GetOrRegister(StaticFactory.Documents, documentType, dataLayer);
 
-	public static DSDocumentInfo GetOrRegister(this IFactoryObjectDictionary<Type, LazyObject<DSDocumentInfo>> @this, Type documentType, IDataLayerInfo dataLayer)
+	public static Lazy<DSDocumentInfo> GetOrRegister(this IFactoryObjectDictionary<Type, Lazy<DSDocumentInfo>> @this, Type documentType, IDataLayerInfo dataLayer)
 	{
-		var registry = (IFactoryObjectRegistry<Type, LazyObject<DSDocumentInfo>>)@this;
+		var registry = (IFactoryObjectRegistry<Type, Lazy<DSDocumentInfo>>)@this;
 
 		var doc = registry.GetValueOrDefault(documentType);
 		if (doc == null)
@@ -36,17 +38,17 @@ public static class DataSourceDocuments
 				// a new var for each type to do not mess up with types in the lambda expression below
 				var type = selectedType;
 				if (doc == null)
-					doc = registry.TryGetOrRegisterObject(type, x => new LazyObject<DSDocumentInfo>(() => dataLayer.CreateDocumentInfo(type)));
+					doc = registry.TryGetOrRegisterObject(type, x => new Lazy<DSDocumentInfo>(() => dataLayer.CreateDocumentInfo(type), LazyThreadSafetyMode.ExecutionAndPublication));
 				else
-					registry.TryGetOrRegisterObject(type, x => new LazyObject<DSDocumentInfo>(() => dataLayer.CreateDocumentInfo(type)));
+					registry.TryGetOrRegisterObject(type, x => new Lazy<DSDocumentInfo>(() => dataLayer.CreateDocumentInfo(type), LazyThreadSafetyMode.ExecutionAndPublication));
 			}
 
 			if (doc == null)
 			{
-				throw new InvalidOperationException($"Could not register as a datasource document type '{documentType.ToPretty()}'.");
+				throw new InvalidOperationException($"Could not register '{documentType.ToPretty()}' as a datasource document type.");
 			}
 		}
-		return doc.Value;
+		return doc;
 	}
 
 	public static IEnumerable<Type> GetReferencingTypes(Type documentType, Func<Type, bool> documentTypesSelector, bool includeThisOne = false)

@@ -1,7 +1,5 @@
-using System.Linq.Expressions;
 using QBCore.Configuration;
 using QBCore.DataSource.Options;
-using QBCore.ObjectFactory;
 
 namespace QBCore.DataSource.QueryBuilder;
 
@@ -23,7 +21,6 @@ public interface IQueryBuilder<TDocument, TProjection> : IQueryBuilder
 
 public interface IInsertQueryBuilder<TDocument, TCreate> : IQueryBuilder<TDocument, TCreate>
 {
-	IQBInsertBuilder<TDocument, TCreate> InsertBuilder { get; }
 	Task<TDocument> InsertAsync(
 		TDocument document,
 		DataSourceInsertOptions? options = null,

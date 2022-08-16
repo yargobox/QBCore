@@ -37,7 +37,7 @@ public abstract partial class DataSource<TKey, TDocument, TCreate, TSelect, TUpd
 				_listener = null;
 			}
 
-			_serviceProvider = null!;
+			//_serviceProvider = null!;
 		}
 	}
 	protected virtual async ValueTask DisposeAsyncCore()
@@ -54,7 +54,7 @@ public abstract partial class DataSource<TKey, TDocument, TCreate, TSelect, TUpd
 			_listener = null;
 		}
 
-		_serviceProvider = null!;
+		//_serviceProvider = null!;
 	}
 
 	protected static void DisposeObject(object? @ref)

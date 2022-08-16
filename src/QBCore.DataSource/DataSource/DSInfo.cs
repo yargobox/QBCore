@@ -11,13 +11,20 @@ internal sealed class DSInfo : IDSInfo
 {
 	public string Name { get; }
 
-	public Type Key { get; }
-	public Type Document { get; }
-	public Type CreateDocument { get; }
-	public Type SelectDocument { get; }
-	public Type UpdateDocument { get; }
-	public Type DeleteDocument { get; }
-	public Type RestoreDocument { get; }
+	public Type KeyType { get; }
+	public Type DocumentType { get; }
+	public Type CreateType { get; }
+	public Type SelectType { get; }
+	public Type UpdateType { get; }
+	public Type DeleteType { get; }
+	public Type RestoreType { get; }
+
+	public Lazy<DSDocumentInfo> DocumentInfo { get; }
+	public Lazy<DSDocumentInfo>? CreateInfo { get; }
+	public Lazy<DSDocumentInfo>? SelectInfo { get; }
+	public Lazy<DSDocumentInfo>? UpdateInfo { get; }
+	public Lazy<DSDocumentInfo>? DeleteInfo { get; }
+	public Lazy<DSDocumentInfo>? RestoreInfo { get; }
 
 	public Type DataSourceConcrete { get; }
 	public Type DataSourceInterface { get; }
@@ -50,13 +57,13 @@ internal sealed class DSInfo : IDSInfo
 		// Get document types from a generic interface IDataSource<,,,,,,,>
 		//
 		var types = DataSourceConcrete.GetDataSourceTypes();
-		Key = types.TKey;
-		Document = types.TDocument;
-		CreateDocument = types.TCreate;
-		SelectDocument = types.TSelect;
-		UpdateDocument = types.TUpdate;
-		DeleteDocument = types.TDelete;
-		RestoreDocument = types.TRestore;
+		KeyType = types.TKey;
+		DocumentType = types.TDocument;
+		CreateType = types.TCreate;
+		SelectType = types.TSelect;
+		UpdateType = types.TUpdate;
+		DeleteType = types.TDelete;
+		RestoreType = types.TRestore;
 		DataSourceInterface = DataSourceConcrete.GetInterfaceOf(typeof(IDataSource<,,,,,,>))!;
 
 		// Our building
@@ -129,18 +136,18 @@ internal sealed class DSInfo : IDSInfo
 		Options = building.Options;
 		if ((Options & AllDSOperations) == DataSourceOptions.None)
 		{
-			if (CreateDocument != typeof(NotSupported)) Options |= DataSourceOptions.CanInsert;
-			if (SelectDocument != typeof(NotSupported)) Options |= DataSourceOptions.CanSelect;
-			if (UpdateDocument != typeof(NotSupported)) Options |= DataSourceOptions.CanUpdate;
-			if (DeleteDocument != typeof(NotSupported)) Options |= DataSourceOptions.CanDelete;
-			if (RestoreDocument != typeof(NotSupported)) Options |= DataSourceOptions.CanRestore;
+			if (CreateType != typeof(NotSupported)) Options |= DataSourceOptions.CanInsert;
+			if (SelectType != typeof(NotSupported)) Options |= DataSourceOptions.CanSelect;
+			if (UpdateType != typeof(NotSupported)) Options |= DataSourceOptions.CanUpdate;
+			if (DeleteType != typeof(NotSupported)) Options |= DataSourceOptions.CanDelete;
+			if (RestoreType != typeof(NotSupported)) Options |= DataSourceOptions.CanRestore;
 		}
 		else if (
-			(Options.HasFlag(DataSourceOptions.CanInsert) && CreateDocument == typeof(NotSupported)) ||
-			(Options.HasFlag(DataSourceOptions.CanSelect) && SelectDocument == typeof(NotSupported)) ||
-			(Options.HasFlag(DataSourceOptions.CanUpdate) && UpdateDocument == typeof(NotSupported)) ||
-			(Options.HasFlag(DataSourceOptions.CanDelete) && DeleteDocument == typeof(NotSupported)) ||
-			(Options.HasFlag(DataSourceOptions.CanRestore) && RestoreDocument == typeof(NotSupported)))
+			(Options.HasFlag(DataSourceOptions.CanInsert) && CreateType == typeof(NotSupported)) ||
+			(Options.HasFlag(DataSourceOptions.CanSelect) && SelectType == typeof(NotSupported)) ||
+			(Options.HasFlag(DataSourceOptions.CanUpdate) && UpdateType == typeof(NotSupported)) ||
+			(Options.HasFlag(DataSourceOptions.CanDelete) && DeleteType == typeof(NotSupported)) ||
+			(Options.HasFlag(DataSourceOptions.CanRestore) && RestoreType == typeof(NotSupported)))
 		{
 			throw new InvalidOperationException($"DataSource {DataSourceConcrete.ToPretty()} operation cannot be set on type '{nameof(NotSupported)}'.");
 		}
@@ -248,11 +255,12 @@ internal sealed class DSInfo : IDSInfo
 
 		// Register DataSource's document types, including nested ones.
 		//
-		if (CreateDocument != typeof(NotSupported)) DataSourceDocuments.GetOrRegister(CreateDocument, dataLayer);
-		if (SelectDocument != typeof(NotSupported)) DataSourceDocuments.GetOrRegister(SelectDocument, dataLayer);
-		if (UpdateDocument != typeof(NotSupported)) DataSourceDocuments.GetOrRegister(UpdateDocument, dataLayer);
-		if (DeleteDocument != typeof(NotSupported)) DataSourceDocuments.GetOrRegister(DeleteDocument, dataLayer);
-		if (RestoreDocument != typeof(NotSupported)) DataSourceDocuments.GetOrRegister(RestoreDocument, dataLayer);
+		DocumentInfo = DataSourceDocuments.GetOrRegister(DocumentType, dataLayer);
+		CreateInfo = CreateType != typeof(NotSupported) ? DataSourceDocuments.GetOrRegister(CreateType, dataLayer) : null;
+		SelectInfo = SelectType != typeof(NotSupported) ? DataSourceDocuments.GetOrRegister(SelectType, dataLayer) : null;
+		UpdateInfo = UpdateType != typeof(NotSupported) ? DataSourceDocuments.GetOrRegister(UpdateType, dataLayer) : null;
+		DeleteInfo = DeleteType != typeof(NotSupported) ? DataSourceDocuments.GetOrRegister(DeleteType, dataLayer) : null;
+		RestoreInfo = RestoreType != typeof(NotSupported) ? DataSourceDocuments.GetOrRegister(RestoreType, dataLayer) : null;
 
 		// Create a query builder factory
 		//
@@ -313,13 +321,13 @@ internal sealed class DSInfo : IDSInfo
 		}
 
 		var genericArgs = type.GetGenericArguments();
-		if (Key != genericArgs[0]
-			|| Document != genericArgs[1]
-			|| CreateDocument != genericArgs[2]
-			|| SelectDocument != genericArgs[3]
-			|| UpdateDocument != genericArgs[4]
-			|| DeleteDocument != genericArgs[5]
-			|| RestoreDocument != genericArgs[6])
+		if (KeyType != genericArgs[0]
+			|| DocumentType != genericArgs[1]
+			|| CreateType != genericArgs[2]
+			|| SelectType != genericArgs[3]
+			|| UpdateType != genericArgs[4]
+			|| DeleteType != genericArgs[5]
+			|| RestoreType != genericArgs[6])
 		{
 			throw new InvalidOperationException($"Incompatible datasource listener type {listener.ToPretty()}.");
 		}

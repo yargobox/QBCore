@@ -2,7 +2,7 @@ using Example1.DAL.Entities;
 using Example1.DAL.Entities.Orders;
 using QBCore.Configuration;
 using QBCore.DataSource;
-using QBCore.DataSource.QueryBuilder;
+using QBCore.DataSource.QueryBuilder.Mongo;
 
 namespace Example1.BLL.Services;
 
@@ -30,11 +30,11 @@ public sealed class OrderService : DataSource<int?, Order, OrderCreateDto, Order
 		//builder.RestoreBuilder = RestoreBuilder;
 	}
 
-	static void SoftDelBuilder(IQBSoftDelBuilder<Order, SoftDelDto> qb)
+	static void SoftDelBuilder(IQBMongoSoftDelBuilder<Order, SoftDelDto> qb)
 	{
 		//qb.UpdateTable("orders");
 	}
-	static void RestoreBuilder(IQBRestoreBuilder<Order, SoftDelDto> qb)
+	static void RestoreBuilder(IQBMongoRestoreBuilder<Order, SoftDelDto> qb)
 	{
 		//qb.UpdateTable("orders");
 	}

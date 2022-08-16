@@ -197,7 +197,7 @@ internal class MongoQBFactory : IQueryBuilderFactory
 		{
 			return creator(dataContext);
 		}
-		throw new InvalidOperationException($"DataSource {DataSourceConcrete.ToPretty()} does not have a query builder like {typeof(IQBSoftDelBuilder<TDocument, TDelete>).ToPretty()}.");
+		throw new InvalidOperationException($"DataSource {DataSourceConcrete.ToPretty()} does not have a query builder like {typeof(IDeleteQueryBuilder<TDocument, TDelete>).ToPretty()}.");
 	}
 
 	public IRestoreQueryBuilder<TDocument, TRestore> CreateQBRestore<TDocument, TRestore>(IDataContext dataContext)

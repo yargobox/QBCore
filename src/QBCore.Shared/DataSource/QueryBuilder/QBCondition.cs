@@ -83,9 +83,6 @@ public record QBCondition
 	public Type FieldType => Field.DataEntryType;
 	public Type? RefFieldType => RefField?.DataEntryType;
 
-	public Type FieldDeclaringType => Field.DocumentType;
-	public Type? RefFieldDeclaringType => RefField?.DocumentType;
-
 	public QBCondition(QBConditionInfo conditionInfo)
 		=> ConditionInfo = conditionInfo;
 	public QBCondition(QBConditionFlags flags, string alias, DataEntryPath field, string? refAlias, DataEntryPath? refField, object? value, FO operation)

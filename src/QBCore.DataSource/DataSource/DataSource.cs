@@ -1,3 +1,5 @@
+using AutoMapper;
+using Microsoft.Extensions.DependencyInjection;
 using QBCore.Configuration;
 using QBCore.DataSource.Options;
 using QBCore.Extensions.Threading.Tasks;
@@ -12,8 +14,9 @@ public abstract partial class DataSource<TKey, TDocument, TCreate, TSelect, TUpd
 	IAsyncDisposable,
 	IDisposable
 {
-	private IServiceProvider _serviceProvider;
-	private IDataContext _dataContext;
+	private readonly IServiceProvider _serviceProvider;
+	private readonly IMapper _mapper;
+	private readonly IDataContext _dataContext;
 	protected DataSourceListener<TKey, TDocument, TCreate, TSelect, TUpdate, TDelete, TRestore>? _listener;
 	private object? _syncRoot;
 
@@ -29,7 +32,9 @@ public abstract partial class DataSource<TKey, TDocument, TCreate, TSelect, TUpd
 	public DataSource(IServiceProvider serviceProvider, IDataContextProvider dataContextProvider)
 	{
 		DSInfo = StaticFactory.DataSources[typeof(TDataSource)];
+
 		_serviceProvider = serviceProvider;
+		_mapper = _serviceProvider.GetRequiredService<IMapper>();
 		_dataContext = dataContextProvider.GetContext(DSInfo.QBFactory.DataLayer.DatabaseContextInterface, DSInfo.DataContextName);
 
 		if (DSInfo.ListenerFactory != null)
@@ -52,8 +57,11 @@ public abstract partial class DataSource<TKey, TDocument, TCreate, TSelect, TUpd
 			throw new InvalidOperationException($"DataSource {DSInfo.Name} does not support the insert operation.");
 		}
 
+		var getId = DSInfo.DocumentInfo.Value.IdField?.Getter
+			?? throw new InvalidOperationException($"Document '{DSInfo.DocumentInfo.Value.DocumentType.ToPretty()}' does not have an id field.");
+
 		var qb = DSInfo.QBFactory.CreateQBInsert<TDocument, TCreate>(_dataContext);
-		var builder = qb.InsertBuilder;
+		var builder = qb.Builder;
 
 		object? value;
 		foreach (var param in builder.Parameters)
@@ -70,7 +78,19 @@ public abstract partial class DataSource<TKey, TDocument, TCreate, TSelect, TUpd
 			builder.Normalize();
 		}
 
-		return (TKey) await qb.InsertAsync(document, options, cancellationToken).ConfigureAwait(false);
+		TDocument result;
+		if (typeof(TDocument) != typeof(TCreate))
+		{
+			result = _mapper.Map<TDocument>(document);
+			result = await qb.InsertAsync(result, options, cancellationToken).ConfigureAwait(false);
+		}
+		else
+		{
+			result = (TDocument)(object)document!;
+			result = await qb.InsertAsync(result, options, cancellationToken).ConfigureAwait(false);
+		}
+
+		return (TKey) getId(result!)!;
 	}
 
 	public Task<IEnumerable<KeyValuePair<string, object?>>> AggregateAsync(
@@ -119,22 +139,22 @@ public abstract partial class DataSource<TKey, TDocument, TCreate, TSelect, TUpd
 		}
 
 		var qb = DSInfo.QBFactory.CreateQBSelect<TDocument, TSelect>(_dataContext);
-		var builder = qb.SelectBuilder;
+		var builder = qb.Builder;
 
 		if (DSInfo.Options.HasFlag(DataSourceOptions.SoftDelete))
 		{
-			if (builder.DateDeleteField == null)
+			if (DSInfo.DocumentInfo.Value.DateDeletedField == null)
 			{
-				throw new InvalidOperationException($"Incorrect definition of select query builder '{typeof(TSelect).ToPretty()}': option '{nameof(builder.DateDeleteField)}' is not set.");
+				throw new InvalidOperationException($"Incorrect definition of select query builder '{typeof(TSelect).ToPretty()}': option '{nameof(DSInfo.DocumentInfo.Value.DateDeletedField)}' is not set.");
 			}
 
 			if (mode == SoftDel.Actual)
 			{
-				builder.Condition(builder.DateDeleteField, null, FO.IsNull);
+				builder.Condition(DSInfo.DocumentInfo.Value.DateDeletedField, null, FO.IsNull);
 			}
 			else if (mode == SoftDel.Deleted)
 			{
-				builder.Condition(builder.DateDeleteField, null, FO.IsNotNull);
+				builder.Condition(DSInfo.DocumentInfo.Value.DateDeletedField, null, FO.IsNotNull);
 			}
 		}
 

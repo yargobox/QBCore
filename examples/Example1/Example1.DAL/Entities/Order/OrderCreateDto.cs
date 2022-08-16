@@ -22,8 +22,8 @@ public class OrderCreateDto
 
 	private static void QBBuilder(IQBMongoInsertBuilder<Order, OrderCreateDto> builder)
 	{
-		builder.InsertTo("orders").AutoBindParameters();
+		builder.InsertTo("orders");
 
-		builder.CustomIdGenerator = () => new PesemisticSequentialIdGenerator<Order>(1, 1, 8);
+		builder.IdGenerator = () => new PesemisticSequentialIdGenerator<Order>(1, 1, 8);
 	}
 }

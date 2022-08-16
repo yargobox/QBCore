@@ -3,7 +3,6 @@ using QBCore.DataSource;
 using QBCore.Configuration;
 using Example1.DAL.Entities;
 using QBCore.DataSource.QueryBuilder.Mongo;
-using QBCore.DataSource.QueryBuilder;
 
 namespace Example1.BLL.Services;
 
@@ -13,11 +12,11 @@ public sealed class OrderPositionService : DataSource<int?, OrderPosition, Order
 {
 	public OrderPositionService(IServiceProvider serviceProvider, IDataContextProvider dataContextProvider) : base(serviceProvider, dataContextProvider) { }
 
-	static void SoftDelBuilder(IQBSoftDelBuilder<OrderPosition, SoftDelDto> qb)
+	static void SoftDelBuilder(IQBMongoSoftDelBuilder<OrderPosition, SoftDelDto> qb)
 	{
 		//qb.UpdateTable("order_positions");
 	}
-	static void RestoreBuilder(IQBRestoreBuilder<OrderPosition, SoftDelDto> qb)
+	static void RestoreBuilder(IQBMongoRestoreBuilder<OrderPosition, SoftDelDto> qb)
 	{
 		//qb.UpdateTable("order_positions");
 	}

@@ -49,7 +49,7 @@ internal abstract class QueryBuilder<TDocument, TProjection> : IQueryBuilder<TDo
 
 	#endregion
 
-	public QueryBuilder(IQBBuilder<TDocument, TProjection> builder, IDataContext dataContext)
+	public QueryBuilder(QBBuilder<TDocument, TProjection> builder, IDataContext dataContext)
 	{
 		if (builder == null)
 		{

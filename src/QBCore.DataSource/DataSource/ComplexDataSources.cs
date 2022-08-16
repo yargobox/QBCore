@@ -4,6 +4,8 @@ namespace QBCore.DataSource;
 
 public static class ComplexDataSources
 {
+	public static IFactoryObjectDictionary<Type, ICDSInfo> Collection => StaticFactory.ComplexDataSources;
+
 	public static void Register<TComplexDataSource>()
 		where TComplexDataSource : IComplexDataSource
 		=> ComplexDataSources.Register(StaticFactory.ComplexDataSources, typeof(TComplexDataSource));

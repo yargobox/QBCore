@@ -1,5 +1,5 @@
 using Example1.DAL.Entities.OrderPositions;
-using QBCore.DataSource.QueryBuilder;
+using QBCore.DataSource.QueryBuilder.Mongo;
 
 namespace Example1.DAL.Entities.Orders;
 
@@ -9,7 +9,7 @@ public class OrderUpdateDto
 	public List<OrderPositionSelectDto>? OrderPositions { get; set; }
 	public decimal? Total { get; set; }
 
-	static void Builder(IQBUpdateBuilder<Order, OrderUpdateDto> builder)
+	static void Builder(IQBMongoUpdateBuilder<Order, OrderUpdateDto> builder)
 	{
 		//builder.UpdateTable("orders");
 	}

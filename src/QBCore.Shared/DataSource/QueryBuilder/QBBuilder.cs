@@ -1,10 +1,29 @@
 using System.Linq.Expressions;
-using QBCore.Extensions.Linq;
 using QBCore.ObjectFactory;
 
 namespace QBCore.DataSource.QueryBuilder;
 
-public abstract class QBBuilder<TDoc, TDto>
+public interface IQBBuilder
+{
+	QueryBuilderTypes QueryBuilderType { get; }
+
+	DSDocumentInfo DocumentInfo { get; }
+	DSDocumentInfo? ProjectionInfo { get; }
+
+	IReadOnlyList<QBContainer> Containers { get; }
+	IReadOnlyList<QBCondition> Connects { get; }
+	IReadOnlyList<QBCondition> Conditions { get; }
+	IReadOnlyList<QBField> Fields { get; }
+	IReadOnlyList<QBParameter> Parameters { get; }
+	IReadOnlyList<QBSortOrder> SortOrders { get; }
+	IReadOnlyList<QBAggregation> Aggregations { get; }
+
+	bool IsNormalized { get; }
+
+	void Normalize();
+}
+
+public abstract class QBBuilder<TDoc, TDto> : IQBBuilder
 {
 	protected static class EmptyLists
 	{
@@ -76,6 +95,8 @@ public abstract class QBBuilder<TDoc, TDto>
 	}
 
 	protected virtual void OnNormalize() { }
+
+	public virtual Func<IDSIdGenerator>? IdGenerator { get => throw new NotSupportedException(); set => throw new NotSupportedException(); }
 
 	public virtual QBBuilder<TDoc, TDto>  SelectFrom(string tableName) => throw new NotSupportedException();
 	public virtual QBBuilder<TDoc, TDto>  SelectFrom(string alias, string tableName) => throw new NotSupportedException();

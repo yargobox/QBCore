@@ -10,8 +10,6 @@ internal sealed partial class SelectQueryBuilder<TDocument, TSelect> : QueryBuil
 {
 	public override QueryBuilderTypes QueryBuilderType => QueryBuilderTypes.Select;
 
-	public IQBSelectBuilder<TDocument, TSelect> SelectBuilder => (IQBSelectBuilder<TDocument, TSelect>)Builder;
-
 	public SelectQueryBuilder(QBSelectBuilder<TDocument, TSelect> building, IDataContext dataContext)
 		: base(building, dataContext)
 	{

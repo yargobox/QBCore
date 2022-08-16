@@ -2,7 +2,7 @@ using Example1.DAL.Entities;
 using Example1.DAL.Entities.Brands;
 using QBCore.Configuration;
 using QBCore.DataSource;
-using QBCore.DataSource.QueryBuilder;
+using QBCore.DataSource.QueryBuilder.Mongo;
 
 namespace Example1.BLL.Services;
 
@@ -29,11 +29,11 @@ public sealed class BrandService : DataSource<int?, Brand, BrandCreateDto, Brand
 		//builder.SoftDelBuilder = SoftDelBuilder;
 		//builder.RestoreBuilder = RestoreBuilder;
 	}
-	static void SoftDelBuilder(IQBSoftDelBuilder<Brand, SoftDelDto> qb)
+	static void SoftDelBuilder(IQBMongoSoftDelBuilder<Brand, SoftDelDto> qb)
 	{
 		//qb.UpdateTable("brands");
 	}
-	static void RestoreBuilder(IQBRestoreBuilder<Brand, SoftDelDto> qb)
+	static void RestoreBuilder(IQBMongoRestoreBuilder<Brand, SoftDelDto> qb)
 	{
 		//qb.UpdateTable("brands");
 	}

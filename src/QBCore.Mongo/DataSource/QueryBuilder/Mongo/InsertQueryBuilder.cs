@@ -9,8 +9,6 @@ internal sealed class InsertQueryBuilder<TDocument, TCreate> : QueryBuilder<TDoc
 {
 	public override QueryBuilderTypes QueryBuilderType => QueryBuilderTypes.Insert;
 
-	public IQBInsertBuilder<TDocument, TCreate> InsertBuilder => (IQBInsertBuilder<TDocument, TCreate>)Builder;
-
 	public InsertQueryBuilder(QBInsertBuilder<TDocument, TCreate> building, IDataContext dataContext)
 		: base(building, dataContext)
 	{
@@ -45,11 +43,11 @@ internal sealed class InsertQueryBuilder<TDocument, TCreate> : QueryBuilder<TDoc
 		var insertOneOptions = (InsertOneOptions?)options?.NativeOptions;
 		var clientSessionHandle = (IClientSessionHandle?)options?.NativeClientSession;
 
-		var deId = (MongoDataEntry?)InsertBuilder.DocumentInfo.IdField;
-		var deCreated = (MongoDataEntry?)InsertBuilder.DocumentInfo.DateCreatedField;
-		var deModified = (MongoDataEntry?)InsertBuilder.DocumentInfo.DateModifiedField;
+		var deId = (MongoDataEntry?)Builder.DocumentInfo.IdField;
+		var deCreated = (MongoDataEntry?)Builder.DocumentInfo.DateCreatedField;
+		var deModified = (MongoDataEntry?)Builder.DocumentInfo.DateModifiedField;
 
-		var customIdGenerator = InsertBuilder.CustomIdGenerator != null ? InsertBuilder.CustomIdGenerator() : null;
+		var customIdGenerator = Builder.IdGenerator != null ? Builder.IdGenerator() : null;
 		var generateId = customIdGenerator != null && deId?.Setter != null && customIdGenerator.IsEmpty(deId.Getter(document!));
 		object id;
 		DataSourceIdGeneratorOptions? generatorOptions = null;

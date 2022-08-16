@@ -6,6 +6,7 @@ namespace QBCore.DataSource.QueryBuilder.Mongo;
 internal sealed class QBSelectBuilder<TDoc, TDto> : QBBuilder<TDoc, TDto>, IQBMongoSelectBuilder<TDoc, TDto>
 {
 	public override QueryBuilderTypes QueryBuilderType => QueryBuilderTypes.Select;
+
 	private int _parentheses;
 	private int _sumParentheses;
 	private bool? _isByOr;

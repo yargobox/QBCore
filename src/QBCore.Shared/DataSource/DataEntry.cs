@@ -153,7 +153,7 @@ public abstract class DataEntry : IComparable<DataEntry>, IEquatable<DataEntry>
 			throw new ArgumentException($"The lambda expression parameter must be of type '{documentType.ToPretty()}' or vice versa.", nameof(memberSelector));
 		}
 
-		return DataSourceDocuments.GetOrRegister(documentType, dataLayer).DataEntries.GetValueOrDefault(memberInfos[0].Name);
+		return DataSourceDocuments.GetOrRegister(documentType, dataLayer).Value.DataEntries.GetValueOrDefault(memberInfos[0].Name);
 	}
 
 	public static DataEntry GetDataEntry(MemberInfo memberInfo, IDataLayerInfo dataLayer)
@@ -166,7 +166,7 @@ public abstract class DataEntry : IComparable<DataEntry>, IEquatable<DataEntry>
 	{
 		var documentType = memberInfo.GetPropertyOrFieldDeclaringType();
 		var documentInfo = DataSourceDocuments.GetOrRegister(documentType, dataLayer);
-		return documentInfo.DataEntries.GetValueOrDefault(memberInfo.Name);
+		return documentInfo.Value.DataEntries.GetValueOrDefault(memberInfo.Name);
 	}
 
 	public static DataEntry GetDataEntry<TDocument>(string propertyOrFieldName, IDataLayerInfo dataLayer)
@@ -201,6 +201,6 @@ public abstract class DataEntry : IComparable<DataEntry>, IEquatable<DataEntry>
 		}
 
 		var documentInfo = DataSourceDocuments.GetOrRegister(documentType, dataLayer);
-		return documentInfo.DataEntries.GetValueOrDefault(propertyOrFieldName);
+		return documentInfo.Value.DataEntries.GetValueOrDefault(propertyOrFieldName);
 	}
 }

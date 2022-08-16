@@ -1,4 +1,4 @@
-using QBCore.DataSource.QueryBuilder;
+using QBCore.DataSource.QueryBuilder.Mongo;
 
 namespace Example1.DAL.Entities.OrderPositions;
 
@@ -8,7 +8,7 @@ public class OrderPositionUpdateDto
 	public int? ProductId { get; set; }
 	public decimal? Quantity { get; set; }
 
-	private static void Builder(IQBUpdateBuilder<OrderPosition, OrderPositionUpdateDto> builder)
+	private static void Builder(IQBMongoUpdateBuilder<OrderPosition, OrderPositionUpdateDto> builder)
 	{
 		//builder.UpdateTable("order_positions");
 	}

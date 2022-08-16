@@ -4,6 +4,8 @@ namespace QBCore.DataSource;
 
 public static class DataSources
 {
+	public static IFactoryObjectDictionary<Type, IDSInfo> Collection => StaticFactory.DataSources;
+
 	public static void Register<TDataSource>()
 		where TDataSource : IDataSource
 		=> DataSources.Register(StaticFactory.DataSources, typeof(TDataSource));
