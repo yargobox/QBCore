@@ -223,9 +223,9 @@ internal sealed class QBSelectBuilder<TDoc, TDto> : QBBuilder<TDoc, TDto>, IQBMo
 			_connects.Add(new QBCondition(
 				flags: flags,
 				alias: alias,
-				field: new MongoDataEntryPath(field, false),
+				field: new DataEntryPath(field, false, MongoDataLayer.Default),
 				refAlias: refAlias,
-				refField: refField != null ? new MongoDataEntryPath(refField, true) : null,
+				refField: refField != null ? new DataEntryPath(refField, true, MongoDataLayer.Default) : null,
 				value: onWhat == QBConditionFlags.OnParam ? paramName : onWhat == QBConditionFlags.OnConst ? constValue : null,
 				operation: operation
 			));
@@ -350,9 +350,9 @@ internal sealed class QBSelectBuilder<TDoc, TDto> : QBBuilder<TDoc, TDto>, IQBMo
 			_conditions.Add(new QBCondition(
 				flags: flags,
 				alias: alias,
-				field: new MongoDataEntryPath(field, false),
+				field: new DataEntryPath(field, false, MongoDataLayer.Default),
 				refAlias: refAlias,
-				refField: refField != null ? new MongoDataEntryPath(refField, true) : null,
+				refField: refField != null ? new DataEntryPath(refField, true, MongoDataLayer.Default) : null,
 				value: onWhat == QBConditionFlags.OnParam ? paramName : onWhat == QBConditionFlags.OnConst ? constValue : null,
 				operation: operation
 			) { Parentheses = _parentheses });
@@ -428,13 +428,13 @@ internal sealed class QBSelectBuilder<TDoc, TDto> : QBBuilder<TDoc, TDto>, IQBMo
 			_fields = new List<QBField>(8);
 		}
 
-		var fieldPath = new MongoDataEntryPath(field, false);
+		var fieldPath = new DataEntryPath(field, false, MongoDataLayer.Default);
 		if (_fields.Any(x => x.Field.FullName == fieldPath.FullName))
 		{
 			throw new InvalidOperationException($"Incorrect field definition of select query builder '{typeof(TDto).ToPretty()}': field {fieldPath.FullName} has already been included/excluded before.");
 		}
 
-		var refFieldPath = new MongoDataEntryPath(refField, true);
+		var refFieldPath = new DataEntryPath(refField, true, MongoDataLayer.Default);
 
 		IsNormalized = false;
 		_fields.Add(new QBField(
@@ -463,7 +463,7 @@ internal sealed class QBSelectBuilder<TDoc, TDto> : QBBuilder<TDoc, TDto>, IQBMo
 			_fields = new List<QBField>(8);
 		}
 
-		var fieldPath = new MongoDataEntryPath(field, false);
+		var fieldPath = new DataEntryPath(field, false, MongoDataLayer.Default);
 		if (_fields.Any(x => x.Field.FullName == fieldPath.FullName))
 		{
 			throw new InvalidOperationException($"Incorrect field definition of select query builder '{typeof(TDto).ToPretty()}': field '{fieldPath.FullName}' has already been included/excluded before.");

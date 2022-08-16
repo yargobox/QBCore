@@ -98,41 +98,42 @@ public abstract class QBBuilder<TDoc, TDto> : IQBBuilder
 
 	public virtual Func<IDSIdGenerator>? IdGenerator { get => throw new NotSupportedException(); set => throw new NotSupportedException(); }
 
-	public virtual QBBuilder<TDoc, TDto>  SelectFrom(string tableName) => throw new NotSupportedException();
-	public virtual QBBuilder<TDoc, TDto>  SelectFrom(string alias, string tableName) => throw new NotSupportedException();
+	public virtual QBBuilder<TDoc, TDto> SelectFrom(string tableName) => throw new NotSupportedException();
+	public virtual QBBuilder<TDoc, TDto> SelectFrom(string alias, string tableName) => throw new NotSupportedException();
 
-	public virtual QBBuilder<TDoc, TDto>  InsertTo(string tableName) => throw new NotSupportedException();
+	public virtual QBBuilder<TDoc, TDto> InsertTo(string tableName) => throw new NotSupportedException();
 
-	public virtual QBBuilder<TDoc, TDto>  LeftJoin<TRef>(string tableName) => throw new NotSupportedException();
-	public virtual QBBuilder<TDoc, TDto>  LeftJoin<TRef>(string alias, string tableName) => throw new NotSupportedException();
-	public virtual QBBuilder<TDoc, TDto>  Join<TRef>(string tableName) => throw new NotSupportedException();
-	public virtual QBBuilder<TDoc, TDto>  Join<TRef>(string alias, string tableName) => throw new NotSupportedException();
-	public virtual QBBuilder<TDoc, TDto>  CrossJoin<TRef>(string tableName) => throw new NotSupportedException();
-	public virtual QBBuilder<TDoc, TDto>  CrossJoin<TRef>(string alias, string tableName) => throw new NotSupportedException();
+	public virtual QBBuilder<TDoc, TDto> LeftJoin<TRef>(string tableName) => throw new NotSupportedException();
+	public virtual QBBuilder<TDoc, TDto> LeftJoin<TRef>(string alias, string tableName) => throw new NotSupportedException();
+	public virtual QBBuilder<TDoc, TDto> Join<TRef>(string tableName) => throw new NotSupportedException();
+	public virtual QBBuilder<TDoc, TDto> Join<TRef>(string alias, string tableName) => throw new NotSupportedException();
+	public virtual QBBuilder<TDoc, TDto> CrossJoin<TRef>(string tableName) => throw new NotSupportedException();
+	public virtual QBBuilder<TDoc, TDto> CrossJoin<TRef>(string alias, string tableName) => throw new NotSupportedException();
 
-	public virtual QBBuilder<TDoc, TDto>  Connect<TLocal, TRef>(Expression<Func<TLocal, object?>> field, Expression<Func<TRef, object?>> refField, FO operation) => throw new NotSupportedException();
-	public virtual QBBuilder<TDoc, TDto>  Connect<TLocal, TRef>(string alias, Expression<Func<TLocal, object?>> field, string refAlias, Expression<Func<TRef, object?>> refField, FO operation) => throw new NotSupportedException();
-	public virtual QBBuilder<TDoc, TDto>  Connect<TLocal>(Expression<Func<TLocal, object?>> field, object? constValue, FO operation) => throw new NotSupportedException();
-	public virtual QBBuilder<TDoc, TDto>  Connect<TLocal>(string alias, Expression<Func<TLocal, object?>> field, object? constValue, FO operation) => throw new NotSupportedException();
-	public virtual QBBuilder<TDoc, TDto>  Connect<TLocal>(Expression<Func<TLocal, object?>> field, FO operation, string paramName) => throw new NotSupportedException();
-	public virtual QBBuilder<TDoc, TDto>  Connect<TLocal>(string alias, Expression<Func<TLocal, object?>> field, FO operation, string paramName) => throw new NotSupportedException();
+	public virtual QBBuilder<TDoc, TDto> Connect<TLocal, TRef>(Expression<Func<TLocal, object?>> field, Expression<Func<TRef, object?>> refField, FO operation) => throw new NotSupportedException();
+	public virtual QBBuilder<TDoc, TDto> Connect<TLocal, TRef>(string alias, Expression<Func<TLocal, object?>> field, string refAlias, Expression<Func<TRef, object?>> refField, FO operation) => throw new NotSupportedException();
+	public virtual QBBuilder<TDoc, TDto> Connect<TLocal>(Expression<Func<TLocal, object?>> field, object? constValue, FO operation) => throw new NotSupportedException();
+	public virtual QBBuilder<TDoc, TDto> Connect<TLocal>(string alias, Expression<Func<TLocal, object?>> field, object? constValue, FO operation) => throw new NotSupportedException();
+	public virtual QBBuilder<TDoc, TDto> Connect<TLocal>(Expression<Func<TLocal, object?>> field, FO operation, string paramName) => throw new NotSupportedException();
+	public virtual QBBuilder<TDoc, TDto> Connect<TLocal>(string alias, Expression<Func<TLocal, object?>> field, FO operation, string paramName) => throw new NotSupportedException();
 
-	public virtual QBBuilder<TDoc, TDto>  Condition<TLocal, TRef>(Expression<Func<TLocal, object?>> field, Expression<Func<TRef, object?>> refField, FO operation) => throw new NotSupportedException();
-	public virtual QBBuilder<TDoc, TDto>  Condition<TLocal, TRef>(string alias, Expression<Func<TLocal, object?>> field, string refAlias, Expression<Func<TRef, object?>> refField, FO operation) => throw new NotSupportedException();
-	public virtual QBBuilder<TDoc, TDto>  Condition<TLocal>(Expression<Func<TLocal, object?>> field, object? constValue, FO operation) => throw new NotSupportedException();
-	public virtual QBBuilder<TDoc, TDto>  Condition<TLocal>(string alias, Expression<Func<TLocal, object?>> field, object? constValue, FO operation) => throw new NotSupportedException();
-	public virtual QBBuilder<TDoc, TDto>  Condition<TLocal>(Expression<Func<TLocal, object?>> field, FO operation, string paramName) => throw new NotSupportedException();
-	public virtual QBBuilder<TDoc, TDto>  Condition<TLocal>(string alias, Expression<Func<TLocal, object?>> field, FO operation, string paramName) => throw new NotSupportedException();
-	public virtual QBBuilder<TDoc, TDto>  Condition(Expression<Func<TDoc, object?>> field, object? constValue, FO operation) => throw new NotSupportedException();
-	public virtual QBBuilder<TDoc, TDto>  Condition(Expression<Func<TDoc, object?>> field, FO operation, string paramName) => throw new NotSupportedException();
+	public virtual QBBuilder<TDoc, TDto> Condition<TLocal, TRef>(Expression<Func<TLocal, object?>> field, Expression<Func<TRef, object?>> refField, FO operation) => throw new NotSupportedException();
+	public virtual QBBuilder<TDoc, TDto> Condition<TLocal, TRef>(string alias, Expression<Func<TLocal, object?>> field, string refAlias, Expression<Func<TRef, object?>> refField, FO operation) => throw new NotSupportedException();
+	public virtual QBBuilder<TDoc, TDto> Condition<TLocal>(Expression<Func<TLocal, object?>> field, object? constValue, FO operation) => throw new NotSupportedException();
+	public virtual QBBuilder<TDoc, TDto> Condition<TLocal>(string alias, Expression<Func<TLocal, object?>> field, object? constValue, FO operation) => throw new NotSupportedException();
+	public virtual QBBuilder<TDoc, TDto> Condition<TLocal>(Expression<Func<TLocal, object?>> field, FO operation, string paramName) => throw new NotSupportedException();
+	public virtual QBBuilder<TDoc, TDto> Condition<TLocal>(string alias, Expression<Func<TLocal, object?>> field, FO operation, string paramName) => throw new NotSupportedException();
+	public virtual QBBuilder<TDoc, TDto> Condition(Expression<Func<TDoc, object?>> field, object? constValue, FO operation) => throw new NotSupportedException();
+	//public virtual QBBuilder<TDoc, TDto> Condition(DEDefinition<TDoc> field, object? constValue, FO operation) => throw new NotSupportedException();
+	public virtual QBBuilder<TDoc, TDto> Condition(Expression<Func<TDoc, object?>> field, FO operation, string paramName) => throw new NotSupportedException();
 
-	public virtual QBBuilder<TDoc, TDto>  Begin() => throw new NotSupportedException();
-	public virtual QBBuilder<TDoc, TDto>  End() => throw new NotSupportedException();
-	public virtual QBBuilder<TDoc, TDto>  And() => throw new NotSupportedException();
-	public virtual QBBuilder<TDoc, TDto>  Or() => throw new NotSupportedException();
+	public virtual QBBuilder<TDoc, TDto> Begin() => throw new NotSupportedException();
+	public virtual QBBuilder<TDoc, TDto> End() => throw new NotSupportedException();
+	public virtual QBBuilder<TDoc, TDto> And() => throw new NotSupportedException();
+	public virtual QBBuilder<TDoc, TDto> Or() => throw new NotSupportedException();
 
-	public virtual QBBuilder<TDoc, TDto>  Include<TRef>(Expression<Func<TDto, object?>> field, Expression<Func<TRef, object?>> refField) => throw new NotSupportedException();
-	public virtual QBBuilder<TDoc, TDto>  Include<TRef>(Expression<Func<TDto, object?>> field, string refAlias, Expression<Func<TRef, object?>> refField) => throw new NotSupportedException();
-	public virtual QBBuilder<TDoc, TDto>  Exclude(Expression<Func<TDto, object?>> field) => throw new NotSupportedException();
-	public virtual QBBuilder<TDoc, TDto>  Optional(Expression<Func<TDto, object?>> field) => throw new NotSupportedException();
+	public virtual QBBuilder<TDoc, TDto> Include<TRef>(Expression<Func<TDto, object?>> field, Expression<Func<TRef, object?>> refField) => throw new NotSupportedException();
+	public virtual QBBuilder<TDoc, TDto> Include<TRef>(Expression<Func<TDto, object?>> field, string refAlias, Expression<Func<TRef, object?>> refField) => throw new NotSupportedException();
+	public virtual QBBuilder<TDoc, TDto> Exclude(Expression<Func<TDto, object?>> field) => throw new NotSupportedException();
+	public virtual QBBuilder<TDoc, TDto> Optional(Expression<Func<TDto, object?>> field) => throw new NotSupportedException();
 }
