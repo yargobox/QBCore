@@ -53,11 +53,11 @@ public class DataSourceControllerRouteConvention : IControllerModelConvention
 		}
 	}
 
-	public virtual void ApplyToAutoDataSourceController(ControllerModel controller, IDSDefinition definition)
+	public virtual void ApplyToAutoDataSourceController(ControllerModel controller, IDSInfo definition)
 	{
 		if (string.IsNullOrEmpty(definition.ControllerName))
 		{
-			throw new InvalidOperationException($"No controller name was specified for data source '{definition.Name}'.");
+			throw new InvalidOperationException($"No controller name was specified for datasource '{definition.Name}'.");
 		}
 
 		controller.ControllerName = definition.ControllerName;
@@ -74,7 +74,7 @@ public class DataSourceControllerRouteConvention : IControllerModelConvention
 		}
 	}
 
-	protected virtual void ApplyToCustomDataSourceController(ControllerModel controller, IDSDefinition definition)
+	protected virtual void ApplyToCustomDataSourceController(ControllerModel controller, IDSInfo definition)
 	{
 		if (!string.IsNullOrEmpty(definition?.ControllerName))
 		{

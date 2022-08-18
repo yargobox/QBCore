@@ -27,12 +27,6 @@ public sealed class MongoDbContext : IMongoDbContext, IDisposable
 		_DB = client.GetDatabase(MongoDbSettings.Catalog);
 	}
 
-	static MongoDbContext()
-	{
-		var conventionPack = new ConventionPack { new CamelCaseElementNameConvention() };
-		ConventionRegistry.Register("camelCase", conventionPack, _ => true);
-	}
-
 	public void Dispose()
 	{
 		if (_DB is IDisposable dispose)

@@ -3,21 +3,20 @@ using QBCore.DataSource;
 using QBCore.Configuration;
 using Example1.DAL.Entities;
 using QBCore.DataSource.QueryBuilder.Mongo;
-using QBCore.DataSource.QueryBuilder;
 
 namespace Example1.BLL.Services;
 
 [DsApiController]
-[DataSource("product", typeof(MongoQBFactory), DataSourceOptions.SoftDelete)]
+[DataSource("product", typeof(MongoDataLayer), DataSourceOptions.SoftDelete)]
 public sealed class ProductService : DataSource<int?, Product, ProductCreateDto, ProductSelectDto, ProductUpdateDto, SoftDelDto, SoftDelDto, OrderService>
 {
 	public ProductService(IServiceProvider serviceProvider, IDataContextProvider dataContextProvider) : base(serviceProvider, dataContextProvider) { }
 
-	static void SoftDelBuilder(IQBSoftDelBuilder<Product, SoftDelDto> qb)
+	static void SoftDelBuilder(IQBMongoSoftDelBuilder<Product, SoftDelDto> qb)
 	{
 		//qb.UpdateTable("products");
 	}
-	static void RestoreBuilder(IQBRestoreBuilder<Product, SoftDelDto> qb)
+	static void RestoreBuilder(IQBMongoRestoreBuilder<Product, SoftDelDto> qb)
 	{
 		//qb.UpdateTable("products");
 	}

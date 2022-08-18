@@ -24,8 +24,14 @@ internal class FactoryObjectRegistry<TKey, TInterface> : IFactoryObjectRegistry<
 			throw new InvalidOperationException($"{key.ToString()} is already registered.");
 		}
 	}
+
 	public bool TryRegisterObject(TKey key, TInterface value)
 	{
 		return _registry.TryAdd(key, value);
+	}
+
+	public TInterface TryGetOrRegisterObject(TKey key, Func<TKey, TInterface> factoryMethod)
+	{
+		return _registry.GetOrAdd(key, factoryMethod);
 	}
 }

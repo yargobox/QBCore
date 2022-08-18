@@ -18,11 +18,11 @@ public record QBConditionInfo
 	public readonly QBConditionFlags Flags;
 
 	public readonly string Alias;
-	public readonly FieldPath Field;
+	public readonly DEPath Field;
 	public readonly Type FieldUnderlyingType;
 
 	public readonly string? RefAlias;
-	public readonly FieldPath? RefField;
+	public readonly DEPath? RefField;
 	public readonly Type? RefFieldUnderlyingType;
 
 	public readonly object? Value;
@@ -31,9 +31,9 @@ public record QBConditionInfo
 	public QBConditionInfo(
 		QBConditionFlags flags,
 		string alias,
-		FieldPath field,
+		DEPath field,
 		string? refAlias,
-		FieldPath? refField,
+		DEPath? refField,
 		object? value,
 		FO operation)
 	{
@@ -45,8 +45,8 @@ public record QBConditionInfo
 		Value = value;
 		Operation = operation;
 
-		FieldUnderlyingType = Field.FieldType.GetUnderlyingSystemType();
-		RefFieldUnderlyingType = RefField?.FieldType.GetUnderlyingSystemType();
+		FieldUnderlyingType = Field.DataEntryType.GetUnderlyingSystemType();
+		RefFieldUnderlyingType = RefField?.DataEntryType.GetUnderlyingSystemType();
 	}
 }
 
@@ -57,11 +57,11 @@ public record QBCondition
 	public int Parentheses;
 
 	public string Alias => ConditionInfo.Alias;
-	public FieldPath Field => ConditionInfo.Field;
+	public DEPath Field => ConditionInfo.Field;
 	public Type FieldUnderlyingType => ConditionInfo.FieldUnderlyingType;
 
 	public string? RefAlias => ConditionInfo.RefAlias;
-	public FieldPath? RefField => ConditionInfo.RefField;
+	public DEPath? RefField => ConditionInfo.RefField;
 	public Type? RefFieldUnderlyingType => ConditionInfo.RefFieldUnderlyingType;
 
 	public object? Value => ConditionInfo.Value;
@@ -77,18 +77,15 @@ public record QBCondition
 	public bool IsFieldNullable => Field.IsNullable;
 	public bool? IsRefFieldNullable => RefField?.IsNullable;
 
-	public string FieldPath => Field.FullName;
-	public string? RefFieldPath => RefField?.FullName;
+	public string FieldPath => Field.Path;
+	public string? RefFieldPath => RefField?.Path;
 
-	public Type FieldType => Field.FieldType;
-	public Type? RefFieldType => RefField?.FieldType;
-
-	public Type FieldDeclaringType => Field.DeclaringType;
-	public Type? RefFieldDeclaringType => RefField?.DeclaringType;
+	public Type FieldType => Field.DataEntryType;
+	public Type? RefFieldType => RefField?.DataEntryType;
 
 	public QBCondition(QBConditionInfo conditionInfo)
 		=> ConditionInfo = conditionInfo;
-	public QBCondition(QBConditionFlags flags, string alias, FieldPath field, string? refAlias, FieldPath? refField, object? value, FO operation)
+	public QBCondition(QBConditionFlags flags, string alias, DEPath field, string? refAlias, DEPath? refField, object? value, FO operation)
 		=> ConditionInfo = new QBConditionInfo(flags, alias, field, refAlias, refField, value, operation);
 
 	protected string DebuggerDisplay
@@ -96,8 +93,8 @@ public record QBCondition
 		get
 		{
 			var s = RefAlias != null
-				? string.Format("{0}:{1} {2} {3}:{4}", Alias, Field.FullName, Operation.ToString(), RefAlias, RefField?.FullName)
-				: string.Format("{0}:{1} {2} {3}", Alias, Field.FullName, Operation.ToString(), Value?.ToString());
+				? string.Format("{0}:{1} {2} {3}:{4}", Alias, Field.Path, Operation.ToString(), RefAlias, RefField?.Path)
+				: string.Format("{0}:{1} {2} {3}", Alias, Field.Path, Operation.ToString(), Value?.ToString());
 
 			if (IsByOr)
 			{

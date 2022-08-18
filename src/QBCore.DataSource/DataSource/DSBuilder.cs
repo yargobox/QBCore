@@ -10,7 +10,7 @@ internal sealed class DSBuilder : IDSBuilder
 		set
 		{
 			if (_name != null)
-				throw new InvalidOperationException($"Datasource '{ConcreteType.ToPretty()}' builder option '{nameof(Name)}' is already set.");
+				throw new InvalidOperationException($"DataSource '{ConcreteType.ToPretty()}' builder option '{nameof(Name)}' is already set.");
 			_name = value;
 		}
 	}
@@ -19,12 +19,12 @@ internal sealed class DSBuilder : IDSBuilder
 		get => _options;
 		set {
 			if (_options != DataSourceOptions.None && !value.HasFlag(_options))
-				throw new InvalidOperationException($"Datasource '{ConcreteType.ToPretty()}' builder option '{nameof(Options)}' is already set.");
+				throw new InvalidOperationException($"DataSource '{ConcreteType.ToPretty()}' builder option '{nameof(Options)}' is already set.");
 		
-			var operationsBefore = _options & DSDefinition.AllDSOperations;
-			var operationsAfter = value & DSDefinition.AllDSOperations;
+			var operationsBefore = _options & DSInfo.AllDSOperations;
+			var operationsAfter = value & DSInfo.AllDSOperations;
 			if (operationsBefore != DataSourceOptions.None && operationsAfter != DataSourceOptions.None && operationsBefore != operationsAfter)
-				throw new InvalidOperationException($"Datasource '{ConcreteType.ToPretty()}' builder option '{nameof(Options)}' is already set. Datasource operations can only be specified once.");
+				throw new InvalidOperationException($"DataSource '{ConcreteType.ToPretty()}' builder option '{nameof(Options)}' is already set. DataSource operations can only be specified once.");
 
 			_options = value;
 		}
@@ -35,7 +35,7 @@ internal sealed class DSBuilder : IDSBuilder
 		set
 		{
 			if (_listener != null)
-				throw new InvalidOperationException($"Datasource '{ConcreteType.ToPretty()}' builder option '{nameof(Listener)}' is already set.");
+				throw new InvalidOperationException($"DataSource '{ConcreteType.ToPretty()}' builder option '{nameof(Listener)}' is already set.");
 			_listener = value;
 		}
 	}
@@ -46,7 +46,7 @@ internal sealed class DSBuilder : IDSBuilder
 		set
 		{
 			if (_serviceInterface != null)
-				throw new InvalidOperationException($"Datasource '{ConcreteType.ToPretty()}' builder option '{nameof(ServiceInterface)}' is already set.");
+				throw new InvalidOperationException($"DataSource '{ConcreteType.ToPretty()}' builder option '{nameof(ServiceInterface)}' is already set.");
 			_serviceInterface = value;
 		}
 	}
@@ -56,7 +56,7 @@ internal sealed class DSBuilder : IDSBuilder
 		set
 		{
 			if (_isServiceSingleton != null)
-				throw new InvalidOperationException($"Datasource '{ConcreteType.ToPretty()}' builder option '{nameof(IsServiceSingleton)}' is already set.");
+				throw new InvalidOperationException($"DataSource '{ConcreteType.ToPretty()}' builder option '{nameof(IsServiceSingleton)}' is already set.");
 			_isServiceSingleton = value;
 		}
 	}
@@ -67,7 +67,7 @@ internal sealed class DSBuilder : IDSBuilder
 		set
 		{
 			if (_isAutoController != null)
-				throw new InvalidOperationException($"Datasource '{ConcreteType.ToPretty()}' builder option '{nameof(IsAutoController)}' is already set.");
+				throw new InvalidOperationException($"DataSource '{ConcreteType.ToPretty()}' builder option '{nameof(IsAutoController)}' is already set.");
 			_isAutoController = value;
 		}
 	}
@@ -77,7 +77,7 @@ internal sealed class DSBuilder : IDSBuilder
 		set
 		{
 			if (_controllerName != null)
-				throw new InvalidOperationException($"Datasource '{ConcreteType.ToPretty()}' builder option '{nameof(ControllerName)}' is already set.");
+				throw new InvalidOperationException($"DataSource '{ConcreteType.ToPretty()}' builder option '{nameof(ControllerName)}' is already set.");
 			_controllerName = value;
 		}
 	}
@@ -88,19 +88,19 @@ internal sealed class DSBuilder : IDSBuilder
 		set
 		{
 			if (_dataContextName != null)
-				throw new InvalidOperationException($"Datasource '{ConcreteType.ToPretty()}' builder option '{nameof(DataContextName)}' is already set.");
+				throw new InvalidOperationException($"DataSource '{ConcreteType.ToPretty()}' builder option '{nameof(DataContextName)}' is already set.");
 			_dataContextName = value;
 		}
 	}
 
-	public Type? QBFactory
+	public Type? DataLayer
 	{
-		get => _qbFactory;
+		get => _dataLayer;
 		set
 		{
-			if (_qbFactory != null)
-				throw new InvalidOperationException($"Datasource '{ConcreteType.ToPretty()}' builder option '{nameof(QBFactory)}' is already set.");
-			_qbFactory = value;
+			if (_dataLayer != null)
+				throw new InvalidOperationException($"DataSource '{ConcreteType.ToPretty()}' builder option '{nameof(DataLayer)}' is already set.");
+			_dataLayer = value;
 		}
 	}
 
@@ -110,7 +110,7 @@ internal sealed class DSBuilder : IDSBuilder
 		set
 		{
 			if (_insertBuilder != null)
-				throw new InvalidOperationException($"Datasource '{ConcreteType.ToPretty()}' builder option '{nameof(InsertBuilder)}' is already set.");
+				throw new InvalidOperationException($"DataSource '{ConcreteType.ToPretty()}' builder option '{nameof(InsertBuilder)}' is already set.");
 			_insertBuilder = value;
 		}
 	}
@@ -121,7 +121,7 @@ internal sealed class DSBuilder : IDSBuilder
 		set
 		{
 			if (_selectBuilder != null)
-				throw new InvalidOperationException($"Datasource '{ConcreteType.ToPretty()}' builder option '{nameof(SelectBuilder)}' is already set.");
+				throw new InvalidOperationException($"DataSource '{ConcreteType.ToPretty()}' builder option '{nameof(SelectBuilder)}' is already set.");
 			_selectBuilder = value;
 		}
 	}
@@ -132,7 +132,7 @@ internal sealed class DSBuilder : IDSBuilder
 		set
 		{
 			if (_updateBuilder != null)
-				throw new InvalidOperationException($"Datasource '{ConcreteType.ToPretty()}' builder option '{nameof(UpdateBuilder)}' is already set.");
+				throw new InvalidOperationException($"DataSource '{ConcreteType.ToPretty()}' builder option '{nameof(UpdateBuilder)}' is already set.");
 			_updateBuilder = value;
 		}
 	}
@@ -143,7 +143,7 @@ internal sealed class DSBuilder : IDSBuilder
 		set
 		{
 			if (_deleteBuilder != null)
-				throw new InvalidOperationException($"Datasource '{ConcreteType.ToPretty()}' builder option '{nameof(DeleteBuilder)}' is already set.");
+				throw new InvalidOperationException($"DataSource '{ConcreteType.ToPretty()}' builder option '{nameof(DeleteBuilder)}' is already set.");
 			_deleteBuilder = value;
 		}
 	}
@@ -154,7 +154,7 @@ internal sealed class DSBuilder : IDSBuilder
 		set
 		{
 			if (_softDelBuilder != null)
-				throw new InvalidOperationException($"Datasource '{ConcreteType.ToPretty()}' builder option '{nameof(SoftDelBuilder)}' is already set.");
+				throw new InvalidOperationException($"DataSource '{ConcreteType.ToPretty()}' builder option '{nameof(SoftDelBuilder)}' is already set.");
 			_softDelBuilder = value;
 		}
 	}
@@ -165,7 +165,7 @@ internal sealed class DSBuilder : IDSBuilder
 		set
 		{
 			if (_restoreBuilder != null)
-				throw new InvalidOperationException($"Datasource '{ConcreteType.ToPretty()}' builder option '{nameof(RestoreBuilder)}' is already set.");
+				throw new InvalidOperationException($"DataSource '{ConcreteType.ToPretty()}' builder option '{nameof(RestoreBuilder)}' is already set.");
 			_restoreBuilder = value;
 		}
 	}
@@ -182,7 +182,7 @@ internal sealed class DSBuilder : IDSBuilder
 
 	private string? _dataContextName;
 
-	private Type? _qbFactory;
+	private Type? _dataLayer;
 	private Delegate? _insertBuilder;
 	private Delegate? _selectBuilder;
 	private Delegate? _updateBuilder;

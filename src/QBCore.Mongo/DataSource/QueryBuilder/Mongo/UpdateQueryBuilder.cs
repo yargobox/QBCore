@@ -1,6 +1,5 @@
 using QBCore.Configuration;
 using QBCore.DataSource.Options;
-using QBCore.ObjectFactory;
 
 namespace QBCore.DataSource.QueryBuilder.Mongo;
 
@@ -8,9 +7,7 @@ internal sealed class UpdateQueryBuilder<TDocument, TUpdate> : QueryBuilder<TDoc
 {
 	public override QueryBuilderTypes QueryBuilderType => QueryBuilderTypes.Update;
 
-	public override Origin Source => new Origin(this.GetType());
-
-	public UpdateQueryBuilder(QBBuilder<TDocument, TUpdate> building, IDataContext dataContext)
+	public UpdateQueryBuilder(QBUpdateBuilder<TDocument, TUpdate> building, IDataContext dataContext)
 		: base(building, dataContext)
 	{
 	}

@@ -64,11 +64,11 @@ internal sealed class CDSNode : ICDSNode
 
 		if (!dataSourceConcreteType.IsClass || dataSourceConcreteType.IsAbstract)
 		{
-			throw new InvalidOperationException($"Invalid data source type {dataSourceConcreteType.ToPretty()}.");
+			throw new InvalidOperationException($"Invalid datasource type {dataSourceConcreteType.ToPretty()}.");
 		}
 		if (dataSourceConcreteType.GetInterfaceOf(typeof(IDataSource<,,,,,,>)) == null)
 		{
-			throw new InvalidOperationException($"Invalid data source type {dataSourceConcreteType.ToPretty()}.");
+			throw new InvalidOperationException($"Invalid datasource type {dataSourceConcreteType.ToPretty()}.");
 		}
 
 		var node = new CDSNode(_collection, dataSourceConcreteType, name, Name != _rootName ? this : null);

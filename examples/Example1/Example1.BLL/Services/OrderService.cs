@@ -2,13 +2,12 @@ using Example1.DAL.Entities;
 using Example1.DAL.Entities.Orders;
 using QBCore.Configuration;
 using QBCore.DataSource;
-using QBCore.DataSource.QueryBuilder;
 using QBCore.DataSource.QueryBuilder.Mongo;
 
 namespace Example1.BLL.Services;
 
 [DsApiController]
-[DataSource("order", typeof(MongoQBFactory), DataSourceOptions.SoftDelete)]
+[DataSource("order", typeof(MongoDataLayer), DataSourceOptions.SoftDelete)]
 public sealed class OrderService : DataSource<int?, Order, OrderCreateDto, OrderSelectDto, OrderUpdateDto, SoftDelDto, SoftDelDto, OrderService>
 {
 	public OrderService(IServiceProvider serviceProvider, IDataContextProvider dataContextProvider) : base(serviceProvider, dataContextProvider) { }
@@ -18,7 +17,7 @@ public sealed class OrderService : DataSource<int?, Order, OrderCreateDto, Order
 		//builder.Name = "[DS]";
 		//builder.Options |= DataSourceOptions.SoftDelete | DataSourceOptions.CanInsert | DataSourceOptions.CanSelect;
 		//builder.DataContextName = "default";
-		//builder.QBFactory = typeof(MongoQBFactory);
+		//builder.DataLayer = typeof(MongoDataLayer);
 		//builder.IsAutoController = true;
 		//builder.ControllerName = "[DS:guessPlural]";
 		//builder.IsServiceSingleton = false;
@@ -31,11 +30,11 @@ public sealed class OrderService : DataSource<int?, Order, OrderCreateDto, Order
 		//builder.RestoreBuilder = RestoreBuilder;
 	}
 
-	static void SoftDelBuilder(IQBSoftDelBuilder<Order, SoftDelDto> qb)
+	static void SoftDelBuilder(IQBMongoSoftDelBuilder<Order, SoftDelDto> qb)
 	{
 		//qb.UpdateTable("orders");
 	}
-	static void RestoreBuilder(IQBRestoreBuilder<Order, SoftDelDto> qb)
+	static void RestoreBuilder(IQBMongoRestoreBuilder<Order, SoftDelDto> qb)
 	{
 		//qb.UpdateTable("orders");
 	}

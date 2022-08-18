@@ -7,10 +7,10 @@ public abstract partial class DataSource<TKey, TDocument, TCreate, TSelect, TUpd
 	private KeyValuePair<DataSourceListener<TKey, TDocument, TCreate, TSelect, TUpdate, TDelete, TRestore>, bool>[]? _listeners;
 
 	/// <summary>
-	/// Gets and adds a listener from the DI container to the data source.
+	/// Gets and adds a listener from the DI container to the datasource.
 	/// </summary>
 	/// <typeparam name="T">Listener type to get and add.</typeparam>
-	/// <param name="attachTransient">Dispose the listener when calling <c>RemoveListener()</c> or disposing the entire data source.</param>
+	/// <param name="attachTransient">Dispose the listener when calling <c>RemoveListener()</c> or disposing the entire datasource.</param>
 	/// <exception cref="InvalidOperationException"></exception>
 	/// <remarks>
 	/// The method itself is thread safe. However, calling <c>OnAttach()</c> on shared listeners will not.
@@ -22,11 +22,11 @@ public abstract partial class DataSource<TKey, TDocument, TCreate, TSelect, TUpd
 	}
 
 	/// <summary>
-	/// Gets and adds a listener from the DI container to the data source.
+	/// Gets and adds a listener from the DI container to the datasource.
 	/// </summary>
 	/// <typeparam name="T">Listener type to get and add.</typeparam>
 	/// <param name="implementationFactory"></param>
-	/// <param name="attachTransient">Dispose the listener when calling <c>RemoveListener()</c> or disposing the entire data source.</param>
+	/// <param name="attachTransient">Dispose the listener when calling <c>RemoveListener()</c> or disposing the entire datasource.</param>
 	/// <exception cref="InvalidOperationException"></exception>
 	/// <remarks>
 	/// The method itself is thread safe. However, calling <c>OnAttach()</c> on shared listeners will not.
@@ -42,7 +42,7 @@ public abstract partial class DataSource<TKey, TDocument, TCreate, TSelect, TUpd
 	}
 
 	/// <summary>
-	/// Removes a listener from the data source.
+	/// Removes a listener from the datasource.
 	/// </summary>
 	/// <typeparam name="T">Listener type to remove.</typeparam>
 	/// <returns>true when such a listener is found and removed.</returns>

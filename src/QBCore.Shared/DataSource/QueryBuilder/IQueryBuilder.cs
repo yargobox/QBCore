@@ -1,29 +1,28 @@
-using System.Linq.Expressions;
 using QBCore.Configuration;
 using QBCore.DataSource.Options;
-using QBCore.ObjectFactory;
 
 namespace QBCore.DataSource.QueryBuilder;
 
-public interface IQueryBuilder : IOriginal
+public interface IQueryBuilder
 {
 	QueryBuilderTypes QueryBuilderType { get; }
 	Type DocumentType { get; }
+	DSDocumentInfo DocumentInfo { get; }
 	Type ProjectionType { get; }
-	
-	Type DatabaseContextInterface { get; }
+	DSDocumentInfo? ProjectionInfo { get; }
+	Type DatabaseContextInterfaceType { get; }
 	IDataContext DataContext { get; }
 }
 
 public interface IQueryBuilder<TDocument, TProjection> : IQueryBuilder
 {
+	QBBuilder<TDocument, TProjection> Builder { get; }
 }
 
 public interface IInsertQueryBuilder<TDocument, TCreate> : IQueryBuilder<TDocument, TCreate>
 {
-	IQBInsertBuilder<TDocument, TCreate> InsertBuilder { get; }
-	Task<object> InsertAsync(
-		TCreate document,
+	Task<TDocument> InsertAsync(
+		TDocument document,
 		DataSourceInsertOptions? options = null,
 		CancellationToken cancellationToken = default(CancellationToken)
 	);
@@ -31,7 +30,6 @@ public interface IInsertQueryBuilder<TDocument, TCreate> : IQueryBuilder<TDocume
 
 public interface ISelectQueryBuilder<TDocument, TSelect> : IQueryBuilder<TDocument, TSelect>
 {
-	IQBSelectBuilder<TDocument, TSelect> SelectBuilder { get; }
 	IQueryable<TDocument> AsQueryable(DataSourceQueryableOptions? options = null);
 	Task<long> CountAsync(DataSourceCountOptions? options = null, CancellationToken cancellationToken = default(CancellationToken));
 	Task<IDSAsyncCursor<TSelect>> SelectAsync(long skip = 0L, int take = -1, DataSourceSelectOptions? options = null, CancellationToken cancellationToken = default(CancellationToken));

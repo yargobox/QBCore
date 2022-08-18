@@ -4,13 +4,13 @@ using QBCore.ObjectFactory;
 
 namespace QBCore.DataSource;
 
-internal class CDSDefinition : ICDSDefinition
+internal class CDSInfo : ICDSInfo
 {
 	public string Name { get; }
 	public Type ComplexDataSourceConcrete { get; }
 	public IReadOnlyDictionary<string, ICDSNode> Nodes { get; }
 
-	public CDSDefinition(Type concreteType)
+	public CDSInfo(Type concreteType)
 	{
 		if (!concreteType.IsClass || concreteType.IsAbstract || concreteType.IsGenericType || concreteType.IsGenericTypeDefinition
 				|| concreteType.GetSubclassOf(typeof(ComplexDataSource<>)) == null)
@@ -61,9 +61,9 @@ internal class CDSDefinition : ICDSDefinition
 			Name = MakeCDSNameFromType(ComplexDataSourceConcrete);
 		}
 		Name = string.Intern(Name);
-		if (DSDefinition.ReservedNames.Contains(Name, StringComparer.OrdinalIgnoreCase))
+		if (DSInfo.ReservedNames.Contains(Name, StringComparer.OrdinalIgnoreCase))
 		{
-			throw new ArgumentException("These names are reserved and cannot be used as names for a datasource, CDS, or controller: " + string.Join(", ", DSDefinition.ReservedNames));
+			throw new ArgumentException("These names are reserved and cannot be used as names for a datasource, CDS, or controller: " + string.Join(", ", DSInfo.ReservedNames));
 		}
 
 		// Nodes

@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.Mvc.Routing;
 using Microsoft.Extensions.Configuration;
 using MongoDB.Bson;
 using MongoDB.Bson.Serialization;
+using MongoDB.Bson.Serialization.Conventions;
 using MongoDB.Bson.Serialization.Serializers;
 using QBCore.Configuration;
 using QBCore.Controllers;
@@ -21,14 +22,14 @@ BsonSerializer.RegisterSerializer(new DateTimeOffsetSerializer(BsonType.String))
 //BsonSerializer.RegisterSerializer(new EnumSerializer<UserRoles>(BsonType.String));
 BsonSerializer.RegisterSerializer(new DecimalSerializer(BsonType.String));
 
-//ModelBinders.Binders.Add(typeof(int[]), new IntArrayModelBinder());
+ConventionRegistry.Register("camelCase", new ConventionPack { new CamelCaseElementNameConvention() }, _ => true);
 
 var appBuilder = WebApplication.CreateBuilder(args);
 
 var builder = appBuilder.Services
 	.AddControllers(options =>
 	{
-		options.SuppressAsyncSuffixInActionNames = false;
+		options.SuppressAsyncSuffixInActionNames = true;
 		options.Conventions.Add(new DataSourceControllerRouteConvention
 		{
 			RoutePrefix = "api/"
@@ -37,13 +38,17 @@ var builder = appBuilder.Services
 	})
 	.AddApplicationPart(typeof(Example1.DAL.Entities.Brands.Brand).Assembly)
 	.AddApplicationPart(typeof(Example1.BLL.Services.BrandService).Assembly)
-	.AddQBCore()
+	.AddQBCore(options => { })
 	.ConfigureApplicationPartManager(partManager =>
 	{
 		partManager.FeatureProviders.Add(new DataSourceControllerFeatureProvider());
 	});
 
 builder.Services
+	.AddAutoMapper(config =>
+	{
+		config.AddProfile(new DataSourceMappings((source, dest) => true));
+	})
 	.Configure<MongoDbSettings>(appBuilder.Configuration.GetSection(nameof(MongoDbSettings)))
 	.Configure<SqlDbSettings>(appBuilder.Configuration.GetSection(nameof(SqlDbSettings)))
 	.AddSingleton<IDataContextProvider, DataContextProvider>()

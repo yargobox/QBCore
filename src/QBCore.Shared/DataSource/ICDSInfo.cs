@@ -1,6 +1,6 @@
 namespace QBCore.DataSource;
 
-public interface ICDSDefinition
+public interface ICDSInfo
 {
 	string Name { get; }
 	Type ComplexDataSourceConcrete { get; }

@@ -17,7 +17,7 @@ public interface IDSBuilder
 	
 	string? DataContextName { get; set; }
 
-	Type? QBFactory { get; set; }
+	Type? DataLayer { get; set; }
 
 	Delegate? InsertBuilder { get; set; }
 	Delegate? SelectBuilder { get; set; }

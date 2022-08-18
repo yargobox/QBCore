@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations;
 using Example1.DAL.Entities.OrderPositions;
 using Example1.DAL.Entities.Stores;
 using MongoDB.Bson;
@@ -11,10 +12,12 @@ namespace Example1.DAL.Entities.Orders;
 
 public class OrderSelectDto
 {
-	[DsId] public int? Id { get; set; }
-	[DsName] public string? Name { get; set; }
+	[DeId] public int? Id { get; set; }
+	
+	[Required, MinLength(4), MaxLength(32)]
+	[DeViewName] public string? Name { get; set; }
 
-	[DsRef] public int? StoreId { get; set; }
+	[DeForeignId] public int? StoreId { get; set; }
 
 	public string? StoreName { get; set; }
 	public StoreSelectDto? Store { get; set; }
@@ -24,9 +27,9 @@ public class OrderSelectDto
 
 	public decimal? Total { get; set; }
 
-	[DsCreated] public DateTimeOffset? Created { get; set; }
-	[DsUpdated] public DateTimeOffset? Updated { get; set; }
-	[DsDeleted] public DateTimeOffset? Deleted { get; set; }
+	[DeCreated] public DateTimeOffset? Created { get; set; }
+	[DeUpdated] public DateTimeOffset? Updated { get; set; }
+	[DeDeleted] public DateTimeOffset? Deleted { get; set; }
 
 	static void Builder(IQBMongoSelectBuilder<Order, OrderSelectDto> builder)
 	{

@@ -66,16 +66,22 @@ public class ExceptionHandlingMiddleware
 		context.Response.ContentType = "application/json";
 		context.Response.StatusCode = (int) httpStatusCode;
 
-		return context.Response.WriteAsync(
-			new HttpExceptionResponse
-			{
-				StatusCode = (int) httpStatusCode,
-				Instance = context.Request.Path,
-				Type = ex.GetType().ToString(),
-				Message = ex.Message,
-				Details = ex.GetBaseException()?.Message
-			}
-			.ToString()
-		);
+		var details = ex.GetBaseException()?.Message;
+		if (ex.Message == details)
+		{
+			details = null;
+		}
+
+		var exceptionResponse = new HttpExceptionResponse
+		{
+			StatusCode = (int)httpStatusCode,
+			Instance = context.Request.Path,
+			Type = ex.GetType().ToString(),
+			Message = ex.Message,
+			Details = details,
+			StackTrace = ex.StackTrace
+		};
+
+		return context.Response.WriteAsync(exceptionResponse.ToString());
 	}
 }

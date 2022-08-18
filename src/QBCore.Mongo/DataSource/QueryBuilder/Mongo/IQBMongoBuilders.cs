@@ -2,10 +2,15 @@ using System.Linq.Expressions;
 
 namespace QBCore.DataSource.QueryBuilder.Mongo;
 
-public interface IQBMongoSelectBuilder<TDoc, TSelect> : IQBBuilder<TDoc, TSelect>
+public interface IQBMongoInsertBuilder<TDoc, TCreate> : IQBBuilder
 {
-	Expression<Func<TSelect, object?>>? DateDeleteField { get; set; }
+	Func<IDSIdGenerator>? IdGenerator { get; set; }
 
+	IQBMongoInsertBuilder<TDoc, TCreate> InsertTo(string tableName);
+}
+
+public interface IQBMongoSelectBuilder<TDoc, TSelect> : IQBBuilder
+{
 	IQBMongoSelectBuilder<TDoc, TSelect> SelectFrom(string tableName);
 	IQBMongoSelectBuilder<TDoc, TSelect> SelectFrom(string alias, string tableName);
 
@@ -44,5 +49,20 @@ public interface IQBMongoSelectBuilder<TDoc, TSelect> : IQBBuilder<TDoc, TSelect
 	IQBMongoSelectBuilder<TDoc, TSelect> Include<TRef>(Expression<Func<TSelect, object?>> field, string refAlias, Expression<Func<TRef, object?>> refField);
 	IQBMongoSelectBuilder<TDoc, TSelect> Exclude(Expression<Func<TSelect, object?>> field);
 	IQBMongoSelectBuilder<TDoc, TSelect> Optional(Expression<Func<TSelect, object?>> field);
+}
 
+public interface IQBMongoUpdateBuilder<TDoc, TCreate> : IQBBuilder
+{
+}
+
+public interface IQBMongoSoftDelBuilder<TDoc, TCreate> : IQBBuilder
+{
+}
+
+public interface IQBMongoDeleteBuilder<TDoc, TCreate> : IQBBuilder
+{
+}
+
+public interface IQBMongoRestoreBuilder<TDoc, TCreate> : IQBBuilder
+{
 }

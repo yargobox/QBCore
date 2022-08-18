@@ -4,4 +4,5 @@ public interface IFactoryObjectRegistry<TKey, TInterface> : IReadOnlyDictionary<
 {
 	void RegisterObject(TKey key, TInterface value);
 	bool TryRegisterObject(TKey key, TInterface value);
+	TInterface TryGetOrRegisterObject(TKey key, Func<TKey, TInterface> factoryMethod);
 }

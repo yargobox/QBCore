@@ -3,7 +3,6 @@ using MongoDB.Bson.Serialization;
 using MongoDB.Driver;
 using QBCore.Configuration;
 using QBCore.DataSource.Options;
-using QBCore.ObjectFactory;
 
 namespace QBCore.DataSource.QueryBuilder.Mongo;
 
@@ -11,13 +10,10 @@ internal sealed partial class SelectQueryBuilder<TDocument, TSelect> : QueryBuil
 {
 	public override QueryBuilderTypes QueryBuilderType => QueryBuilderTypes.Select;
 
-	public override Origin Source => new Origin(this.GetType());
-
-	public IQBSelectBuilder<TDocument, TSelect> SelectBuilder => Builder;
-
-	public SelectQueryBuilder(QBBuilder<TDocument, TSelect> building, IDataContext dataContext)
+	public SelectQueryBuilder(QBSelectBuilder<TDocument, TSelect> building, IDataContext dataContext)
 		: base(building, dataContext)
 	{
+		building.Normalize();
 	}
 
 	public IMongoCollection<TDocument> Collection
@@ -226,7 +222,11 @@ internal sealed partial class SelectQueryBuilder<TDocument, TSelect> : QueryBuil
 							} } });
 		}
 
-		if (options?.QueryStringCallback != null)
+		if (options?.QueryStringAsyncCallback != null)
+		{
+			await options.QueryStringAsyncCallback(new BsonArray(query).ToString()).ConfigureAwait(false);
+		}
+		else if (options?.QueryStringCallback != null)
 		{
 			options.QueryStringCallback(new BsonArray(query).ToString());
 		}
@@ -280,72 +280,27 @@ internal sealed partial class SelectQueryBuilder<TDocument, TSelect> : QueryBuil
 			{
 				options.NativeSelectQueryCallback(query);
 			}
-			if (options.QueryStringCallback != null)
+			if (options.QueryStringAsyncCallback != null)
+			{
+				await options.QueryStringAsyncCallback(new BsonArray(query).ToString()).ConfigureAwait(false);
+			}
+			else if (options.QueryStringCallback != null)
 			{
 				options.QueryStringCallback(new BsonArray(query).ToString());
 			}
 		}
 
-		using (var cursor = clientSessionHandle == null
+		var cursor = clientSessionHandle == null
 			? await Collection.AggregateAsync<TSelect>(query, aggregateOptions, cancellationToken)
-			: await Collection.AggregateAsync<TSelect>(clientSessionHandle, query, aggregateOptions, cancellationToken))
-		{
-			if (options?.ObtainLastPageMarker == true)
-			{
-				return await Task.FromResult(new DSAsyncCursorWithLastPageMarker<TSelect>(cursor, take, cancellationToken));
-			}
-			else
-			{
-				return await Task.FromResult(new DSAsyncCursor<TSelect>(cursor, cancellationToken));
-			}
-		}
-	}
+			: await Collection.AggregateAsync<TSelect>(clientSessionHandle, query, aggregateOptions, cancellationToken);
 
-	private async ValueTask<long> GetTotalCountAsync(List<BsonDocument> query, bool remainOrTotalCount, Action<string>? getQueryStringCallback, AggregateOptions? aggregateOptions, IClientSessionHandle? clientSessionHandle, CancellationToken cancellationToken)
-	{
-		var index = query.FindLastIndex(x => x.Contains("$limit"));
-		if (index >= 0)
+		if (options?.ObtainLastPageMarker == true)
 		{
-			query.RemoveAt(index);
+			return await Task.FromResult(new DSAsyncCursorWithLastPageMarker<TSelect>(cursor, take, cancellationToken));
 		}
-		if (!remainOrTotalCount)
+		else
 		{
-			index = query.FindLastIndex(x => x.Contains("$skip"));
-			if (index >= 0)
-			{
-				query.RemoveAt(index);
-			}
-		}
-		index = query.FindLastIndex(x => x.Contains("$sort"));
-		if (index >= 0)
-		{
-			query.RemoveAt(index);
-		}
-		while (query.LastOrDefault()?.Contains("$project") == true)
-		{
-			query.RemoveAt(query.Count - 1);
-		}
-
-		query.Add(new BsonDocument {
-						{ "$group", new BsonDocument {
-								{ "_id", BsonNull.Value },
-								{ "n", new BsonDocument {
-										{ "$sum", 1 }
-									}
-								}
-						} } });
-		
-		if (getQueryStringCallback != null)
-		{
-			getQueryStringCallback(new BsonArray(query).ToString());
-		}
-
-		using (var cursor = clientSessionHandle == null
-			? await Collection.AggregateAsync<TSelect>(query, aggregateOptions, cancellationToken)
-			: await Collection.AggregateAsync<TSelect>(clientSessionHandle, query, aggregateOptions, cancellationToken))
-		{
-			var bsonCount = (await cursor.FirstAsync(cancellationToken)).ToBsonDocument();
-			return bsonCount["n"].ToInt64();
+			return await Task.FromResult(new DSAsyncCursor<TSelect>(cursor, cancellationToken));
 		}
 	}
 
@@ -392,24 +347,24 @@ internal sealed partial class SelectQueryBuilder<TDocument, TSelect> : QueryBuil
 
 		// Declare func to get DB-side field names. They are depend on 'stages' and 'stageIndex'
 		int stageIndex = 0;
-		var getDBSideNameInsideLookup = string (string alias, FieldPath fieldPath) =>
+		var getDBSideNameInsideLookup = string (string alias, DEPath fieldPath) =>
 		{
 			var trueAlias = stages.Take(stageIndex).FirstOrDefault(x => x.Container.Alias == alias)?.LookupAs;
 			if (trueAlias == null)
 			{
 				if (stages[stageIndex].Container.Alias == alias)
 				{
-					return fieldPath.DBSideName;
+					return fieldPath.GetDBSideName();
 				}
 				throw new KeyNotFoundException($"Collection '{alias}' is not yet defined at this stage.");
 			}
 			else if (trueAlias.Length == 0)
 			{
-				return fieldPath.DBSideName;
+				return fieldPath.GetDBSideName();
 			}
-			return string.Concat(trueAlias, ".", fieldPath.DBSideName);
+			return string.Concat(trueAlias, ".", fieldPath.GetDBSideName());
 		};
-		var getDBSideNameAfterLookup = string (string alias, FieldPath fieldPath) =>
+		var getDBSideNameAfterLookup = string (string alias, DEPath fieldPath) =>
 		{
 			var trueAlias = stages.Take(stageIndex + 1).FirstOrDefault(x => x.Container.Alias == alias)?.LookupAs;
 			if (trueAlias == null)
@@ -418,9 +373,9 @@ internal sealed partial class SelectQueryBuilder<TDocument, TSelect> : QueryBuil
 			}
 			else if (trueAlias.Length == 0)
 			{
-				return fieldPath.DBSideName;
+				return fieldPath.GetDBSideName();
 			}
-			return string.Concat(trueAlias, ".", fieldPath.DBSideName);
+			return string.Concat(trueAlias, ".", fieldPath.GetDBSideName());
 		};
 
 		for ( ; stageIndex < stages.Count; stageIndex++)
@@ -440,7 +395,7 @@ internal sealed partial class SelectQueryBuilder<TDocument, TSelect> : QueryBuil
 				{
 					firstConnect = stage.ConditionMap.First().First(x => x.IsConnectOnField);
 
-					lookup["foreignField"] = firstConnect.Field.DBSideName;
+					lookup["foreignField"] = firstConnect.Field.GetDBSideName();
 					lookup["localField"] = getDBSideNameInsideLookup(firstConnect.RefAlias!, firstConnect.RefField!);
 				}
 				else
@@ -573,20 +528,20 @@ internal sealed partial class SelectQueryBuilder<TDocument, TSelect> : QueryBuil
 		int stageIndex;
 
 		// Fill the includes and change the LookupAs names for the joining documents the result of which is directly projected into the field.
-		foreach (var field in fields.Where(x => x.IncludeOrExclude).OrderBy(x => x.RefAlias ?? string.Empty).ThenBy(x => x.RefField?.ElementCount ?? 0))
+		foreach (var field in fields.Where(x => x.IncludeOrExclude).OrderBy(x => x.RefAlias ?? string.Empty).ThenBy(x => x.RefField?.Count ?? 0))
 		{
 			stageIndex = stages.FindIndex(x => x.Container.Alias == field.RefAlias);
 
-			if (field.RefField != null && field.RefField.FieldType == stages[stageIndex].Container.DocumentType)
+			if (field.RefField != null && field.RefField.DataEntryType == stages[stageIndex].Container.DocumentType)
 			{
 				// project the joining document as the result field
-				stages[stageIndex].LookupAs = field.Field.DBSideName;
+				stages[stageIndex].LookupAs = field.Field.GetDBSideName();
 			}
 			else
 			{
 				path = string.Concat(
 					stages[stageIndex].LookupAs, ".",
-					field.RefField!.DBSideName
+					field.RefField!.GetDBSideName()
 				);
 
 				// Propagate the include to the pipeline stage using the dependencies on conditions and the include fields.
@@ -602,7 +557,7 @@ internal sealed partial class SelectQueryBuilder<TDocument, TSelect> : QueryBuil
 						stageIndex = i;
 					}
 				}
-				stages[stageIndex].ProjectAfter.Add((path, field.Field.DBSideName, field));
+				stages[stageIndex].ProjectAfter.Add((path, field.Field.GetDBSideName(), field));
 			}
 		}
 
@@ -613,15 +568,15 @@ internal sealed partial class SelectQueryBuilder<TDocument, TSelect> : QueryBuil
 				// search in includes
 				x.IncludeOrExclude
 				// for the entire document: (store) => store
-				&& x.RefField!.FieldType == stages.First(xx => xx.Container.Alias == x.RefAlias).Container.DocumentType
+				&& x.RefField!.DataEntryType == stages.First(xx => xx.Container.Alias == x.RefAlias).Container.DocumentType
 				// in this case our exclude must be a part of it: (sel) => sel.Store.LogoImg, (sel) => sel.Store
-				&& field.Field.FullName.StartsWith(x.Field.FullName)
-				&& field.Field.FullName.Length > x.Field.FullName.Length + 1
-				&& field.Field.FullName[x.Field.FullName.Length] == '.'
+				&& field.Field.Path.StartsWith(x.Field.Path)
+				&& field.Field.Path.Length > x.Field.Path.Length + 1
+				&& field.Field.Path[x.Field.Path.Length] == '.'
 			);
 			if (joinedDoc == null)
 			{
-				path = field.Field.DBSideName;
+				path = field.Field.GetDBSideName();
 
 				// Propagate the exclude
 				//
@@ -630,7 +585,7 @@ internal sealed partial class SelectQueryBuilder<TDocument, TSelect> : QueryBuil
 				{
 					map = stages[i].ConditionMap;
 
-					if (map.Any(x => x.Any(xx => xx.Field.FullName == field.Field.FullName)))
+					if (map.Any(x => x.Any(xx => xx.Field.Path == field.Field.Path)))
 					{
 						stageIndex = i;
 					}
@@ -649,18 +604,18 @@ internal sealed partial class SelectQueryBuilder<TDocument, TSelect> : QueryBuil
 				stageIndex = stages.FindIndex(x => x.Container.Alias == joinedDoc.RefAlias!);
 
 				path = string.Concat(stages[stageIndex].LookupAs, ".",
-					string.Join(".", field.Field.Elements.Skip(joinedDoc.Field.ElementCount).Select(x => field.Field.GetDBSideName(x))));
+					string.Join(".", field.Field.Skip(joinedDoc.Field.Count).Select(x => field.Field.Cast<MongoDataEntry>().Select(x => x.DBSideName))));
 
 				// Propagate the exclude
 				//
-				var trueFullName = string.Join(".", field.Field.Elements.Skip(joinedDoc.Field.ElementCount).Select(x => x.Name));
+				var trueFullName = string.Join(".", field.Field.Skip(joinedDoc.Field.Count).Select(x => x.Name));
 				for (int i = stageIndex + 1; i < stages.Count; i++)
 				{
 					map = stages[i].ConditionMap;
 
 					if (map.Any(x => x.Any(xx =>
-							(xx.Alias == joinedDoc.RefAlias && xx.Field.FullName == trueFullName) ||
-							(xx.RefAlias == joinedDoc.RefAlias && xx.RefField!.FullName == trueFullName))))
+							(xx.Alias == joinedDoc.RefAlias && xx.Field.Path == trueFullName) ||
+							(xx.RefAlias == joinedDoc.RefAlias && xx.RefField!.Path == trueFullName))))
 					{
 						stageIndex = i;
 					}
@@ -690,8 +645,8 @@ internal sealed partial class SelectQueryBuilder<TDocument, TSelect> : QueryBuil
 						map = stages[i].ConditionMap;
 
 						if (map.Any(x => x.Any(xx =>
-								(xx.Alias == topAlias && xx.Field.FullName == path) ||
-								(xx.RefAlias == topAlias && xx.RefField!.FullName == path))))
+								(xx.Alias == topAlias && xx.Field.Path == path) ||
+								(xx.RefAlias == topAlias && xx.RefField!.Path == path))))
 						{
 							stageIndex = i;
 						}
@@ -740,7 +695,7 @@ internal sealed partial class SelectQueryBuilder<TDocument, TSelect> : QueryBuil
 
 			eqStmt.Add(new BsonDocument { { "$type", "$" + projField.fromPath } });
 			
-			if (projField.builderField!.Field.FieldType == typeof(string))
+			if (projField.builderField!.Field.DataEntryType == typeof(string))
 			{
 				eqStmt.Add("string");
 
