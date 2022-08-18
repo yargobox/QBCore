@@ -24,7 +24,7 @@ public class PesemisticSequentialIdGenerator<TDocument> : IDSIdGenerator
 		MaxAttempts = maxAttempts;
 	}
 
-	public bool IsEmpty(object? id) => id == null ? false : IsEmpty((int)id);
+	public bool IsEmpty(object? id) => id == null || (Step > 0 ? ((int)id) >= StartAt : ((int)id) <= StartAt);
 
 	public object GenerateId(object container, object document, DataSourceIdGeneratorOptions? options = null, CancellationToken cancellationToken = default(CancellationToken))
 	{
@@ -67,9 +67,9 @@ public class PesemisticSequentialIdGenerator<TDocument> : IDSIdGenerator
 
 		var lastId =
 			(
-				clientSessionHandle != null
-					? collection.Aggregate<SequentialIdGeneratorBase.DocumentId>(clientSessionHandle, query, aggregateOptions, cancellationToken)
-					: collection.Aggregate<SequentialIdGeneratorBase.DocumentId>(query, aggregateOptions, cancellationToken)
+				clientSessionHandle == null
+					? collection.Aggregate<SequentialIdGeneratorBase.DocumentId>(query, aggregateOptions, cancellationToken)
+					: collection.Aggregate<SequentialIdGeneratorBase.DocumentId>(clientSessionHandle, query, aggregateOptions, cancellationToken)
 			)
 			.FirstOrDefault(cancellationToken)?.Id;
 
@@ -135,7 +135,7 @@ public class PesemisticSequentialIdGenerator<TDocument> : IDSIdGenerator
 
 		var lastId = (await
 			(
-				clientSessionHandle != null
+				clientSessionHandle == null
 					? await collection.AggregateAsync<SequentialIdGeneratorBase.DocumentId>(query, aggregateOptions, cancellationToken).ConfigureAwait(false)
 					: await collection.AggregateAsync<SequentialIdGeneratorBase.DocumentId>(clientSessionHandle, query, aggregateOptions, cancellationToken).ConfigureAwait(false)
 			)
@@ -163,7 +163,9 @@ internal static class SequentialIdGeneratorBase
 {
 	public sealed class DocumentId
 	{
+#pragma warning disable CS0649
 		[BsonElement, BsonId] public int? Id;
+#pragma warning restore CS0649
 	}
 
 	private static string? _maxIDQueryString;
@@ -173,7 +175,7 @@ internal static class SequentialIdGeneratorBase
 	{
 		new BsonDocument { { "$sort", new BsonDocument { { "_id", -1 } } } },
 		new BsonDocument { { "$limit", 1 } },
-		new BsonDocument { { "$project", new BsonDocument { { "$_id", 1 } } } }
+		new BsonDocument { { "$project", new BsonDocument { { "_id", 1 } } } }
 	};
 
 	public static readonly BsonDocument[] MinIDQuery = new BsonDocument[]

@@ -11,6 +11,6 @@ public class OrderPositionCreateDto
 
 	static void Builder(IQBMongoInsertBuilder<OrderPosition, OrderPositionCreateDto> builder)
 	{
-		//builder.InsertToTable("order_positions");
+		builder.InsertTo("order_positions");
 	}
 }

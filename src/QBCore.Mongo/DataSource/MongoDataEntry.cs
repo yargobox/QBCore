@@ -3,7 +3,7 @@ using MongoDB.Bson.Serialization;
 
 namespace QBCore.DataSource;
 
-internal sealed class MongoDataEntry : DataEntry
+internal sealed class MongoDataEntry : DEInfo
 {
 	private readonly BsonMemberMap? MemberMap;
 	public string? DBSideName => MemberMap?.ElementName;

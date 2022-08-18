@@ -8,6 +8,8 @@ public class BrandCreateDto
 
 	public static void Builder(IQBMongoInsertBuilder<Brand, BrandCreateDto> builder)
 	{
-		//builder.InsertToTable("brands");
+		builder
+			.InsertTo("brands")
+			.IdGenerator = () => new PesemisticSequentialIdGenerator<Brand>(1, 1, 8);
 	}
 }

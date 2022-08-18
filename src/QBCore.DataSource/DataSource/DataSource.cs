@@ -73,11 +73,6 @@ public abstract partial class DataSource<TKey, TDocument, TCreate, TSelect, TUpd
 			}
 		}
 
-		if (!builder.IsNormalized)
-		{
-			builder.Normalize();
-		}
-
 		TDocument result;
 		if (typeof(TDocument) != typeof(TCreate))
 		{
@@ -197,11 +192,6 @@ public abstract partial class DataSource<TKey, TDocument, TCreate, TSelect, TUpd
 			{
 				param.Value = value;
 			}
-		}
-
-		if (!builder.IsNormalized)
-		{
-			builder.Normalize();
 		}
 
 		return await qb.SelectAsync(skip, take, options, cancellationToken).ConfigureAwait(false);

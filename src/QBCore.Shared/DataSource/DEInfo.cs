@@ -20,7 +20,7 @@ public enum DataEntryFlags
 
 
 [DebuggerDisplay("{ToString(false)}")]
-public abstract class DataEntry : IComparable<DataEntry>, IEquatable<DataEntry>
+public abstract class DEInfo : IComparable<DEInfo>, IEquatable<DEInfo>
 {
 	public readonly string Name;
 	public readonly DSDocumentInfo Document;
@@ -34,7 +34,7 @@ public abstract class DataEntry : IComparable<DataEntry>, IEquatable<DataEntry>
 	public Action<object, object?>? Setter => _setter ?? (_setter = MakeSetter());
 	protected Action<object, object?>? _setter;
 
-	protected DataEntry(DSDocumentInfo document, MemberInfo memberInfo, DataEntryFlags flags)
+	protected DEInfo(DSDocumentInfo document, MemberInfo memberInfo, DataEntryFlags flags)
 	{
 		if (document == null)
 		{
@@ -80,14 +80,14 @@ public abstract class DataEntry : IComparable<DataEntry>, IEquatable<DataEntry>
 		=> Document.DocumentType.GetHashCode() ^ Name.GetHashCode();
 
 	public override bool Equals(object? obj)
-		=> obj == null ? false : Equals(obj as DataEntry);
+		=> obj == null ? false : Equals(obj as DEInfo);
 
-	public bool Equals(DataEntry? other)
+	public bool Equals(DEInfo? other)
 		=> other == null
 			? false
 			: Document.DocumentType == other.Document.DocumentType && Name == other.Name;
 
-	public int CompareTo(DataEntry? other)
+	public int CompareTo(DEInfo? other)
 	{
 		var result = Comparer<Type>.Default.Compare(Document.DocumentType, other?.Document.DocumentType);
 		return result != 0 ? result : Name.CompareTo(other!.Name);
@@ -133,13 +133,13 @@ public abstract class DataEntry : IComparable<DataEntry>, IEquatable<DataEntry>
 		throw new ArgumentException(nameof(memberInfo));
 	}
 
-	public static DataEntry GetDataEntry(LambdaExpression memberSelector, IDataLayerInfo dataLayer)
+	public static DEInfo GetDataEntry(LambdaExpression memberSelector, IDataLayerInfo dataLayer)
 	{
 		return GetDataEntryOrDefault(memberSelector, dataLayer)
 			?? throw new InvalidOperationException($"The document type '{memberSelector.Parameters[0].Type.ToPretty()}' does not have the specified data entry '{memberSelector.GetMemberName()}'.");
 	}
 
-	public static DataEntry? GetDataEntryOrDefault(LambdaExpression memberSelector, IDataLayerInfo dataLayer)
+	public static DEInfo? GetDataEntryOrDefault(LambdaExpression memberSelector, IDataLayerInfo dataLayer)
 	{
 		if (memberSelector == null)
 		{
@@ -165,36 +165,36 @@ public abstract class DataEntry : IComparable<DataEntry>, IEquatable<DataEntry>
 		return DataSourceDocuments.GetOrRegister(documentType, dataLayer).Value.DataEntries.GetValueOrDefault(memberInfos[0].Name);
 	}
 
-	public static DataEntry GetDataEntry(MemberInfo memberInfo, IDataLayerInfo dataLayer)
+	public static DEInfo GetDataEntry(MemberInfo memberInfo, IDataLayerInfo dataLayer)
 	{
 		return GetDataEntryOrDefault(memberInfo, dataLayer)
 			?? throw new InvalidOperationException($"The document type '{memberInfo.GetPropertyOrFieldDeclaringType().ToPretty()}' does not have the specified data entry '{memberInfo.Name}'.");
 	}
 
-	public static DataEntry? GetDataEntryOrDefault(MemberInfo memberInfo, IDataLayerInfo dataLayer)
+	public static DEInfo? GetDataEntryOrDefault(MemberInfo memberInfo, IDataLayerInfo dataLayer)
 	{
 		var documentType = memberInfo.GetPropertyOrFieldDeclaringType();
 		var documentInfo = DataSourceDocuments.GetOrRegister(documentType, dataLayer);
 		return documentInfo.Value.DataEntries.GetValueOrDefault(memberInfo.Name);
 	}
 
-	public static DataEntry GetDataEntry<TDocument>(string propertyOrFieldName, IDataLayerInfo dataLayer)
+	public static DEInfo GetDataEntryInfo<TDocument>(string propertyOrFieldName, IDataLayerInfo dataLayer)
 	{
 		return GetDataEntry(typeof(TDocument), propertyOrFieldName, dataLayer);
 	}
 
-	public static DataEntry? GetDataEntryOrDefault<TDocument>(string propertyOrFieldName, IDataLayerInfo dataLayer)
+	public static DEInfo? GetDataEntryOrDefault<TDocument>(string propertyOrFieldName, IDataLayerInfo dataLayer)
 	{
 		return GetDataEntryOrDefault(typeof(TDocument), propertyOrFieldName, dataLayer);
 	}
 
-	public static DataEntry GetDataEntry(Type documentType, string propertyOrFieldName, IDataLayerInfo dataLayer)
+	public static DEInfo GetDataEntry(Type documentType, string propertyOrFieldName, IDataLayerInfo dataLayer)
 	{
 		return GetDataEntryOrDefault(documentType, propertyOrFieldName, dataLayer)
 			?? throw new InvalidOperationException($"The document type '{documentType.ToPretty()}' does not have the specified data entry '{propertyOrFieldName}'.");
 	}
 
-	public static DataEntry? GetDataEntryOrDefault(Type documentType, string propertyOrFieldName, IDataLayerInfo dataLayer)
+	public static DEInfo? GetDataEntryOrDefault(Type documentType, string propertyOrFieldName, IDataLayerInfo dataLayer)
 	{
 		if (dataLayer == null)
 		{
@@ -219,7 +219,7 @@ public abstract class DataEntry : IComparable<DataEntry>, IEquatable<DataEntry>
 public readonly struct DEDefinition<TDocument> : IEquatable<DEDefinition<TDocument>>
 {
 	public readonly string? Name;
-	public readonly DataEntry? DataEntry;
+	public readonly DEInfo? Info;
 
 	public DEDefinition(string propertyOrFieldName)
 	{
@@ -229,50 +229,60 @@ public readonly struct DEDefinition<TDocument> : IEquatable<DEDefinition<TDocume
 		}
 
 		Name = propertyOrFieldName;
-		DataEntry = null;
+		Info = null;
 	}
 
-	public DEDefinition(DataEntry dataEntry)
+	public DEDefinition(DEInfo dataEntryInfo)
 	{
-		if (dataEntry == null)
+		if (dataEntryInfo == null)
 		{
-			throw new ArgumentNullException(nameof(dataEntry));
+			throw new ArgumentNullException(nameof(dataEntryInfo));
 		}
 
 		Name = null;
-		DataEntry = dataEntry;
+		Info = dataEntryInfo;
 	}
 
-	public readonly DataEntry ToDataEntry(IDataLayerInfo dataLayer)
+	public readonly DEInfo ToDataEntry(IDataLayerInfo dataLayer)
 	{
-		if (DataEntry != null)
+		if (Info != null)
 		{
-			return DataEntry;
+			return Info;
 		}
 
-		return DataEntry.GetDataEntry<TDocument>(Name!, dataLayer);
+		return DEInfo.GetDataEntryInfo<TDocument>(Name!, dataLayer);
+	}
+	
+	public readonly DEPath ToDataEntryPath(IDataLayerInfo dataLayer)
+	{
+		if (Info != null)
+		{
+			return new DEPath(Info);
+		}
+
+		return new DEPath(typeof(TDocument), Name!, false, dataLayer);
 	}
 
 	public readonly override string ToString()
 	{
-		return Name ?? DataEntry!.Name;
+		return Name ?? Info!.Name;
 	}
 
 	public readonly string ToString(bool shortDocumentName)
 	{
 		if (shortDocumentName)
 		{
-			return string.Concat(typeof(TDocument).Name, ".", (Name ?? DataEntry!.Name));
+			return string.Concat(typeof(TDocument).Name, ".", (Name ?? Info!.Name));
 		}
 		else
 		{
-			return string.Concat(typeof(TDocument).FullName, ".", (Name ?? DataEntry!.Name));
+			return string.Concat(typeof(TDocument).FullName, ".", (Name ?? Info!.Name));
 		}
 	}
 
 	public readonly override int GetHashCode()
 	{
-		return typeof(TDocument).GetHashCode() ^ (Name ?? DataEntry!.Name).GetHashCode();
+		return typeof(TDocument).GetHashCode() ^ (Name ?? Info!.Name).GetHashCode();
 	}
 
 	public readonly override bool Equals(object? obj)
@@ -289,13 +299,13 @@ public readonly struct DEDefinition<TDocument> : IEquatable<DEDefinition<TDocume
 	}
 
 	public readonly bool Equals(DEDefinition<TDocument> other)
-		=> (Name ?? DataEntry!.Name) == (other.Name ?? other.DataEntry!.Name);
+		=> (Name ?? Info!.Name) == (other.Name ?? other.Info!.Name);
 
 	public static implicit operator DEDefinition<TDocument>(string propertyOrFieldName)
 		=> new DEDefinition<TDocument>(propertyOrFieldName);
 
-	public static implicit operator DEDefinition<TDocument>(DataEntry dataEntry)
-		=> new DEDefinition<TDocument>(dataEntry);
+	public static implicit operator DEDefinition<TDocument>(DEInfo dataEntryInfo)
+		=> new DEDefinition<TDocument>(dataEntryInfo);
 
 	public static bool operator ==(DEDefinition<TDocument> a, DEDefinition<TDocument> b)
 		=> a.Equals(b);
@@ -309,7 +319,7 @@ public readonly struct DEDefinition<TDocument> : IEquatable<DEDefinition<TDocume
 public readonly struct DEDefinition<TDocument, TField> : IEquatable<DEDefinition<TDocument, TField>>, IEquatable<DEDefinition<TDocument>>
 {
 	public readonly string? Name;
-	public readonly DataEntry? DataEntry;
+	public readonly DEInfo? Info;
 
 	public DEDefinition(string propertyOrFieldName)
 	{
@@ -319,59 +329,59 @@ public readonly struct DEDefinition<TDocument, TField> : IEquatable<DEDefinition
 		}
 
 		Name = propertyOrFieldName;
-		DataEntry = null;
+		Info = null;
 	}
 
-	public DEDefinition(DataEntry dataEntry)
+	public DEDefinition(DEInfo dataEntryInfo)
 	{
-		if (dataEntry == null)
+		if (dataEntryInfo == null)
 		{
-			throw new ArgumentNullException(nameof(dataEntry));
+			throw new ArgumentNullException(nameof(dataEntryInfo));
 		}
-		if (dataEntry.DataEntryType != typeof(TField))
+		if (dataEntryInfo.DataEntryType != typeof(TField))
 		{
-			throw new ArgumentException($"DataEntry '{dataEntry.ToString(true)}' is of type '{dataEntry.DataEntryType.ToPretty()}' which does not match the expected '{typeof(TField).ToPretty()}'.", nameof(dataEntry));
+			throw new ArgumentException($"DataEntry '{dataEntryInfo.ToString(true)}' is of type '{dataEntryInfo.DataEntryType.ToPretty()}' which does not match the expected '{typeof(TField).ToPretty()}'.", nameof(dataEntryInfo));
 		}
 
 		Name = null;
-		DataEntry = dataEntry;
+		Info = dataEntryInfo;
 	}
 
-	public readonly DataEntry ToDataEntry(IDataLayerInfo dataLayer)
+	public readonly DEInfo ToDataEntry(IDataLayerInfo dataLayer)
 	{
-		if (DataEntry != null)
+		if (Info != null)
 		{
-			return DataEntry;
+			return Info;
 		}
 
-		var dataEntry = DataEntry.GetDataEntry<TDocument>(Name!, dataLayer);
-		if (dataEntry.DataEntryType != typeof(TField))
+		var dataEntryInfo = DEInfo.GetDataEntryInfo<TDocument>(Name!, dataLayer);
+		if (dataEntryInfo.DataEntryType != typeof(TField))
 		{
-			throw new InvalidCastException($"DataEntry '{dataEntry.ToString(true)}' is of type '{dataEntry.DataEntryType.ToPretty()}' which does not match the expected '{typeof(TField).ToPretty()}'.");
+			throw new InvalidCastException($"DataEntry '{dataEntryInfo.ToString(true)}' is of type '{dataEntryInfo.DataEntryType.ToPretty()}' which does not match the expected '{typeof(TField).ToPretty()}'.");
 		}
-		return dataEntry;
+		return dataEntryInfo;
 	}
 
 	public readonly override string ToString()
 	{
-		return Name ?? DataEntry!.Name;
+		return Name ?? Info!.Name;
 	}
 
 	public readonly string ToString(bool shortDocumentName)
 	{
 		if (shortDocumentName)
 		{
-			return string.Concat(typeof(TDocument).Name, ".", (Name ?? DataEntry!.Name));
+			return string.Concat(typeof(TDocument).Name, ".", (Name ?? Info!.Name));
 		}
 		else
 		{
-			return string.Concat(typeof(TDocument).FullName, ".", (Name ?? DataEntry!.Name));
+			return string.Concat(typeof(TDocument).FullName, ".", (Name ?? Info!.Name));
 		}
 	}
 
 	public readonly override int GetHashCode()
 	{
-		return typeof(TDocument).GetHashCode() ^ (Name ?? DataEntry!.Name).GetHashCode();
+		return typeof(TDocument).GetHashCode() ^ (Name ?? Info!.Name).GetHashCode();
 	}
 
 	public readonly override bool Equals(object? obj)
@@ -392,10 +402,10 @@ public readonly struct DEDefinition<TDocument, TField> : IEquatable<DEDefinition
 	}
 
 	public readonly bool Equals(DEDefinition<TDocument> other)
-		=> (Name ?? DataEntry!.Name) == (other.Name ?? other.DataEntry!.Name);
+		=> (Name ?? Info!.Name) == (other.Name ?? other.Info!.Name);
 
 	public readonly bool Equals(DEDefinition<TDocument, TField> other)
-		=> (Name ?? DataEntry!.Name) == (other.Name ?? other.DataEntry!.Name);
+		=> (Name ?? Info!.Name) == (other.Name ?? other.Info!.Name);
 
 	public static bool operator ==(DEDefinition<TDocument, TField> a, DEDefinition<TDocument, TField> b)
 		=> a.Equals(b);
@@ -406,11 +416,11 @@ public readonly struct DEDefinition<TDocument, TField> : IEquatable<DEDefinition
 	public static implicit operator DEDefinition<TDocument, TField>(DEDefinition<TDocument> definition)
 		=> definition.Name != null
 			? new DEDefinition<TDocument, TField>(definition.Name)
-			: new DEDefinition<TDocument, TField>(definition.DataEntry!);
+			: new DEDefinition<TDocument, TField>(definition.Info!);
 
 	public static implicit operator DEDefinition<TDocument, TField>(string propertyOrFieldName)
 		=> new DEDefinition<TDocument, TField>(propertyOrFieldName);
 
-	public static implicit operator DEDefinition<TDocument, TField>(DataEntry dataEntry)
-		=> new DEDefinition<TDocument, TField>(dataEntry);
+	public static implicit operator DEDefinition<TDocument, TField>(DEInfo dataEntryInfo)
+		=> new DEDefinition<TDocument, TField>(dataEntryInfo);
 }

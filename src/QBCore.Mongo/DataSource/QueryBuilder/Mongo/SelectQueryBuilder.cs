@@ -13,6 +13,7 @@ internal sealed partial class SelectQueryBuilder<TDocument, TSelect> : QueryBuil
 	public SelectQueryBuilder(QBSelectBuilder<TDocument, TSelect> building, IDataContext dataContext)
 		: base(building, dataContext)
 	{
+		building.Normalize();
 	}
 
 	public IMongoCollection<TDocument> Collection
@@ -289,18 +290,17 @@ internal sealed partial class SelectQueryBuilder<TDocument, TSelect> : QueryBuil
 			}
 		}
 
-		using (var cursor = clientSessionHandle == null
+		var cursor = clientSessionHandle == null
 			? await Collection.AggregateAsync<TSelect>(query, aggregateOptions, cancellationToken)
-			: await Collection.AggregateAsync<TSelect>(clientSessionHandle, query, aggregateOptions, cancellationToken))
+			: await Collection.AggregateAsync<TSelect>(clientSessionHandle, query, aggregateOptions, cancellationToken);
+
+		if (options?.ObtainLastPageMarker == true)
 		{
-			if (options?.ObtainLastPageMarker == true)
-			{
-				return await Task.FromResult(new DSAsyncCursorWithLastPageMarker<TSelect>(cursor, take, cancellationToken));
-			}
-			else
-			{
-				return await Task.FromResult(new DSAsyncCursor<TSelect>(cursor, cancellationToken));
-			}
+			return await Task.FromResult(new DSAsyncCursorWithLastPageMarker<TSelect>(cursor, take, cancellationToken));
+		}
+		else
+		{
+			return await Task.FromResult(new DSAsyncCursor<TSelect>(cursor, cancellationToken));
 		}
 	}
 
@@ -347,7 +347,7 @@ internal sealed partial class SelectQueryBuilder<TDocument, TSelect> : QueryBuil
 
 		// Declare func to get DB-side field names. They are depend on 'stages' and 'stageIndex'
 		int stageIndex = 0;
-		var getDBSideNameInsideLookup = string (string alias, DataEntryPath fieldPath) =>
+		var getDBSideNameInsideLookup = string (string alias, DEPath fieldPath) =>
 		{
 			var trueAlias = stages.Take(stageIndex).FirstOrDefault(x => x.Container.Alias == alias)?.LookupAs;
 			if (trueAlias == null)
@@ -364,7 +364,7 @@ internal sealed partial class SelectQueryBuilder<TDocument, TSelect> : QueryBuil
 			}
 			return string.Concat(trueAlias, ".", fieldPath.GetDBSideName());
 		};
-		var getDBSideNameAfterLookup = string (string alias, DataEntryPath fieldPath) =>
+		var getDBSideNameAfterLookup = string (string alias, DEPath fieldPath) =>
 		{
 			var trueAlias = stages.Take(stageIndex + 1).FirstOrDefault(x => x.Container.Alias == alias)?.LookupAs;
 			if (trueAlias == null)
@@ -570,9 +570,9 @@ internal sealed partial class SelectQueryBuilder<TDocument, TSelect> : QueryBuil
 				// for the entire document: (store) => store
 				&& x.RefField!.DataEntryType == stages.First(xx => xx.Container.Alias == x.RefAlias).Container.DocumentType
 				// in this case our exclude must be a part of it: (sel) => sel.Store.LogoImg, (sel) => sel.Store
-				&& field.Field.FullName.StartsWith(x.Field.FullName)
-				&& field.Field.FullName.Length > x.Field.FullName.Length + 1
-				&& field.Field.FullName[x.Field.FullName.Length] == '.'
+				&& field.Field.Path.StartsWith(x.Field.Path)
+				&& field.Field.Path.Length > x.Field.Path.Length + 1
+				&& field.Field.Path[x.Field.Path.Length] == '.'
 			);
 			if (joinedDoc == null)
 			{
@@ -585,7 +585,7 @@ internal sealed partial class SelectQueryBuilder<TDocument, TSelect> : QueryBuil
 				{
 					map = stages[i].ConditionMap;
 
-					if (map.Any(x => x.Any(xx => xx.Field.FullName == field.Field.FullName)))
+					if (map.Any(x => x.Any(xx => xx.Field.Path == field.Field.Path)))
 					{
 						stageIndex = i;
 					}
@@ -614,8 +614,8 @@ internal sealed partial class SelectQueryBuilder<TDocument, TSelect> : QueryBuil
 					map = stages[i].ConditionMap;
 
 					if (map.Any(x => x.Any(xx =>
-							(xx.Alias == joinedDoc.RefAlias && xx.Field.FullName == trueFullName) ||
-							(xx.RefAlias == joinedDoc.RefAlias && xx.RefField!.FullName == trueFullName))))
+							(xx.Alias == joinedDoc.RefAlias && xx.Field.Path == trueFullName) ||
+							(xx.RefAlias == joinedDoc.RefAlias && xx.RefField!.Path == trueFullName))))
 					{
 						stageIndex = i;
 					}
@@ -645,8 +645,8 @@ internal sealed partial class SelectQueryBuilder<TDocument, TSelect> : QueryBuil
 						map = stages[i].ConditionMap;
 
 						if (map.Any(x => x.Any(xx =>
-								(xx.Alias == topAlias && xx.Field.FullName == path) ||
-								(xx.RefAlias == topAlias && xx.RefField!.FullName == path))))
+								(xx.Alias == topAlias && xx.Field.Path == path) ||
+								(xx.RefAlias == topAlias && xx.RefField!.Path == path))))
 						{
 							stageIndex = i;
 						}

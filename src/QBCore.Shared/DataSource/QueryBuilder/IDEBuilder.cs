@@ -4,8 +4,8 @@ namespace QBCore.DataSource.QueryBuilder;
 
 public interface IDEBuilder
 {
-	DataEntry Build<TDocument>(string fieldName);
-	DataEntry Build<TDocument, TField>(string fieldName);
-	DataEntry Build<TDocument>(LambdaExpression memberSelector);
-	DataEntry Build<TDocument, TField>(Expression<Func<TDocument, TField>> memberSelector);
+	DEInfo Build<TDocument>(string fieldName);
+	DEInfo Build<TDocument, TField>(string fieldName);
+	DEInfo Build<TDocument>(LambdaExpression memberSelector);
+	DEInfo Build<TDocument, TField>(Expression<Func<TDocument, TField>> memberSelector);
 }

@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.Mvc.Routing;
 using Microsoft.Extensions.Configuration;
 using MongoDB.Bson;
 using MongoDB.Bson.Serialization;
+using MongoDB.Bson.Serialization.Conventions;
 using MongoDB.Bson.Serialization.Serializers;
 using QBCore.Configuration;
 using QBCore.Controllers;
@@ -21,14 +22,14 @@ BsonSerializer.RegisterSerializer(new DateTimeOffsetSerializer(BsonType.String))
 //BsonSerializer.RegisterSerializer(new EnumSerializer<UserRoles>(BsonType.String));
 BsonSerializer.RegisterSerializer(new DecimalSerializer(BsonType.String));
 
-//ModelBinders.Binders.Add(typeof(int[]), new IntArrayModelBinder());
+ConventionRegistry.Register("camelCase", new ConventionPack { new CamelCaseElementNameConvention() }, _ => true);
 
 var appBuilder = WebApplication.CreateBuilder(args);
 
 var builder = appBuilder.Services
 	.AddControllers(options =>
 	{
-		options.SuppressAsyncSuffixInActionNames = false;
+		options.SuppressAsyncSuffixInActionNames = true;
 		options.Conventions.Add(new DataSourceControllerRouteConvention
 		{
 			RoutePrefix = "api/"

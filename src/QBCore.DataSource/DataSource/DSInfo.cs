@@ -248,9 +248,9 @@ internal sealed class DSInfo : IDSInfo
 		{
 			throw new InvalidOperationException($"Invalid data layer specified '{building.DataLayer.ToPretty()}'.");
 		}
-		var dataLayer = (IDataLayerInfo?)
-			building.DataLayer.GetProperty("Default", BindingFlags.Static | BindingFlags.Public | BindingFlags.GetProperty)
-			?.GetMethod?.Invoke(null, null)
+		var dataLayer =
+			(IDataLayerInfo?)building.DataLayer.GetField("Default", BindingFlags.Static | BindingFlags.Public)?.GetValue(null)
+			?? (IDataLayerInfo?)building.DataLayer.GetProperty("Default", BindingFlags.Static | BindingFlags.Public)?.GetValue(null)
 			?? throw new InvalidOperationException($"Invalid data layer specified '{building.DataLayer.ToPretty()}'.");
 
 		// Register DataSource's document types, including nested ones.

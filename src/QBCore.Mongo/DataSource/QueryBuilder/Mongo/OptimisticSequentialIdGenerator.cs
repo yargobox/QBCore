@@ -50,7 +50,7 @@ public class OptimisticSequentialIdGenerator<TDocument, TIdNamespace> : IDSIdGen
 		MaxAttempts = maxAttempts;
 	}
 
-	public bool IsEmpty(object? id) => id == null ? false : IsEmpty((int)id);
+	public bool IsEmpty(object? id) => id == null || (Step > 0 ? ((int)id) >= StartAt : ((int)id) <= StartAt);
 
 	public object GenerateId(object container, object document, DataSourceIdGeneratorOptions? options = null, CancellationToken cancellationToken = default(CancellationToken))
 	{
@@ -96,9 +96,9 @@ public class OptimisticSequentialIdGenerator<TDocument, TIdNamespace> : IDSIdGen
 
 			var lastId =
 				(
-					clientSessionHandle != null
-						? collection.Aggregate<SequentialIdGeneratorBase.DocumentId>(clientSessionHandle, query, aggregateOptions, cancellationToken)
-						: collection.Aggregate<SequentialIdGeneratorBase.DocumentId>(query, aggregateOptions, cancellationToken)
+					clientSessionHandle == null
+						? collection.Aggregate<SequentialIdGeneratorBase.DocumentId>(query, aggregateOptions, cancellationToken)
+						: collection.Aggregate<SequentialIdGeneratorBase.DocumentId>(clientSessionHandle, query, aggregateOptions, cancellationToken)
 				)
 				.FirstOrDefault(cancellationToken)?.Id;
 
@@ -178,7 +178,7 @@ public class OptimisticSequentialIdGenerator<TDocument, TIdNamespace> : IDSIdGen
 
 			var lastId = (await
 				(
-					clientSessionHandle != null
+					clientSessionHandle == null
 						? await collection.AggregateAsync<SequentialIdGeneratorBase.DocumentId>(query, aggregateOptions, cancellationToken).ConfigureAwait(false)
 						: await collection.AggregateAsync<SequentialIdGeneratorBase.DocumentId>(clientSessionHandle, query, aggregateOptions, cancellationToken).ConfigureAwait(false)
 				)

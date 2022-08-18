@@ -10,12 +10,12 @@ public abstract class DSDocumentInfo
 	protected sealed class DSDocumentBuilder : IDSDocumentBuilder { }
 
 	public readonly Type DocumentType;
-	public readonly IReadOnlyDictionary<string, DataEntry> DataEntries;
-	public readonly DataEntry? IdField;
-	public readonly DataEntry? DateCreatedField;
-	public readonly DataEntry? DateModifiedField;
-	public readonly DataEntry? DateUpdatedField;
-	public readonly DataEntry? DateDeletedField;
+	public readonly IReadOnlyDictionary<string, DEInfo> DataEntries;
+	public readonly DEInfo? IdField;
+	public readonly DEInfo? DateCreatedField;
+	public readonly DEInfo? DateModifiedField;
+	public readonly DEInfo? DateUpdatedField;
+	public readonly DEInfo? DateDeletedField;
 
 	public DSDocumentInfo(Type documentType)
 	{
@@ -28,14 +28,14 @@ public abstract class DSDocumentInfo
 
 		PreBuild();
 
-		DataEntry dataEntry;
+		DEInfo dataEntryInfo;
 		object? methodSharedContext = null;
-		var dataEntries = new Dictionary<string, DataEntry>();
+		var dataEntries = new Dictionary<string, DEInfo>();
 
 		foreach (var candidate in GetDataEntryCandidates(documentType))
 		{
-			dataEntry = CreateDataEntry(candidate.memberInfo, candidate.flags, ref methodSharedContext);
-			dataEntries.Add(dataEntry.Name, dataEntry);
+			dataEntryInfo = CreateDataEntryInfo(candidate.memberInfo, candidate.flags, ref methodSharedContext);
+			dataEntries.Add(dataEntryInfo.Name, dataEntryInfo);
 		}
 
 		DataEntries = dataEntries;
@@ -68,7 +68,7 @@ public abstract class DSDocumentInfo
 		PostBuild();
 	}
 
-	protected abstract DataEntry CreateDataEntry(MemberInfo propertyInfo, DataEntryFlags flags, ref object? methodSharedContext);
+	protected abstract DEInfo CreateDataEntryInfo(MemberInfo propertyInfo, DataEntryFlags flags, ref object? methodSharedContext);
 	
 	protected virtual void PreBuild()
 	{

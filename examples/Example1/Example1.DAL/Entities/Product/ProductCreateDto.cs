@@ -9,6 +9,6 @@ public class ProductCreateDto
 
 	static void Builder(IQBMongoInsertBuilder<Product, ProductCreateDto> builder)
 	{
-		//builder.InsertToTable("products");
+		builder.InsertTo("products");
 	}
 }

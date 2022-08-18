@@ -12,6 +12,7 @@ internal sealed class InsertQueryBuilder<TDocument, TCreate> : QueryBuilder<TDoc
 	public InsertQueryBuilder(QBInsertBuilder<TDocument, TCreate> building, IDataContext dataContext)
 		: base(building, dataContext)
 	{
+		building.Normalize();
 	}
 
 	public async Task<TDocument> InsertAsync(
@@ -76,7 +77,7 @@ internal sealed class InsertQueryBuilder<TDocument, TCreate> : QueryBuilder<TDoc
 					var zero = deCreated.DataEntryType.GetDefaultValue();
 					if (dateValue == zero)
 					{
-						dateValue = Convert.ChangeType(DateTimeOffset.Now, deCreated.DataEntryType);
+						dateValue = Convert.ChangeType(DateTimeOffset.Now, deCreated.UnderlyingType);
 						deCreated.Setter(document!, dateValue);
 					}
 				}

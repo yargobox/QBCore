@@ -11,7 +11,7 @@ internal sealed class MongoDocumentInfo : DSDocumentInfo
 	public MongoDocumentInfo(Type documentType) : base(documentType)
 		=> ClassMap = BsonClassMap.LookupClassMap(DocumentType);
 
-	protected override DataEntry CreateDataEntry(MemberInfo memberInfo, DataEntryFlags flags, ref object? methodSharedContext)
+	protected override DEInfo CreateDataEntryInfo(MemberInfo memberInfo, DataEntryFlags flags, ref object? methodSharedContext)
 	{
 		if (methodSharedContext is not BsonClassMap classMap)
 		{
@@ -23,9 +23,9 @@ internal sealed class MongoDocumentInfo : DSDocumentInfo
 
 	MethodInfo _registerClassMapMethodInfo = typeof(BsonClassMap)
 		.GetMethods(BindingFlags.Static | BindingFlags.Public)
-		.SingleOrDefault(x => x.Name == nameof(BsonClassMap<DataEntry>.RegisterClassMap)
+		.SingleOrDefault(x => x.Name == nameof(BsonClassMap<DEInfo>.RegisterClassMap)
 			&& x.IsGenericMethodDefinition && x.GetParameters().Length == 1
-			&& x.GetParameters()[0].ParameterType == typeof(Action<>).MakeGenericType(x.GetGenericArguments()[0]))
+			&& x.GetParameters()[0].ParameterType == typeof(Action<>).MakeGenericType(typeof(BsonClassMap<>).MakeGenericType(x.GetGenericArguments()[0])))
 		?? throw new ApplicationException("Could not get MethodInfo for the BsonClassMap<T>.RegisterClassMap(Action<T>) method.");
 
 	protected override void PreBuild()
