@@ -49,8 +49,10 @@ public interface IUpdateQueryBuilder<TDocument, TUpdate> : IQueryBuilder<TDocume
 
 public interface IDeleteQueryBuilder<TDocument, TDelete> : IQueryBuilder<TDocument, TDelete>
 {
+	Task DeleteAsync(object id, TDelete? document, DataSourceDeleteOptions? options = null, CancellationToken cancellationToken = default(CancellationToken));
 }
 
 public interface IRestoreQueryBuilder<TDocument, TRestore> : IQueryBuilder<TDocument, TRestore>
 {
+	Task RestoreAsync(object id, TRestore? document, DataSourceRestoreOptions? options = null, CancellationToken cancellationToken = default(CancellationToken));
 }

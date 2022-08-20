@@ -31,10 +31,14 @@ public sealed class BrandService : DataSource<int?, Brand, BrandCreateDto, Brand
 	}
 	static void SoftDelBuilder(IQBMongoSoftDelBuilder<Brand, SoftDelDto> qb)
 	{
-		//qb.UpdateTable("brands");
+		qb.Update("brands");
 	}
 	static void RestoreBuilder(IQBMongoRestoreBuilder<Brand, SoftDelDto> qb)
 	{
-		//qb.UpdateTable("brands");
+		qb.Update("brands");
+	}
+	static void DeleteBuilder(IQBMongoDeleteBuilder<Brand, SoftDelDto> qb)
+	{
+		qb.DeleteFrom("brands");
 	}
 }

@@ -3,12 +3,12 @@ using MongoDB.Bson.Serialization;
 
 namespace QBCore.DataSource;
 
-internal sealed class MongoDataEntry : DEInfo
+internal sealed class MongoDEInfo : DEInfo
 {
-	private readonly BsonMemberMap? MemberMap;
+	public readonly BsonMemberMap? MemberMap;
 	public string? DBSideName => MemberMap?.ElementName;
 
-	public MongoDataEntry(MongoDocumentInfo document, MemberInfo memberInfo, DataEntryFlags flags, BsonClassMap classMap)
+	public MongoDEInfo(MongoDocumentInfo document, MemberInfo memberInfo, DataEntryFlags flags, BsonClassMap classMap)
 		: base(document, memberInfo, flags)
 		=> MemberMap = classMap.GetMemberMap(Name);
 

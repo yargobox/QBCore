@@ -10,8 +10,7 @@ internal sealed partial class SelectQueryBuilder<TDocument, TSelect> : QueryBuil
 {
 	public override QueryBuilderTypes QueryBuilderType => QueryBuilderTypes.Select;
 
-	public SelectQueryBuilder(QBSelectBuilder<TDocument, TSelect> building, IDataContext dataContext)
-		: base(building, dataContext)
+	public SelectQueryBuilder(QBSelectBuilder<TDocument, TSelect> building, IDataContext dataContext) : base(building, dataContext)
 	{
 		building.Normalize();
 	}
@@ -222,13 +221,18 @@ internal sealed partial class SelectQueryBuilder<TDocument, TSelect> : QueryBuil
 							} } });
 		}
 
-		if (options?.QueryStringAsyncCallback != null)
+		if (options != null)
 		{
-			await options.QueryStringAsyncCallback(new BsonArray(query).ToString()).ConfigureAwait(false);
-		}
-		else if (options?.QueryStringCallback != null)
-		{
-			options.QueryStringCallback(new BsonArray(query).ToString());
+			if (options.QueryStringAsyncCallback != null)
+			{
+				var queryString = string.Concat("db.", Builder.Containers.First().DBSideName, ".aggregate(", new BsonArray(query).ToString(), ");");
+				await options.QueryStringAsyncCallback(queryString).ConfigureAwait(false);
+			}
+			else if (options.QueryStringCallback != null)
+			{
+				var queryString = string.Concat("db.", Builder.Containers.First().DBSideName, ".aggregate(", new BsonArray(query).ToString(), ");");
+				options.QueryStringCallback(queryString);
+			}
 		}
 
 		using (var cursor = clientSessionHandle == null
@@ -282,11 +286,13 @@ internal sealed partial class SelectQueryBuilder<TDocument, TSelect> : QueryBuil
 			}
 			if (options.QueryStringAsyncCallback != null)
 			{
-				await options.QueryStringAsyncCallback(new BsonArray(query).ToString()).ConfigureAwait(false);
+				var queryString = string.Concat("db.", Builder.Containers.First().DBSideName, ".aggregate(", new BsonArray(query).ToString(), ");");
+				await options.QueryStringAsyncCallback(queryString).ConfigureAwait(false);
 			}
 			else if (options.QueryStringCallback != null)
 			{
-				options.QueryStringCallback(new BsonArray(query).ToString());
+				var queryString = string.Concat("db.", Builder.Containers.First().DBSideName, ".aggregate(", new BsonArray(query).ToString(), ");");
+				options.QueryStringCallback(queryString);
 			}
 		}
 
@@ -604,7 +610,7 @@ internal sealed partial class SelectQueryBuilder<TDocument, TSelect> : QueryBuil
 				stageIndex = stages.FindIndex(x => x.Container.Alias == joinedDoc.RefAlias!);
 
 				path = string.Concat(stages[stageIndex].LookupAs, ".",
-					string.Join(".", field.Field.Skip(joinedDoc.Field.Count).Select(x => field.Field.Cast<MongoDataEntry>().Select(x => x.DBSideName))));
+					string.Join(".", field.Field.Skip(joinedDoc.Field.Count).Select(x => field.Field.Cast<MongoDEInfo>().Select(x => x.DBSideName))));
 
 				// Propagate the exclude
 				//

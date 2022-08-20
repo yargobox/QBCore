@@ -30,10 +30,10 @@ public interface IDataSource<TKey, TDocument, TCreate, TSelect, TUpdate, TDelete
 		DataSourceCountOptions? options = null,
 		CancellationToken cancellationToken = default(CancellationToken)
 	);
-	Task<TSelect> SelectAsync(
+	Task<TSelect?> SelectAsync(
 		TKey id,
-		DataSourceSelectOptions? options = null,
 		IReadOnlyDictionary<string, object?>? arguments = null,
+		DataSourceSelectOptions? options = null,
 		CancellationToken cancellationToken = default(CancellationToken)
 	);
 	Task<IDSAsyncCursor<TSelect>> SelectAsync(
@@ -50,37 +50,21 @@ public interface IDataSource<TKey, TDocument, TCreate, TSelect, TUpdate, TDelete
 		TKey id,
 		TUpdate document,
 		IReadOnlyCollection<string>? modifiedFieldNames = null,
-		DataSourceUpdateOptions? options = null,
-		CancellationToken cancellationToken = default(CancellationToken)
-	);
-	Task<TUpdate> UpdateAsync(
-		TUpdate document,
-		IReadOnlyList<DSCondition<TSelect>> conditions,
-		IReadOnlyCollection<string>? modifiedFieldNames = null,
+		IReadOnlyDictionary<string, object?>? arguments = null,
 		DataSourceUpdateOptions? options = null,
 		CancellationToken cancellationToken = default(CancellationToken)
 	);
 	Task DeleteAsync(
 		TKey id,
-		TDelete document,
-		DataSourceDeleteOptions? options = null,
-		CancellationToken cancellationToken = default(CancellationToken)
-	);
-	Task DeleteAsync(
-		TDelete document,
-		IReadOnlyList<DSCondition<TSelect>> conditions,
+		TDelete? document = default(TDelete?),
+		IReadOnlyDictionary<string, object?>? arguments = null,
 		DataSourceDeleteOptions? options = null,
 		CancellationToken cancellationToken = default(CancellationToken)
 	);
 	Task RestoreAsync(
 		TKey id,
-		TRestore document,
-		DataSourceRestoreOptions? options = null,
-		CancellationToken cancellationToken = default(CancellationToken)
-	);
-	Task RestoreAsync(
-		TRestore document,
-		IReadOnlyList<DSCondition<TSelect>> conditions,
+		TRestore? document = default(TRestore?),
+		IReadOnlyDictionary<string, object?>? arguments = null,
 		DataSourceRestoreOptions? options = null,
 		CancellationToken cancellationToken = default(CancellationToken)
 	);

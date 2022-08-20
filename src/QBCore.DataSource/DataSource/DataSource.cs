@@ -2,6 +2,7 @@ using AutoMapper;
 using Microsoft.Extensions.DependencyInjection;
 using QBCore.Configuration;
 using QBCore.DataSource.Options;
+using QBCore.DataSource.QueryBuilder;
 using QBCore.Extensions.Threading.Tasks;
 using QBCore.ObjectFactory;
 
@@ -20,6 +21,7 @@ public abstract partial class DataSource<TKey, TDocument, TCreate, TSelect, TUpd
 	protected DataSourceListener<TKey, TDocument, TCreate, TSelect, TUpdate, TDelete, TRestore>? _listener;
 	private object? _syncRoot;
 
+	public IDSInfo DSInfo { get; }
 	public object SyncRoot
 	{
 		get
@@ -43,8 +45,6 @@ public abstract partial class DataSource<TKey, TDocument, TCreate, TSelect, TUpd
 			AsyncHelper.RunSync(async () => await _listener.OnAttachAsync(this));
 		}
 	}
-
-	public IDSInfo DSInfo { get; }
 
 	public async Task<TKey> InsertAsync(
 		TCreate document,
@@ -109,13 +109,43 @@ public abstract partial class DataSource<TKey, TDocument, TCreate, TSelect, TUpd
 		throw new NotImplementedException();
 	}
 
-	public Task<TSelect> SelectAsync(
+	public async Task<TSelect?> SelectAsync(
 		TKey id,
-		DataSourceSelectOptions? options = null,
 		IReadOnlyDictionary<string, object?>? arguments = null,
+		DataSourceSelectOptions? options = null,
 		CancellationToken cancellationToken = default(CancellationToken))
 	{
-		throw new NotImplementedException();
+		if (!DSInfo.Options.HasFlag(DataSourceOptions.CanSelect))
+		{
+			throw new InvalidOperationException($"DataSource {DSInfo.Name} does not support the select operation.");
+		}
+
+		if (default(TKey) == null && id == null)
+		{
+			throw new ArgumentNullException(nameof(id), "Identifier value not specified.");
+		}
+
+		var idField = DSInfo.DocumentInfo.Value.IdField
+			?? throw new InvalidOperationException($"Document '{DSInfo.DocumentInfo.Value.DocumentType.ToPretty()}' does not have an id field.");
+
+		var qb = DSInfo.QBFactory.CreateQBSelect<TDocument, TSelect>(_dataContext);
+		var builder = qb.Builder;
+
+		builder.Condition(idField, id, FO.Equal);
+
+		object? value;
+		foreach (var param in builder.Parameters)
+		{
+			param.ResetValue();
+			if (arguments != null && arguments.TryGetValue(param.Name, out value))
+			{
+				param.Value = value;
+			}
+		}
+
+		return await
+			(await qb.SelectAsync(0, -1, options, cancellationToken).ConfigureAwait(false))
+				.FirstOrDefaultAsync().ConfigureAwait(false);
 	}
 
 	public async Task<IDSAsyncCursor<TSelect>> SelectAsync(
@@ -201,6 +231,7 @@ public abstract partial class DataSource<TKey, TDocument, TCreate, TSelect, TUpd
 		TKey id,
 		TUpdate document,
 		IReadOnlyCollection<string>? modifiedFieldNames = null,
+		IReadOnlyDictionary<string, object?>? arguments = null,
 		DataSourceUpdateOptions? options = null,
 		CancellationToken cancellationToken = default(CancellationToken)
 	)
@@ -208,54 +239,81 @@ public abstract partial class DataSource<TKey, TDocument, TCreate, TSelect, TUpd
 		throw new NotImplementedException();
 	}
 
-	public Task<TUpdate> UpdateAsync(
-		TUpdate document,
-		IReadOnlyList<DSCondition<TSelect>> conditions,
-		IReadOnlyCollection<string>? modifiedFieldNames = null,
-		DataSourceUpdateOptions? options = null,
-		CancellationToken cancellationToken = default(CancellationToken)
-	)
-	{
-		throw new NotImplementedException();
-	}
-
-	public Task DeleteAsync(
+	public async Task DeleteAsync(
 		TKey id,
-		TDelete document,
+		TDelete? document = default(TDelete?),
+		IReadOnlyDictionary<string, object?>? arguments = null,
 		DataSourceDeleteOptions? options = null,
 		CancellationToken cancellationToken = default(CancellationToken)
 	)
 	{
-		throw new NotImplementedException();
+		if (!DSInfo.Options.HasFlag(DataSourceOptions.CanDelete))
+		{
+			throw new InvalidOperationException($"DataSource {DSInfo.Name} does not support the delete operation.");
+		}
+
+		if (DSInfo.Options.HasFlag(DataSourceOptions.SoftDelete))
+		{
+			var qb = DSInfo.QBFactory.CreateQBSoftDel<TDocument, TDelete>(_dataContext);
+			var builder = qb.Builder;
+
+			object? value;
+			foreach (var param in builder.Parameters)
+			{
+				param.ResetValue();
+				if (arguments != null && arguments.TryGetValue(param.Name, out value))
+				{
+					param.Value = value;
+				}
+			}
+
+			await qb.DeleteAsync(id!, document, options, cancellationToken).ConfigureAwait(false);
+		}
+		else
+		{
+			var qb = DSInfo.QBFactory.CreateQBDelete<TDocument, TDelete>(_dataContext);
+			var builder = qb.Builder;
+
+			object? value;
+			foreach (var param in builder.Parameters)
+			{
+				param.ResetValue();
+				if (arguments != null && arguments.TryGetValue(param.Name, out value))
+				{
+					param.Value = value;
+				}
+			}
+
+			await qb.DeleteAsync(id!, document, options, cancellationToken).ConfigureAwait(false);
+		}
 	}
 
-	public Task DeleteAsync(
-		TDelete document,
-		IReadOnlyList<DSCondition<TSelect>> conditions,
-		DataSourceDeleteOptions? options = null,
-		CancellationToken cancellationToken = default(CancellationToken)
-	)
-	{
-		throw new NotImplementedException();
-	}
-
-	public Task RestoreAsync(
+	public async Task RestoreAsync(
 		TKey id,
-		TRestore document,
+		TRestore? document = default(TRestore?),
+		IReadOnlyDictionary<string, object?>? arguments = null,
 		DataSourceRestoreOptions? options = null,
 		CancellationToken cancellationToken = default(CancellationToken)
 	)
 	{
-		throw new NotImplementedException();
-	}
+		if (!DSInfo.Options.HasFlag(DataSourceOptions.CanRestore | DataSourceOptions.SoftDelete))
+		{
+			throw new InvalidOperationException($"DataSource {DSInfo.Name} does not support the restore operation.");
+		}
 
-	public Task RestoreAsync(
-		TRestore document,
-		IReadOnlyList<DSCondition<TSelect>> conditions,
-		DataSourceRestoreOptions? options = null,
-		CancellationToken cancellationToken = default(CancellationToken)
-	)
-	{
-		throw new NotImplementedException();
+		var qb = DSInfo.QBFactory.CreateQBRestore<TDocument, TRestore>(_dataContext);
+		var builder = qb.Builder;
+
+		object? value;
+		foreach (var param in builder.Parameters)
+		{
+			param.ResetValue();
+			if (arguments != null && arguments.TryGetValue(param.Name, out value))
+			{
+				param.Value = value;
+			}
+		}
+
+		await qb.RestoreAsync(id!, document, options, cancellationToken).ConfigureAwait(false);
 	}
 }

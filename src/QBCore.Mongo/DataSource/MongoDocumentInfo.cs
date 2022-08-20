@@ -18,7 +18,7 @@ internal sealed class MongoDocumentInfo : DSDocumentInfo
 			methodSharedContext = classMap = BsonClassMap.LookupClassMap(DocumentType);
 		}
 
-		return new MongoDataEntry(this, memberInfo, flags, classMap);
+		return new MongoDEInfo(this, memberInfo, flags, classMap);
 	}
 
 	MethodInfo _registerClassMapMethodInfo = typeof(BsonClassMap)

@@ -1,4 +1,5 @@
 using MongoDB.Bson;
+using MongoDB.Bson.Serialization;
 using MongoDB.Driver;
 using QBCore.Configuration;
 using QBCore.DataSource.Options;
@@ -9,17 +10,12 @@ internal sealed class InsertQueryBuilder<TDocument, TCreate> : QueryBuilder<TDoc
 {
 	public override QueryBuilderTypes QueryBuilderType => QueryBuilderTypes.Insert;
 
-	public InsertQueryBuilder(QBInsertBuilder<TDocument, TCreate> building, IDataContext dataContext)
-		: base(building, dataContext)
+	public InsertQueryBuilder(QBInsertBuilder<TDocument, TCreate> building, IDataContext dataContext) : base(building, dataContext)
 	{
 		building.Normalize();
 	}
 
-	public async Task<TDocument> InsertAsync(
-		TDocument document,
-		DataSourceInsertOptions? options = null,
-		CancellationToken cancellationToken = default(CancellationToken)
-	)
+	public async Task<TDocument> InsertAsync(TDocument document, DataSourceInsertOptions? options = null, CancellationToken cancellationToken = default(CancellationToken))
 	{
 		var top = Builder.Containers.First();
 		if (top.ContainerOperation != ContainerOperations.Insert)
@@ -44,9 +40,9 @@ internal sealed class InsertQueryBuilder<TDocument, TCreate> : QueryBuilder<TDoc
 		var insertOneOptions = (InsertOneOptions?)options?.NativeOptions;
 		var clientSessionHandle = (IClientSessionHandle?)options?.NativeClientSession;
 
-		var deId = (MongoDataEntry?)Builder.DocumentInfo.IdField;
-		var deCreated = (MongoDataEntry?)Builder.DocumentInfo.DateCreatedField;
-		var deModified = (MongoDataEntry?)Builder.DocumentInfo.DateModifiedField;
+		var deId = (MongoDEInfo?)Builder.DocumentInfo.IdField;
+		var deCreated = (MongoDEInfo?)Builder.DocumentInfo.DateCreatedField;
+		var deModified = (MongoDEInfo?)Builder.DocumentInfo.DateModifiedField;
 
 		var customIdGenerator = Builder.IdGenerator != null ? Builder.IdGenerator() : null;
 		var generateId = customIdGenerator != null && deId?.Setter != null && customIdGenerator.IsEmpty(deId.Getter(document!));
@@ -57,8 +53,8 @@ internal sealed class InsertQueryBuilder<TDocument, TCreate> : QueryBuilder<TDoc
 		{
 			generatorOptions = options.GeneratorOptions ?? new DataSourceIdGeneratorOptions();
 			generatorOptions.NativeClientSession ??= options.NativeClientSession;
-			//generatorOptions.QueryStringCallback ??= options.QueryStringCallback;
-			//generatorOptions.QueryStringAsyncCallback ??= options.QueryStringAsyncCallback;
+			generatorOptions.QueryStringCallback ??= options.QueryStringCallback;
+			generatorOptions.QueryStringAsyncCallback ??= options.QueryStringAsyncCallback;
 		}
 
 		for (int i = 0; ; )
@@ -94,6 +90,20 @@ internal sealed class InsertQueryBuilder<TDocument, TCreate> : QueryBuilder<TDoc
 						dateValue = Convert.ChangeType(DateTimeOffset.Now, deModified.DataEntryType);
 						deModified.Setter(document!, dateValue);
 					}
+				}
+			}
+
+			if (options != null)
+			{
+				if (options.QueryStringAsyncCallback != null)
+				{
+					var queryString = string.Concat("db.", top.DBSideName, ".insertOne(", document.ToBsonDocument().ToString(), ");");
+					await options.QueryStringAsyncCallback(queryString).ConfigureAwait(false);
+				}
+				else if (options.QueryStringCallback != null)
+				{
+					var queryString = string.Concat("db.", top.DBSideName, ".insertOne(", document.ToBsonDocument().ToString(), ");");
+					options.QueryStringCallback(queryString);
 				}
 			}
 

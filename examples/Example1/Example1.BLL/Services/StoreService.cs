@@ -14,10 +14,10 @@ public sealed class StoreService : DataSource<int?, Store, StoreCreateDto, Store
 
 	static void SoftDelBuilder(IQBMongoSoftDelBuilder<Store, SoftDelDto> qb)
 	{
-		//qb.UpdateTable("stores");
+		qb.Update("stores");
 	}
 	static void RestoreBuilder(IQBMongoRestoreBuilder<Store, SoftDelDto> qb)
 	{
-		//qb.UpdateTable("stores");
+		qb.Update("stores");
 	}
 }

@@ -4,6 +4,6 @@ internal static class ExtensionsForDataEntryPath
 {
 	public static string GetDBSideName(this DEPath path)
 	{
-		return string.Join('.', path.Cast<MongoDataEntry>().Select(x => x.DBSideName));
+		return string.Join('.', path.Cast<MongoDEInfo>().Select(x => x.DBSideName));
 	}
 }

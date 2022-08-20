@@ -51,18 +51,21 @@ public interface IQBMongoSelectBuilder<TDoc, TSelect> : IQBBuilder
 	IQBMongoSelectBuilder<TDoc, TSelect> Optional(Expression<Func<TSelect, object?>> field);
 }
 
-public interface IQBMongoUpdateBuilder<TDoc, TCreate> : IQBBuilder
+public interface IQBMongoUpdateBuilder<TDoc, TUpdate> : IQBBuilder
 {
 }
 
-public interface IQBMongoSoftDelBuilder<TDoc, TCreate> : IQBBuilder
+public interface IQBMongoSoftDelBuilder<TDoc, TDelete> : IQBBuilder
 {
+	IQBMongoSoftDelBuilder<TDoc, TDelete> Update(string tableName);
 }
 
-public interface IQBMongoDeleteBuilder<TDoc, TCreate> : IQBBuilder
+public interface IQBMongoDeleteBuilder<TDoc, TDelete> : IQBBuilder
 {
+	IQBMongoDeleteBuilder<TDoc, TDelete> DeleteFrom(string tableName);
 }
 
-public interface IQBMongoRestoreBuilder<TDoc, TCreate> : IQBBuilder
+public interface IQBMongoRestoreBuilder<TDoc, TRestore> : IQBBuilder
 {
+	IQBMongoRestoreBuilder<TDoc, TRestore> Update(string tableName);
 }

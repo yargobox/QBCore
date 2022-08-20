@@ -25,30 +25,30 @@ public class DataSourceController<TKey, TDocument, TCreate, TSelect, TUpdate, TD
 	[HttpGet, ActionName("index")]
 	//[ProducesResponseType(typeof(DataSourceResponse<TSelect>), StatusCodes.Status200OK)]
 	public async Task<ActionResult<DataSourceResponse<TSelect>>> IndexAsync(
-		[FromQuery, MaxLength(7)] string? _de,
-		[FromQuery, MaxLength(8192)] string? _fl,
-		[FromQuery, MaxLength(2048)] string? _so,
-		[FromQuery, Range(1, int.MaxValue)] int? _ps,
-		[FromQuery, Range(1, int.MaxValue)] int? _pn)
+		[FromQuery, MaxLength(7)] string? mode,
+		[FromQuery, MaxLength(8192)] string? filter,
+		[FromQuery, MaxLength(2048)] string? sort,
+		[FromQuery, Range(1, int.MaxValue)] int? size,
+		[FromQuery, Range(1, int.MaxValue)] int? num)
 	{
 		long skip = 0;
-		if (_ps != null)
+		if (size != null)
 		{
-			if (_pn == null)
+			if (num == null)
 			{
-				throw new ArgumentNullException(nameof(_pn));
+				throw new ArgumentNullException(nameof(num));
 			}
-			skip = (long)_ps.Value * (_pn.Value - 1);
+			skip = (long)size.Value * (num.Value - 1);
 		}
-		else if (_pn != null)
+		else if (num != null)
 		{
-			throw new ArgumentNullException(nameof(_ps));
+			throw new ArgumentNullException(nameof(size));
 		}
 
 		var dataSourceResponse = new DataSourceResponse<TSelect>
 		{
-			PageSize = _ps ?? -1,
-			PageNumber = _pn ?? -1
+			PageSize = size ?? -1,
+			PageNumber = num ?? -1
 		};
 		var options = new DataSourceSelectOptions
 		{
@@ -57,7 +57,7 @@ public class DataSourceController<TKey, TDocument, TCreate, TSelect, TUpdate, TD
 		};
 
 		dataSourceResponse.Data =
-			await ( await _service.SelectAsync(SoftDel.Actual, null, null, null, skip, _pn ?? -1, options) )
+			await ( await _service.SelectAsync(SoftDel.Actual, null, null, null, skip, num ?? -1, options) )
 				.ToListAsync((bool x) => dataSourceResponse.IsLastPage = x ? 1 : 0);
 
 		return Ok(dataSourceResponse);
@@ -73,19 +73,18 @@ public class DataSourceController<TKey, TDocument, TCreate, TSelect, TUpdate, TD
 	}
 
 	[HttpGet("{id}"), ActionName("get")]
-	public async Task<ActionResult<TSelect>> GetAsync([FromQuery, Required] TKey id)
+	public async Task<ActionResult<TSelect?>> GetAsync(TKey id)
 	{
-		Console.WriteLine(ControllerContext.ActionDescriptor.ActionName);
-		Console.WriteLine(string.Join(", ", ControllerContext.ActionDescriptor.RouteValues.Select(x => x.Key + " = " + x.Value)));
-		Console.WriteLine(string.Join(", ", Request.Query.Select(x => x.Key + " = " + x.Value)));
-		return await Task.FromResult(Ok());
+		var options = new DataSourceSelectOptions
+		{
+			QueryStringCallback = x => Console.WriteLine(x)//!!!
+		};
+
+		return await _service.SelectAsync(id, null, options);
 	}
 
-	[HttpPost, ActionName("create")]
-	//[ValidateAntiForgeryToken]
-	public async Task<ActionResult<TKey>> CreateAsync(
-		[FromBody] TCreate model,
-		[FromQuery, Range(0, 1)] int? _dp)
+	[HttpPost, ActionName("create")/* , ValidateAntiForgeryToken */]
+	public async Task<ActionResult<TKey>> CreateAsync([FromBody] TCreate model, [FromQuery, Range(0, 1)] int? depends)
 	{
 		var options = new DataSourceInsertOptions
 		{
@@ -102,36 +101,38 @@ public class DataSourceController<TKey, TDocument, TCreate, TSelect, TUpdate, TD
 	}
 
 	[HttpPut("{id}"), ActionName("update")]
-	public async Task<ActionResult> UpdateAsync(
-		[FromQuery, Required] TKey id,
-		[FromBody] TUpdate model,
-		[FromQuery, Range(0, 1)] int? _dp)
+	public async Task<ActionResult> UpdateAsync(TKey id, [FromBody] TUpdate model, [FromQuery, Range(0, 1)] int? depends)
 	{
-		Console.WriteLine(ControllerContext.ActionDescriptor.ActionName);
-		Console.WriteLine(string.Join(", ", ControllerContext.ActionDescriptor.RouteValues.Select(x => x.Key + " = " + x.Value)));
-		Console.WriteLine(string.Join(", ", Request.Query.Select(x => x.Key + " = " + x.Value)));
-		return await Task.FromResult(Ok());
+		var options = new DataSourceUpdateOptions
+		{
+			QueryStringCallback = x => Console.WriteLine(x)//!!!
+		};
+
+		await _service.UpdateAsync(id, model, null, null, options);
+		return Ok();
 	}
 
 	[HttpDelete("{id}"), ActionName("delete")]
-	public async Task<ActionResult> DeleteAsync(
-		[FromQuery, Required] TKey id,
-		[FromBody] TDelete? model)
+	public async Task<ActionResult> DeleteAsync(TKey id, [FromBody] TDelete? model)
 	{
-		Console.WriteLine(ControllerContext.ActionDescriptor.ActionName);
-		Console.WriteLine(string.Join(", ", ControllerContext.ActionDescriptor.RouteValues.Select(x => x.Key + " = " + x.Value)));
-		Console.WriteLine(string.Join(", ", Request.Query.Select(x => x.Key + " = " + x.Value)));
-		return await Task.FromResult(Ok());
+		var options = new DataSourceDeleteOptions
+		{
+			QueryStringCallback = x => Console.WriteLine(x)//!!!
+		};
+
+		await _service.DeleteAsync(id, model, null, options);
+		return Ok();
 	}
 
 	[HttpPatch("{id}"), ActionName("restore")]
-	public async Task<ActionResult> RestoreAsync(
-		[FromQuery, Required] TKey id,
-		[FromBody] TRestore? model)
+	public async Task<ActionResult> RestoreAsync(TKey id, [FromBody] TRestore? model)
 	{
-		Console.WriteLine(ControllerContext.ActionDescriptor.ActionName);
-		Console.WriteLine(string.Join(", ", ControllerContext.ActionDescriptor.RouteValues.Select(x => x.Key + " = " + x.Value)));
-		Console.WriteLine(string.Join(", ", Request.Query.Select(x => x.Key + " = " + x.Value)));
-		return await Task.FromResult(Ok());
+		var options = new DataSourceRestoreOptions
+		{
+			QueryStringCallback = x => Console.WriteLine(x)//!!!
+		};
+
+		await _service.RestoreAsync(id, model, null, options);
+		return Ok();
 	}
 }

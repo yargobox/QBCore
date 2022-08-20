@@ -61,7 +61,7 @@ public abstract class QBBuilder<TDoc, TDto> : IQBBuilder
 	public QBBuilder()
 	{
 		_documentInfo = StaticFactory.Documents[typeof(TDoc)].Value;
-		_projectionInfo = StaticFactory.Documents.GetValueOrDefault(typeof(TDoc))?.Value;
+		_projectionInfo = StaticFactory.Documents.GetValueOrDefault(typeof(TDto))?.Value;
 		_containers = new List<QBContainer>(3);
 	}
 	public QBBuilder(QBBuilder<TDoc, TDto> other)
@@ -102,6 +102,8 @@ public abstract class QBBuilder<TDoc, TDto> : IQBBuilder
 	public virtual QBBuilder<TDoc, TDto> SelectFrom(string alias, string tableName) => throw new NotSupportedException();
 
 	public virtual QBBuilder<TDoc, TDto> InsertTo(string tableName) => throw new NotSupportedException();
+	public virtual QBBuilder<TDoc, TDto> Update(string tableName) => throw new NotSupportedException();
+	public virtual QBBuilder<TDoc, TDto> DeleteFrom(string tableName) => throw new NotSupportedException();
 
 	public virtual QBBuilder<TDoc, TDto> LeftJoin<TRef>(string tableName) => throw new NotSupportedException();
 	public virtual QBBuilder<TDoc, TDto> LeftJoin<TRef>(string alias, string tableName) => throw new NotSupportedException();

@@ -91,7 +91,11 @@ public class OptimisticSequentialIdGenerator<TDocument, TIdNamespace> : IDSIdGen
 
 			if (options?.QueryStringCallback != null)
 			{
-				options.QueryStringCallback(Step > 0 ? SequentialIdGeneratorBase.MaxIDQueryString : SequentialIdGeneratorBase.MinIDQueryString);
+				var queryString = string.Concat(
+					"db.", collection.CollectionNamespace.CollectionName, ".aggregate(",
+						Step > 0 ? SequentialIdGeneratorBase.MaxIDQueryString : SequentialIdGeneratorBase.MinIDQueryString,
+					");");
+				options.QueryStringCallback(queryString);
 			}
 
 			var lastId =
@@ -169,11 +173,19 @@ public class OptimisticSequentialIdGenerator<TDocument, TIdNamespace> : IDSIdGen
 
 			if (options?.QueryStringAsyncCallback != null)
 			{
-				await options.QueryStringAsyncCallback(Step > 0 ? SequentialIdGeneratorBase.MaxIDQueryString : SequentialIdGeneratorBase.MinIDQueryString).ConfigureAwait(false);
+				var queryString = string.Concat(
+					"db.", collection.CollectionNamespace.CollectionName, ".aggregate(",
+						Step > 0 ? SequentialIdGeneratorBase.MaxIDQueryString : SequentialIdGeneratorBase.MinIDQueryString,
+					");");
+				await options.QueryStringAsyncCallback(queryString).ConfigureAwait(false);
 			}
 			else if (options?.QueryStringCallback != null)
 			{
-				options.QueryStringCallback(Step > 0 ? SequentialIdGeneratorBase.MaxIDQueryString : SequentialIdGeneratorBase.MinIDQueryString);
+				var queryString = string.Concat(
+					"db.", collection.CollectionNamespace.CollectionName, ".aggregate(",
+						Step > 0 ? SequentialIdGeneratorBase.MaxIDQueryString : SequentialIdGeneratorBase.MinIDQueryString,
+					");");
+				options.QueryStringCallback(queryString);
 			}
 
 			var lastId = (await
