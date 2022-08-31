@@ -3,9 +3,8 @@ namespace QBCore.DataSource.QueryBuilder.Mongo;
 internal sealed class QBInsertBuilder<TDoc, TDto> : QBBuilder<TDoc, TDto>, IQBMongoInsertBuilder<TDoc, TDto>
 {
 	public override QueryBuilderTypes QueryBuilderType => QueryBuilderTypes.Insert;
-
-	private Func<IDSIdGenerator>? _idGenerator;
-
+	public override IDataLayerInfo DataLayer => MongoDataLayer.Default;
+	public override IReadOnlyList<QBContainer> Containers => _containers ?? EmptyLists.Containers;
 	public override Func<IDSIdGenerator>? IdGenerator
 	{
 		get => _idGenerator;
@@ -18,54 +17,87 @@ internal sealed class QBInsertBuilder<TDoc, TDto> : QBBuilder<TDoc, TDto>, IQBMo
 	}
 	Func<IDSIdGenerator>? IQBMongoInsertBuilder<TDoc, TDto>.IdGenerator
 	{
-		get => this.IdGenerator;
-		set => this.IdGenerator = value;
+		get => IdGenerator;
+		set => IdGenerator = value;
 	}
+
+	private List<QBContainer>? _containers;
+	private Func<IDSIdGenerator>? _idGenerator;
 
 	public QBInsertBuilder() { }
 	public QBInsertBuilder(QBInsertBuilder<TDoc, TDto> other) : base(other)
 	{
+		if (other._containers != null) _containers = new List<QBContainer>(1) { other._containers.First() };
 		_idGenerator = other._idGenerator;
+	}
+	public QBInsertBuilder(IQBBuilder other)
+	{
+		if (other.DocumentType != typeof(TDoc))
+		{
+			throw new InvalidOperationException($"Could not make insert query builder '{typeof(TDoc).ToPretty()}, {typeof(TDto).ToPretty()}' from '{other.DocumentType.ToPretty()}, {other.ProjectionType.ToPretty()}'.");
+		}
+
+		if (other.Containers.Count > 0)
+		{
+			var c = other.Containers.First();
+			if (c.DocumentType != typeof(TDoc) || c.ContainerType != ContainerTypes.Table)
+			{
+				throw new InvalidOperationException($"Could not make insert query builder '{typeof(TDoc).ToPretty()}, {typeof(TDto).ToPretty()}' from '{other.DocumentType.ToPretty()}, {other.ProjectionType.ToPretty()}'.");
+			}
+
+			Insert(c.DBSideName);
+		}
+	}
+	public override QBBuilder<TDoc, TDto> AutoBuild()
+	{
+		if (Containers.Count > 0)
+		{
+			throw new InvalidOperationException($"Insert query builder '{typeof(TDto).ToPretty()}' has already been initialized.");
+		}
+
+		return Insert();
 	}
 
 	protected override void OnNormalize()
 	{
-		if (_containers.Count != 1)
+		if (Containers.Count != 1)
 		{
 			throw new InvalidOperationException($"Incompatible configuration of insert query builder '{typeof(TDto).ToPretty()}'.");
 		}
 	}
 
-	private QBInsertBuilder<TDoc, TDto> AddContainer(
-		Type documentType,
-		string alias,
-		string dbSideName,
-		ContainerTypes containerType,
-		ContainerOperations containerOperation)
+	private QBInsertBuilder<TDoc, TDto> AddContainer(string? dbSideName)
 	{
-		if (_containers.Count > 0)
+		if (Containers.Count > 0)
 		{
 			throw new InvalidOperationException($"Incorrect definition of insert query builder '{typeof(TDto).ToPretty()}': initial container has already been added before.");
 		}
-		if (alias.Contains('.'))
+
+		dbSideName ??= MongoDataLayer.Default.GetDefaultDBSideContainerName(typeof(TDoc));
+		if (string.IsNullOrEmpty(dbSideName))
 		{
-			throw new InvalidOperationException($"Incorrect definition of insert query builder '{typeof(TDto).ToPretty()}': container alias '{alias}' cannot contain a period character '.'.");
+			throw new ArgumentException(nameof(dbSideName));
+		}
+
+		if (_containers == null)
+		{
+			_containers = new List<QBContainer>(1);
 		}
 
 		IsNormalized = false;
 		_containers.Add(new QBContainer(
-			DocumentType: documentType,
-			Alias: alias,
+			DocumentType: typeof(TDoc),
+			Alias: dbSideName,
 			DBSideName: dbSideName,
-			ContainerType: containerType,
-			ContainerOperation: containerOperation
+			ContainerType: ContainerTypes.Table,
+			ContainerOperation: ContainerOperations.Insert
 		));
 
 		return this;
 	}
 
-	public override QBBuilder<TDoc, TDto> InsertTo(string tableName)
-		=> AddContainer(typeof(TDoc), tableName, tableName, ContainerTypes.Table, ContainerOperations.Insert);
-	IQBMongoInsertBuilder<TDoc, TDto> IQBMongoInsertBuilder<TDoc, TDto>.InsertTo(string tableName)
-		=> AddContainer(typeof(TDoc), tableName, tableName, ContainerTypes.Table, ContainerOperations.Insert);
+	public override QBBuilder<TDoc, TDto> Insert(string? tableName = null)
+		=> AddContainer(tableName);
+	IQBMongoInsertBuilder<TDoc, TDto> IQBMongoInsertBuilder<TDoc, TDto>.Insert(string? tableName)
+		=> AddContainer(tableName);
 }

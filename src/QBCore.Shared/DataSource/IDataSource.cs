@@ -46,10 +46,10 @@ public interface IDataSource<TKey, TDocument, TCreate, TSelect, TUpdate, TDelete
 		DataSourceSelectOptions? options = null,
 		CancellationToken cancellationToken = default(CancellationToken)
 	);
-	Task<TUpdate> UpdateAsync(
+	Task UpdateAsync(
 		TKey id,
 		TUpdate document,
-		IReadOnlyCollection<string>? modifiedFieldNames = null,
+		IReadOnlySet<string>? modifiedFieldNames = null,
 		IReadOnlyDictionary<string, object?>? arguments = null,
 		DataSourceUpdateOptions? options = null,
 		CancellationToken cancellationToken = default(CancellationToken)

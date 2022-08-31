@@ -1,5 +1,4 @@
 using MongoDB.Bson;
-using MongoDB.Bson.Serialization;
 using MongoDB.Driver;
 using QBCore.Configuration;
 using QBCore.DataSource.Options;

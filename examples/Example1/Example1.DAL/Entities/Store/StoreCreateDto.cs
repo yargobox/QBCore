@@ -8,6 +8,6 @@ public class StoreCreateDto
 
 	static void Builder(IQBMongoInsertBuilder<Store, StoreCreateDto> builder)
 	{
-		builder.InsertTo("stores");
+		builder.Insert("stores");
 	}
 }

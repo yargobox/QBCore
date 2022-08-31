@@ -17,6 +17,6 @@ public class BrandSelectDto
 
 	static void Builder(IQBMongoSelectBuilder<Brand, BrandSelectDto> builder)
 	{
-		builder.SelectFrom("brands");
+		builder.Select("brands");
 	}
 }

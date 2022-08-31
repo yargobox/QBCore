@@ -7,6 +7,7 @@ public interface IDataLayerInfo
 	string Name { get; }
 	Type DatabaseContextInterface { get; }
 	Func<Type, bool> IsDocumentType { get; set; }
+	Func<Type, string> GetDefaultDBSideContainerName { get; set; }
 
 	DSDocumentInfo CreateDocumentInfo(Type documentType);
 	IQueryBuilderFactory CreateQBFactory(

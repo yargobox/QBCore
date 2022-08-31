@@ -42,14 +42,14 @@ public class OrderSelectDto
 		*/
 
 		builder
-			.SelectFrom("orders")
+			.Select("orders")
 				//.Optional(sel => sel.Updated)
 
   			.Join<Store>("stores")
 				.Connect<Store, Order>(store => store.Id, order => order.StoreId, FO.Equal)
 				.Include<Store>(sel => sel.StoreName, "stores", store => store.Name)
 
-			.LeftJoin<Store>("stores2", "stores")
+			.LeftJoin<Store>("stores", "stores2")
 				.Connect<Store, Order>("stores2", store => store.Id, "orders", order => order.StoreId, FO.Equal)
 				//.Connect<Store, Store>("stores2", store => store.Created, "stores", store => store.Deleted, ConditionOperations.NotEqual)
 				//.Connect<Store>("stores2", store => store.Updated, null, ConditionOperations.IsNull)
@@ -57,7 +57,7 @@ public class OrderSelectDto
 				//.Exclude(sel => sel.Store!.Created)
 				//.Optional(sel => sel.Store!.Updated)
 
-			.LeftJoin<Store>("stores3", "stores")
+			.LeftJoin<Store>("stores", "stores3")
 				.Connect<Store, Store>("stores3", store => store.Id, "stores2", store2 => store2.Id, FO.Equal)
 				.Include<Store>(sel => sel.Store3!.Name, "stores3", store => store.Name)
 

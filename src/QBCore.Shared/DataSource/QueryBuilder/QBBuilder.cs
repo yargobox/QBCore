@@ -1,4 +1,5 @@
 using System.Linq.Expressions;
+using System.Reflection;
 using QBCore.ObjectFactory;
 
 namespace QBCore.DataSource.QueryBuilder;
@@ -6,6 +7,10 @@ namespace QBCore.DataSource.QueryBuilder;
 public interface IQBBuilder
 {
 	QueryBuilderTypes QueryBuilderType { get; }
+	IDataLayerInfo DataLayer { get; }
+
+	Type DocumentType { get; }
+	Type ProjectionType { get; }
 
 	DSDocumentInfo DocumentInfo { get; }
 	DSDocumentInfo? ProjectionInfo { get; }
@@ -36,51 +41,39 @@ public abstract class QBBuilder<TDoc, TDto> : IQBBuilder
 	}
 
 	public abstract QueryBuilderTypes QueryBuilderType { get; }
+	public abstract IDataLayerInfo DataLayer { get; }
+	public Type DocumentType => typeof(TDoc);
+	public Type ProjectionType => typeof(TDto);
 	public DSDocumentInfo DocumentInfo => _documentInfo;
 	public DSDocumentInfo? ProjectionInfo => _projectionInfo;
 	public bool IsNormalized { get; protected set; }
 
-	public IReadOnlyList<QBContainer> Containers => _containers;
-	public IReadOnlyList<QBCondition> Connects => _connects ?? EmptyLists.Conditions;
-	public IReadOnlyList<QBCondition> Conditions => _conditions ?? EmptyLists.Conditions;
-	public IReadOnlyList<QBField> Fields => _fields ?? EmptyLists.Fields;
-	public IReadOnlyList<QBParameter> Parameters => _parameters ?? EmptyLists.Parameters;
-	public IReadOnlyList<QBSortOrder> SortOrders => _sortOrders ?? EmptyLists.SortOrders;
-	public IReadOnlyList<QBAggregation> Aggregations => _aggregations ?? EmptyLists.Aggregations;
+	public virtual IReadOnlyList<QBContainer> Containers => EmptyLists.Containers;
+	public virtual IReadOnlyList<QBCondition> Connects => EmptyLists.Conditions;
+	public virtual IReadOnlyList<QBCondition> Conditions => EmptyLists.Conditions;
+	public virtual IReadOnlyList<QBField> Fields => EmptyLists.Fields;
+	public virtual IReadOnlyList<QBParameter> Parameters => EmptyLists.Parameters;
+	public virtual IReadOnlyList<QBSortOrder> SortOrders => EmptyLists.SortOrders;
+	public virtual IReadOnlyList<QBAggregation> Aggregations => EmptyLists.Aggregations;
 
 	private readonly DSDocumentInfo _documentInfo;
 	private readonly DSDocumentInfo? _projectionInfo;
-	protected readonly List<QBContainer> _containers;
-	protected List<QBField>? _fields;
-	protected List<QBCondition>? _connects;
-	protected List<QBCondition>? _conditions;
-	protected List<QBParameter>? _parameters;
-	protected List<QBSortOrder>? _sortOrders;
-	protected List<QBAggregation>? _aggregations;
 
 	public QBBuilder()
 	{
 		_documentInfo = StaticFactory.Documents[typeof(TDoc)].Value;
 		_projectionInfo = StaticFactory.Documents.GetValueOrDefault(typeof(TDto))?.Value;
-		_containers = new List<QBContainer>(3);
 	}
 	public QBBuilder(QBBuilder<TDoc, TDto> other)
 	{
-		if (!(IsNormalized = other.IsNormalized))
-		{
-			other.Normalize();
-		}
+		other.Normalize();
+		IsNormalized = other.IsNormalized;
 
 		_documentInfo = other._documentInfo;
 		_projectionInfo = other._projectionInfo;
-		_containers = new List<QBContainer>(other._containers);
-		if (other._fields != null) _fields = new List<QBField>(other._fields);
-		if (other._parameters != null) _parameters = new List<QBParameter>(other._parameters);
-		if (other._connects != null) _connects = new List<QBCondition>(other._connects);
-		if (other._conditions != null) _conditions = new List<QBCondition>(other._conditions);
-		if (other._sortOrders != null) _sortOrders = new List<QBSortOrder>(other._sortOrders);
-		if (other._aggregations != null) _aggregations = new List<QBAggregation>(other._aggregations);
 	}
+
+	public virtual QBBuilder<TDoc, TDto> AutoBuild() => throw new NotSupportedException();
 
 	public void Normalize()
 	{
@@ -93,24 +86,17 @@ public abstract class QBBuilder<TDoc, TDto> : IQBBuilder
 
 		IsNormalized = true;
 	}
-
 	protected virtual void OnNormalize() { }
 
 	public virtual Func<IDSIdGenerator>? IdGenerator { get => throw new NotSupportedException(); set => throw new NotSupportedException(); }
 
-	public virtual QBBuilder<TDoc, TDto> SelectFrom(string tableName) => throw new NotSupportedException();
-	public virtual QBBuilder<TDoc, TDto> SelectFrom(string alias, string tableName) => throw new NotSupportedException();
-
-	public virtual QBBuilder<TDoc, TDto> InsertTo(string tableName) => throw new NotSupportedException();
-	public virtual QBBuilder<TDoc, TDto> Update(string tableName) => throw new NotSupportedException();
-	public virtual QBBuilder<TDoc, TDto> DeleteFrom(string tableName) => throw new NotSupportedException();
-
-	public virtual QBBuilder<TDoc, TDto> LeftJoin<TRef>(string tableName) => throw new NotSupportedException();
-	public virtual QBBuilder<TDoc, TDto> LeftJoin<TRef>(string alias, string tableName) => throw new NotSupportedException();
-	public virtual QBBuilder<TDoc, TDto> Join<TRef>(string tableName) => throw new NotSupportedException();
-	public virtual QBBuilder<TDoc, TDto> Join<TRef>(string alias, string tableName) => throw new NotSupportedException();
-	public virtual QBBuilder<TDoc, TDto> CrossJoin<TRef>(string tableName) => throw new NotSupportedException();
-	public virtual QBBuilder<TDoc, TDto> CrossJoin<TRef>(string alias, string tableName) => throw new NotSupportedException();
+	public virtual QBBuilder<TDoc, TDto> Insert(string? tableName = null) => throw new NotSupportedException();
+	public virtual QBBuilder<TDoc, TDto> Update(string? tableName = null) => throw new NotSupportedException();
+	public virtual QBBuilder<TDoc, TDto> Delete(string? tableName = null) => throw new NotSupportedException();
+	public virtual QBBuilder<TDoc, TDto> Select(string? tableName = null, string? alias = null) => throw new NotSupportedException();
+	public virtual QBBuilder<TDoc, TDto> LeftJoin<TRef>(string? tableName = null, string? alias = null) => throw new NotSupportedException();
+	public virtual QBBuilder<TDoc, TDto> Join<TRef>(string? tableName = null, string? alias = null) => throw new NotSupportedException();
+	public virtual QBBuilder<TDoc, TDto> CrossJoin<TRef>(string? tableName = null, string? alias = null) => throw new NotSupportedException();
 
 	public virtual QBBuilder<TDoc, TDto> Connect<TLocal, TRef>(Expression<Func<TLocal, object?>> field, Expression<Func<TRef, object?>> refField, FO operation) => throw new NotSupportedException();
 	public virtual QBBuilder<TDoc, TDto> Connect<TLocal, TRef>(DEPathDefinition<TLocal> field, DEPathDefinition<TRef> refField, FO operation) => throw new NotSupportedException();

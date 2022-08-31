@@ -6,6 +6,22 @@ namespace QBCore.DataSource.QueryBuilder.Mongo;
 internal sealed class QBSelectBuilder<TDoc, TDto> : QBBuilder<TDoc, TDto>, IQBMongoSelectBuilder<TDoc, TDto>
 {
 	public override QueryBuilderTypes QueryBuilderType => QueryBuilderTypes.Select;
+	public override IDataLayerInfo DataLayer => MongoDataLayer.Default;
+	public override IReadOnlyList<QBContainer> Containers => _containers ?? EmptyLists.Containers;
+	public override IReadOnlyList<QBField> Fields => _fields ?? EmptyLists.Fields;
+	public override IReadOnlyList<QBCondition> Connects => _connects ?? EmptyLists.Conditions;
+	public override IReadOnlyList<QBCondition> Conditions => _conditions ?? EmptyLists.Conditions;
+	public override IReadOnlyList<QBParameter> Parameters => _parameters ?? EmptyLists.Parameters;
+	public override IReadOnlyList<QBSortOrder> SortOrders => _sortOrders ?? EmptyLists.SortOrders;
+	public override IReadOnlyList<QBAggregation> Aggregations => _aggregations ?? EmptyLists.Aggregations;
+
+	private List<QBContainer>? _containers;
+	private List<QBField>? _fields;
+	private List<QBCondition>? _connects;
+	private List<QBCondition>? _conditions;
+	private List<QBParameter>? _parameters;
+	private List<QBSortOrder>? _sortOrders;
+	private List<QBAggregation>? _aggregations;
 
 	private int _parentheses;
 	private int _sumParentheses;
@@ -13,7 +29,43 @@ internal sealed class QBSelectBuilder<TDoc, TDto> : QBBuilder<TDoc, TDto>, IQBMo
 	private int _autoOpenedParentheses;
 
 	public QBSelectBuilder() { }
-	public QBSelectBuilder(QBSelectBuilder<TDoc, TDto> other) : base(other) { }
+	public QBSelectBuilder(QBSelectBuilder<TDoc, TDto> other) : base(other)
+	{
+		if (other._containers != null) _containers = new List<QBContainer>(other._containers);
+		if (other._fields != null) _fields = new List<QBField>(other._fields);
+		if (other._parameters != null) _parameters = new List<QBParameter>(other._parameters);
+		if (other._connects != null) _connects = new List<QBCondition>(other._connects);
+		if (other._conditions != null) _conditions = new List<QBCondition>(other._conditions);
+		if (other._sortOrders != null) _sortOrders = new List<QBSortOrder>(other._sortOrders);
+		if (other._aggregations != null) _aggregations = new List<QBAggregation>(other._aggregations);
+	}
+	public QBSelectBuilder(IQBBuilder other)
+	{
+		if (other.DocumentType != typeof(TDoc))
+		{
+			throw new InvalidOperationException($"Could not make select query builder '{typeof(TDoc).ToPretty()}, {typeof(TDto).ToPretty()}' from '{other.DocumentType.ToPretty()}, {other.ProjectionType.ToPretty()}'.");
+		}
+
+		if (other.Containers.Count > 0)
+		{
+			var c = other.Containers.First();
+			if (c.DocumentType != typeof(TDoc) || c.ContainerType != ContainerTypes.Table)
+			{
+				throw new InvalidOperationException($"Could not make select query builder '{typeof(TDoc).ToPretty()}, {typeof(TDto).ToPretty()}' from '{other.DocumentType.ToPretty()}, {other.ProjectionType.ToPretty()}'.");
+			}
+
+			Select(c.DBSideName);//!!!
+		}
+	}
+	public override QBBuilder<TDoc, TDto> AutoBuild()
+	{
+		if (Containers.Count > 0)
+		{
+			throw new InvalidOperationException($"Select query builder '{typeof(TDto).ToPretty()}' has already been initialized.");
+		}
+
+		return Select();//!!!
+	}
 
 	protected override void OnNormalize()
 	{
@@ -30,7 +82,6 @@ internal sealed class QBSelectBuilder<TDoc, TDto> : QBBuilder<TDoc, TDto>, IQBMo
 
 		var containers = _containers ?? EmptyLists.Containers;
 		var connects = _connects ?? EmptyLists.Conditions;
-		var conditions = _conditions ?? EmptyLists.Conditions;
 
 		var rootIndex = containers.FindIndex(x => x.ContainerOperation == ContainerOperations.Select);
 		if (rootIndex < 0)
@@ -126,8 +177,8 @@ internal sealed class QBSelectBuilder<TDoc, TDto> : QBBuilder<TDoc, TDto>, IQBMo
 
 	private QBSelectBuilder<TDoc, TDto> AddContainer(
 		Type documentType,
-		string alias,
-		string dbSideName,
+		string? alias,
+		string? dbSideName,
 		ContainerTypes containerType,
 		ContainerOperations containerOperation)
 	{
@@ -136,8 +187,10 @@ internal sealed class QBSelectBuilder<TDoc, TDto> : QBBuilder<TDoc, TDto>, IQBMo
 			throw new InvalidOperationException($"Incorrect condition definition of select query builder '{typeof(TDto).ToPretty()}'.");
 		}
 
-		if ((containerOperation & ContainerOperations.MainMask) != ContainerOperations.None &&
-			_containers.Any(x => x.ContainerOperation.HasFlag(ContainerOperations.MainMask)))
+		dbSideName ??= MongoDataLayer.Default.GetDefaultDBSideContainerName(documentType);
+		alias ??= dbSideName;
+
+		if ((containerOperation & ContainerOperations.MainMask) != ContainerOperations.None && Containers.Any(x => x.ContainerOperation.HasFlag(ContainerOperations.MainMask)))
 		{
 			throw new InvalidOperationException($"Incorrect definition of select query builder '{typeof(TDto).ToPretty()}': another initial container has already been added before.");
 		}
@@ -145,9 +198,14 @@ internal sealed class QBSelectBuilder<TDoc, TDto> : QBBuilder<TDoc, TDto>, IQBMo
 		{
 			throw new InvalidOperationException($"Incorrect definition of select query builder '{typeof(TDto).ToPretty()}': container alias '{alias}' cannot contain a period character '.'.");
 		}
-		if (_containers.Any(x => x.Alias == alias))
+		if (Containers.Any(x => x.Alias == alias))
 		{
 			throw new InvalidOperationException($"Incorrect definition of select query builder '{typeof(TDto).ToPretty()}': initial container '{alias}' has already been added before.");
+		}
+
+		if (_containers == null)
+		{
+			_containers = new List<QBContainer>(3);
 		}
 
 		IsNormalized = false;
@@ -217,9 +275,9 @@ internal sealed class QBSelectBuilder<TDoc, TDto> : QBBuilder<TDoc, TDto>, IQBMo
 		var trueContainerType = typeof(TLocal) == typeof(TDto) ? typeof(TDoc) : typeof(TLocal);
 		if (alias == null)
 		{
-			alias = _containers.Single(x => x.DocumentType == trueContainerType).Alias;
+			alias = Containers.Single(x => x.DocumentType == trueContainerType).Alias;
 		}
-		else if (!_containers.Any(x => x.Alias == alias && x.DocumentType == trueContainerType))
+		else if (!Containers.Any(x => x.Alias == alias && x.DocumentType == trueContainerType))
 		{
 			throw new InvalidOperationException($"Incorrect condition definition of select query builder '{typeof(TDto).ToPretty()}': referenced container '{alias}' of  document '{trueContainerType.ToPretty()}' has not been added yet.");
 		}
@@ -243,9 +301,9 @@ internal sealed class QBSelectBuilder<TDoc, TDto> : QBBuilder<TDoc, TDto>, IQBMo
 		{
 			if (refAlias == null)
 			{
-				refAlias = _containers.Single(x => x.DocumentType == typeof(TRef)).Alias;
+				refAlias = Containers.Single(x => x.DocumentType == typeof(TRef)).Alias;
 			}
-			else if (!_containers.Any(x => x.Alias == refAlias && x.DocumentType == typeof(TRef)))
+			else if (!Containers.Any(x => x.Alias == refAlias && x.DocumentType == typeof(TRef)))
 			{
 				throw new InvalidOperationException($"Incorrect condition definition of select query builder '{typeof(TDto).ToPretty()}': referenced container '{refAlias}' of  document '{typeof(TRef).ToPretty()}' has not been added yet.");
 			}
@@ -489,9 +547,9 @@ internal sealed class QBSelectBuilder<TDoc, TDto> : QBBuilder<TDoc, TDto>, IQBMo
 
 		if (refAlias == null)
 		{
-			refAlias = _containers.Single(x => x.DocumentType == typeof(TRef)).Alias;
+			refAlias = Containers.Single(x => x.DocumentType == typeof(TRef)).Alias;
 		}
-		else if (!_containers.Any(x => x.Alias == refAlias && x.DocumentType == typeof(TRef)))
+		else if (!Containers.Any(x => x.Alias == refAlias && x.DocumentType == typeof(TRef)))
 		{
 			throw new InvalidOperationException($"Incorrect field definition of select query builder '{typeof(TDto).ToPretty()}': referenced container '{refAlias}' of  document '{typeof(TRef).ToPretty()}' has not been added yet.");
 		}
@@ -558,40 +616,24 @@ internal sealed class QBSelectBuilder<TDoc, TDto> : QBBuilder<TDoc, TDto>, IQBMo
 		return this;
 	}
 
-	public override QBBuilder<TDoc, TDto> SelectFrom(string tableName)
-		=> AddContainer(typeof(TDoc), tableName, tableName, ContainerTypes.Table, ContainerOperations.Select);
-	IQBMongoSelectBuilder<TDoc, TDto> IQBMongoSelectBuilder<TDoc, TDto>.SelectFrom(string tableName)
-		=> AddContainer(typeof(TDoc), tableName, tableName, ContainerTypes.Table, ContainerOperations.Select);
-	public override QBBuilder<TDoc, TDto> SelectFrom(string alias, string tableName)
+	public override QBBuilder<TDoc, TDto> Select(string? tableName = null, string? alias = null)
 		=> AddContainer(typeof(TDoc), alias, tableName, ContainerTypes.Table, ContainerOperations.Select);
-	IQBMongoSelectBuilder<TDoc, TDto> IQBMongoSelectBuilder<TDoc, TDto>.SelectFrom(string alias, string tableName)
+	IQBMongoSelectBuilder<TDoc, TDto> IQBMongoSelectBuilder<TDoc, TDto>.Select(string? tableName, string? alias)
 		=> AddContainer(typeof(TDoc), alias, tableName, ContainerTypes.Table, ContainerOperations.Select);
 
-	public override QBBuilder<TDoc, TDto> LeftJoin<TRef>(string tableName)
-		=> AddContainer(typeof(TRef), tableName, tableName, ContainerTypes.Table, ContainerOperations.LeftJoin);
-	IQBMongoSelectBuilder<TDoc, TDto> IQBMongoSelectBuilder<TDoc, TDto>.LeftJoin<TRef>(string tableName)
-		=> AddContainer(typeof(TRef), tableName, tableName, ContainerTypes.Table, ContainerOperations.LeftJoin);
-	public override QBBuilder<TDoc, TDto> LeftJoin<TRef>(string alias, string tableName)
+	public override QBBuilder<TDoc, TDto> LeftJoin<TRef>(string? tableName = null, string? alias = null)
 		=> AddContainer(typeof(TRef), alias, tableName, ContainerTypes.Table, ContainerOperations.LeftJoin);
-	IQBMongoSelectBuilder<TDoc, TDto> IQBMongoSelectBuilder<TDoc, TDto>.LeftJoin<TRef>(string alias, string tableName)
+	IQBMongoSelectBuilder<TDoc, TDto> IQBMongoSelectBuilder<TDoc, TDto>.LeftJoin<TRef>(string? tableName, string? alias)
 		=> AddContainer(typeof(TRef), alias, tableName, ContainerTypes.Table, ContainerOperations.LeftJoin);
 
-	public override QBBuilder<TDoc, TDto> Join<TRef>(string tableName)
-		=> AddContainer(typeof(TRef), tableName, tableName, ContainerTypes.Table, ContainerOperations.Join);
-	IQBMongoSelectBuilder<TDoc, TDto> IQBMongoSelectBuilder<TDoc, TDto>.Join<TRef>(string tableName)
-		=> AddContainer(typeof(TRef), tableName, tableName, ContainerTypes.Table, ContainerOperations.Join);
-	public override QBBuilder<TDoc, TDto> Join<TRef>(string alias, string tableName)
+	public override QBBuilder<TDoc, TDto> Join<TRef>(string? tableName = null, string? alias = null)
 		=> AddContainer(typeof(TRef), alias, tableName, ContainerTypes.Table, ContainerOperations.Join);
-	IQBMongoSelectBuilder<TDoc, TDto> IQBMongoSelectBuilder<TDoc, TDto>.Join<TRef>(string alias, string tableName)
+	IQBMongoSelectBuilder<TDoc, TDto> IQBMongoSelectBuilder<TDoc, TDto>.Join<TRef>(string? tableName, string? alias)
 		=> AddContainer(typeof(TRef), alias, tableName, ContainerTypes.Table, ContainerOperations.Join);
 
-	public override QBBuilder<TDoc, TDto> CrossJoin<TRef>(string tableName)
-		=> AddContainer(typeof(TRef), tableName, tableName, ContainerTypes.Table, ContainerOperations.CrossJoin);
-	IQBMongoSelectBuilder<TDoc, TDto> IQBMongoSelectBuilder<TDoc, TDto>.CrossJoin<TRef>(string tableName)
-		=> AddContainer(typeof(TRef), tableName, tableName, ContainerTypes.Table, ContainerOperations.CrossJoin);
-	public override QBBuilder<TDoc, TDto> CrossJoin<TRef>(string alias, string tableName)
+	public override QBBuilder<TDoc, TDto> CrossJoin<TRef>(string? tableName = null, string? alias = null)
 		=> AddContainer(typeof(TRef), alias, tableName, ContainerTypes.Table, ContainerOperations.CrossJoin);
-	IQBMongoSelectBuilder<TDoc, TDto> IQBMongoSelectBuilder<TDoc, TDto>.CrossJoin<TRef>(string alias, string tableName)
+	IQBMongoSelectBuilder<TDoc, TDto> IQBMongoSelectBuilder<TDoc, TDto>.CrossJoin<TRef>(string? tableName, string? alias)
 		=> AddContainer(typeof(TRef), alias, tableName, ContainerTypes.Table, ContainerOperations.CrossJoin);
 
 	public override QBBuilder<TDoc, TDto> Connect<TLocal, TRef>(Expression<Func<TLocal, object?>> field, Expression<Func<TRef, object?>> refField, FO operation)

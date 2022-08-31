@@ -1,9 +1,12 @@
 using System.Collections;
+using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.Text.RegularExpressions;
 using MongoDB.Bson;
 using MongoDB.Bson.Serialization;
 using MongoDB.Driver;
 using QBCore.Configuration;
+using QBCore.Extensions.Linq;
 using QBCore.Extensions.Text;
 
 namespace QBCore.DataSource.QueryBuilder.Mongo;
@@ -46,6 +49,8 @@ internal abstract class QueryBuilder<TDocument, TProjection> : IQueryBuilder<TDo
 	{
 		typeof(sbyte), typeof(byte), typeof(short), typeof(ushort), typeof(int), typeof(uint), typeof(long), typeof(ulong)
 	};
+
+	protected static readonly BsonDocument _noneFilter = new BsonDocument { { "$expr", BsonBoolean.False } };
 
 	#endregion
 
@@ -294,82 +299,174 @@ internal abstract class QueryBuilder<TDocument, TProjection> : IQueryBuilder<TDo
 		}
 
 		var constValue = cond.IsOnParam ? paramValue : cond.Value;
+		var itemType = GetEnumerationItemType(constValue);
 		var leftField = getDBSideName(cond.Alias, cond.Field);
 
 		switch (cond.Operation & _supportedOperations)
 		{
 			case FO.Equal:
+			case FO.In:
 				{
-					var value = RenderToBsonValue(cond, constValue, true);
-					return MakeEqBsonCondition(useExprFormat, leftField, value);
+					if (constValue == null || itemType == null || (itemType != cond.FieldType && itemType != cond.FieldUnderlyingType))
+					{
+						var value = RenderToBsonValue(cond, constValue, true);
+						return MakeBsonCondition(useExprFormat, "$eq", leftField, value);
+					}
+					else
+					{
+						var values = RenderToBsonArray(cond, constValue);
+						return MakeBsonArrayCondition(useExprFormat, "$in", leftField, values);
+					}
 				}
 			case FO.NotEqual:
+			case FO.NotIn:
 				{
-					var value = RenderToBsonValue(cond, constValue, true);
-					return MakeBsonCondition(useExprFormat, "$ne", leftField, value);
+					if (constValue == null || itemType == null || (itemType != cond.FieldType && itemType != cond.FieldUnderlyingType))
+					{
+						var value = RenderToBsonValue(cond, constValue, true);
+						return MakeBsonCondition(useExprFormat, "$ne", leftField, value);
+					}
+					else
+					{
+						var values = RenderToBsonArray(cond, constValue);
+						return MakeBsonArrayCondition(useExprFormat, "$nin", leftField, values);
+					}
 				}
 			case FO.Greater:
 				{
-					var value = RenderToBsonValue(cond, constValue, false);
-					return MakeBsonCondition(useExprFormat, "$gt", leftField, value);
+					if (constValue == null || itemType == null || (itemType != cond.FieldType && itemType != cond.FieldUnderlyingType))
+					{
+						var value = RenderToBsonValue(cond, constValue, false);
+						return MakeBsonCondition(useExprFormat, "$gt", leftField, value);
+					}
+					else
+					{
+						var values = RenderToBsonArray(cond, constValue);
+						return MakeBsonArrayCondition(useExprFormat, "$gt", leftField, values);
+					}
 				}
 			case FO.GreaterOrEqual:
 				{
-					var value = RenderToBsonValue(cond, constValue, false);
-					return MakeBsonCondition(useExprFormat, "$gte", leftField, value);
+					if (constValue == null || itemType == null || (itemType != cond.FieldType && itemType != cond.FieldUnderlyingType))
+					{
+						var value = RenderToBsonValue(cond, constValue, false);
+						return MakeBsonCondition(useExprFormat, "$gte", leftField, value);
+					}
+					else
+					{
+						var values = RenderToBsonArray(cond, constValue);
+						return MakeBsonArrayCondition(useExprFormat, "$gte", leftField, values);
+					}
 				}
 			case FO.Less:
 				{
-					var value = RenderToBsonValue(cond, constValue, false);
-					return MakeBsonCondition(useExprFormat, "$lt", leftField, value);
+					if (constValue == null || itemType == null || (itemType != cond.FieldType && itemType != cond.FieldUnderlyingType))
+					{
+						var value = RenderToBsonValue(cond, constValue, false);
+						return MakeBsonCondition(useExprFormat, "$lt", leftField, value);
+					}
+					else
+					{
+						var values = RenderToBsonArray(cond, constValue);
+						return MakeBsonArrayCondition(useExprFormat, "$lt", leftField, values);
+					}
 				}
 			case FO.LessOrEqual:
 				{
-					var value = RenderToBsonValue(cond, constValue, false);
-					return MakeBsonCondition(useExprFormat, "$lte", leftField, value);
+					if (constValue == null || itemType == null || (itemType != cond.FieldType && itemType != cond.FieldUnderlyingType))
+					{
+						var value = RenderToBsonValue(cond, constValue, false);
+						return MakeBsonCondition(useExprFormat, "$lte", leftField, value);
+					}
+					else
+					{
+						var values = RenderToBsonArray(cond, constValue);
+						return MakeBsonArrayCondition(useExprFormat, "$lte", leftField, values);
+					}
 				}
 			case FO.IsNull:
 				{
-					_ = RenderToBsonValue(cond, null, false);
-					return MakeEqBsonCondition(useExprFormat, leftField, BsonNull.Value);
+					RenderToBsonValue(cond, null, false);
+					return MakeBsonCondition(useExprFormat, "$eq", leftField, BsonNull.Value);
 				}
 			case FO.IsNotNull:
 				{
-					//_ = RenderToBsonValue(cond, constValue, false);
 					return MakeBsonCondition(useExprFormat, "$ne", leftField, BsonNull.Value);
-				}
-			case FO.In:
-				{
-					var value = RenderToBsonArray(cond, constValue, true);
-					return MakeBsonCondition(useExprFormat, "$in", leftField, value);
-				}
-			case FO.NotIn:
-				{
-					var value = RenderToBsonArray(cond, constValue, true);
-					return MakeBsonCondition(useExprFormat, "$nin", leftField, value);
 				}
 			case FO.Like:
 				{
-					var value = RenderToBsonContainsRegex(cond, constValue);
-					return MakeEqBsonCondition(useExprFormat, leftField, value);
+					if (constValue == null || itemType == null || (itemType != cond.FieldType && itemType != cond.FieldUnderlyingType))
+					{
+						var value = RenderToBsonRegexForLike(cond, constValue);
+						return MakeBsonCondition(useExprFormat, "$eq", leftField, value);
+					}
+					else
+					{
+						var values = RenderToBsonRegexArrayForLike(cond, constValue);
+						return MakeBsonCondition(useExprFormat, "$in", leftField, values);
+					}
 				}
 			case FO.NotLike:
 				{
-					var value = RenderToBsonContainsRegex(cond, constValue);
-					return MakeBsonCondition(useExprFormat, "$ne", leftField, value);
+					if (constValue == null || itemType == null || (itemType != cond.FieldType && itemType != cond.FieldUnderlyingType))
+					{
+						var value = RenderToBsonRegexForLike(cond, constValue);
+						return MakeBsonCondition(useExprFormat, "$ne", leftField, value);
+					}
+					else
+					{
+						var values = RenderToBsonRegexArrayForLike(cond, constValue);
+						return MakeBsonCondition(useExprFormat, "$nin", leftField, values);
+					}
 				}
 			case FO.BitsAnd:
 				{
-					var value = RenderToBsonLong(cond, constValue);
-					return MakeBsonCondition(useExprFormat, "$bitsAllSet", leftField, value);
+					if (constValue == null || itemType == null || (itemType != cond.FieldType && itemType != cond.FieldUnderlyingType))
+					{
+						var value = RenderToBsonInt64(cond, constValue);
+						return MakeBsonCondition(useExprFormat, "$bitsAllSet", leftField, value);
+					}
+					else
+					{
+						var values = RenderToLongArray(cond, constValue).Distinct();
+						return MakeBsonArrayCondition(useExprFormat, "$bitsAllSet", leftField, new BsonArray(values));
+					}
 				}
 			case FO.BitsOr:
 				{
-					var value = RenderToBsonLong(cond, constValue);
-					return MakeBsonCondition(useExprFormat, "$bitsAnySet", leftField, value);
+					if (constValue == null || itemType == null || (itemType != cond.FieldType && itemType != cond.FieldUnderlyingType))
+					{
+						var value = RenderToBsonInt64(cond, constValue);
+						return MakeBsonCondition(useExprFormat, "$bitsAnySet", leftField, value);
+					}
+					else
+					{
+						var values = RenderToLongArray(cond, constValue);
+						var mask = values.Aggregate(0L, (acc, x) => acc | x);
+						if (mask == 0 && values.IsNullEmpty())
+						{
+							throw new ArgumentException("value");
+						}
+
+						return MakeBsonCondition(useExprFormat, "$bitsAnySet", leftField, mask);
+					}
 				}
 			case FO.Between:
 			case FO.NotBetween:
+				{
+					if (constValue == null || itemType == null)
+					{
+						throw new ArgumentException($"Expected IEnumerable of two arguments for the 'Between' or 'NotBetween' operation on field {cond.Alias}.{cond.FieldPath}.", nameof(paramValue));
+					}
+
+					var values = RenderToBsonArray(cond, constValue);
+					if (values.Count != 2)
+					{
+						throw new ArgumentException($"Expected IEnumerable of two arguments for the 'Between' or 'NotBetween' operation on field {cond.Alias}.{cond.FieldPath}.", nameof(paramValue));
+					}
+
+					return MakeBsonBetweenCondition(useExprFormat, cond.Operation.HasFlag(FO.Between), leftField, values);
+				}
 			default:
 				throw new NotSupportedException();
 		}
@@ -412,6 +509,11 @@ internal abstract class QueryBuilder<TDocument, TProjection> : IQueryBuilder<TDo
 		}
 	}
 
+	protected static string GetDBSideName(string? alias, DEPath fieldPath)
+	{
+		return fieldPath.GetDBSideName();
+	}
+
 	private static BsonValue RenderToBsonValue(QBCondition cond, object? value, bool allowCaseInsensitive)
 	{
 		if (value == null)
@@ -427,9 +529,9 @@ internal abstract class QueryBuilder<TDocument, TProjection> : IQueryBuilder<TDo
 		var type = value.GetType();
 		if (type != cond.FieldType && type != cond.FieldUnderlyingType)
 		{
-			if (!TryConvertIntegerToOtherInteger(value, cond.FieldUnderlyingType, out value))
+			if (!TryConvertIntegerToOtherInteger(value, cond.FieldUnderlyingType, ref value))
 			{
-				throw new ArgumentException($"Field {cond.Alias}.{cond.FieldPath} has type {cond.FieldType.ToPretty()} not {value.GetType().ToPretty()}.", nameof(value));
+				throw new ArgumentException($"Field {cond.Alias}.{cond.FieldPath} has type {cond.FieldType.ToPretty()} not {value!.GetType().ToPretty()}.", nameof(value));
 			}
 		}
 		
@@ -439,16 +541,76 @@ internal abstract class QueryBuilder<TDocument, TProjection> : IQueryBuilder<TDo
 			{
 				throw new InvalidOperationException("Such an operation cannot be case sensitive or insensitive.");
 			}
-			if (value is string stringValue)
+			if (type != typeof(string))
 			{
-				return new BsonRegularExpression(string.Concat("^", Regex.Escape(stringValue.ToLower()), "$"), "i");//!!! localization
+				throw new InvalidOperationException($"Such operations can only be performed on strings. Field {cond.Alias}.{cond.FieldPath} is not a string type.");
 			}
-			throw new InvalidOperationException($"Such operations can only be performed on strings. Field {cond.Alias}.{cond.FieldPath} is not a string type.");
+
+			return new BsonRegularExpression(string.Concat("^", Regex.Escape(((string)value).ToLower()), "$"), "i");//!!! localization
 		}
 
 		return new BsonDocumentWrapper(value, BsonSerializer.SerializerRegistry.GetSerializer(cond.FieldType));
 	}
-	private static BsonValue RenderToBsonContainsRegex(QBCondition cond, object? value)
+	private static BsonArray RenderToBsonArray(QBCondition cond, object values)
+	{
+		if (values is not IEnumerable<object?> objectValues)
+		{
+			throw new ArgumentNullException(nameof(values), "IEnumerable<> is expected.");
+		}
+
+		var bsonArray = new BsonArray();
+		IBsonSerializer? serializer = null;
+		object? convertedValue = null;
+		Type type;
+
+		foreach (var value in objectValues)
+		{
+			if (value == null)
+			{
+				if (!cond.IsFieldNullable)
+				{
+					throw new ArgumentNullException(nameof(values), $"Field {cond.Alias}.{cond.FieldPath} does not support null values.");
+				}
+
+				bsonArray.Add(BsonNull.Value);
+				continue;
+			}
+
+			type = value.GetType();
+			if (type != cond.FieldType && type != cond.FieldUnderlyingType)
+			{
+				if (!TryConvertIntegerToOtherInteger(value, cond.FieldUnderlyingType, ref convertedValue))
+				{
+					throw new ArgumentException($"Field {cond.Alias}.{cond.FieldPath} has type {cond.FieldType.ToPretty()} not {type.ToPretty()}.", nameof(values));
+				}
+
+				bsonArray.Add(new BsonDocumentWrapper(convertedValue, serializer ?? (serializer = BsonSerializer.SerializerRegistry.GetSerializer(cond.FieldType))));
+			}
+			else if (type == typeof(string))
+			{
+				if (cond.Operation.HasFlag(FO.CaseInsensitive))
+				{
+					bsonArray.Add(new BsonRegularExpression(string.Concat("^", Regex.Escape(((string)value).ToLower()), "$"), "i"));
+				}
+				else
+				{
+					bsonArray.Add(new BsonString((string)value));
+				}
+			}
+			else if (cond.Operation.HasFlag(FO.CaseInsensitive))
+			{
+				throw new InvalidOperationException($"Such operations can only be performed on strings. Field {cond.Alias}.{cond.FieldPath} is not a string type.");
+			}
+			else
+			{
+				bsonArray.Add(new BsonDocumentWrapper(value, serializer ?? (serializer = BsonSerializer.SerializerRegistry.GetSerializer(cond.FieldType))));
+			}
+		}
+
+		return bsonArray;
+	}
+
+	private static BsonValue RenderToBsonRegexForLike(QBCondition cond, object? value)
 	{
 		if (cond.FieldUnderlyingType != typeof(string))
 		{
@@ -463,24 +625,138 @@ internal abstract class QueryBuilder<TDocument, TProjection> : IQueryBuilder<TDo
 
 			return BsonNull.Value;
 		}
-		if (value is string stringValue)
+		if (value is not string stringValue)
 		{
-			if (cond.Operation.HasFlag(FO.CaseInsensitive))
+			throw new ArgumentException($"Field {cond.Alias}.{cond.FieldPath} has type {cond.FieldType.ToPretty()} not {value.GetType().ToPretty()}.", nameof(value));
+		}
+
+		if (cond.Operation.HasFlag(FO.CaseInsensitive))
+		{
+			if (cond.Operation.HasFlag(FO.Like))
 			{
 				return new BsonRegularExpression(Regex.Escape(stringValue.ToLower()), "i");//!!! localization
 			}
 			else
 			{
-				return new BsonRegularExpression(Regex.Escape(stringValue));
+				return new BsonRegularExpression(string.Concat("(?s)^(?!.*", Regex.Escape(stringValue.ToLower()), ").*$"), "i");//!!! localization
 			}
 		}
-		throw new ArgumentException($"Field {cond.Alias}.{cond.FieldPath} has type {cond.FieldType.ToPretty()} not {value.GetType().ToPretty()}.", nameof(value));
+		else
+		{
+			if (cond.Operation.HasFlag(FO.Like))
+			{
+				return new BsonRegularExpression(Regex.Escape(stringValue));//!!! localization
+			}
+			else
+			{
+				return new BsonRegularExpression(string.Concat("(?s)^(?!.*", Regex.Escape(stringValue), ").*$"));//!!! localization
+			}
+		}
 	}
-	private static BsonValue RenderToBsonLong(QBCondition cond, object? value)
+	private static BsonArray RenderToBsonRegexArrayForLike(QBCondition cond, object values)
+	{
+		if (cond.FieldUnderlyingType != typeof(string))
+		{
+			throw new InvalidOperationException($"Such operations can only be performed on strings. Field {cond.Alias}.{cond.FieldPath} is not a string type.");
+		}
+
+		var bsonArray = new BsonArray();
+
+		if (values is IEnumerable<string?> stringValues)
+		{
+			foreach (var stringValue in stringValues)
+			{
+				if (stringValue == null)
+				{
+					if (!cond.IsFieldNullable)
+					{
+						throw new ArgumentNullException(nameof(values), $"Field {cond.Alias}.{cond.FieldPath} does not support null values.");
+					}
+
+					bsonArray.Add(BsonNull.Value);
+				}
+				else if (cond.Operation.HasFlag(FO.CaseInsensitive))
+				{
+					if (cond.Operation.HasFlag(FO.Like))
+					{
+						bsonArray.Add(new BsonRegularExpression(Regex.Escape(stringValue.ToLower()), "i"));//!!! localization
+					}
+					else
+					{
+						bsonArray.Add(new BsonRegularExpression(string.Concat("(?s)^(?!.*", Regex.Escape(stringValue.ToLower()), ").*$"), "i"));//!!! localization
+					}
+				}
+				else
+				{
+					if (cond.Operation.HasFlag(FO.Like))
+					{
+						bsonArray.Add(new BsonRegularExpression(Regex.Escape(stringValue)));//!!! localization
+					}
+					else
+					{
+						bsonArray.Add(new BsonRegularExpression(string.Concat("(?s)^(?!.*", Regex.Escape(stringValue), ").*$")));//!!! localization
+					}
+				}
+			}
+		}
+		else if (values is IEnumerable<object?> objectValues)
+		{
+			foreach (var objectValue in objectValues)
+			{
+				if (objectValue == null)
+				{
+					if (!cond.IsFieldNullable)
+					{
+						throw new ArgumentNullException(nameof(values), $"Field {cond.Alias}.{cond.FieldPath} does not support null values.");
+					}
+
+					bsonArray.Add(BsonNull.Value);
+				}
+				else if (objectValue is not string stringValue)
+				{
+					throw new ArgumentException($"Field {cond.Alias}.{cond.FieldPath} has type {cond.FieldType.ToPretty()} not {values.GetType().ToPretty()}.", nameof(values));
+				}
+				else if (cond.Operation.HasFlag(FO.CaseInsensitive))
+				{
+					if (cond.Operation.HasFlag(FO.Like))
+					{
+						bsonArray.Add(new BsonRegularExpression(Regex.Escape(stringValue.ToLower()), "i"));//!!! localization
+					}
+					else
+					{
+						bsonArray.Add(new BsonRegularExpression(string.Concat("(?s)^(?!.*", Regex.Escape(stringValue.ToLower()), ").*$"), "i"));//!!! localization
+					}
+				}
+				else
+				{
+					if (cond.Operation.HasFlag(FO.Like))
+					{
+						bsonArray.Add(new BsonRegularExpression(Regex.Escape(stringValue)));//!!! localization
+					}
+					else
+					{
+						bsonArray.Add(new BsonRegularExpression(string.Concat("(?s)^(?!.*", Regex.Escape(stringValue), ").*$")));//!!! localization
+					}
+				}
+			}
+		}
+		else
+		{
+			throw new ArgumentNullException(nameof(values), "IEnumerable<string> is expected.");
+		}
+
+		return bsonArray;
+	}
+
+	private static BsonInt64 RenderToBsonInt64(QBCondition cond, object? value)
 	{
 		if (!_integerTypes.Contains(cond.FieldUnderlyingType))
 		{
 			throw new InvalidOperationException($"Such operations can only be performed on integers. Field {cond.Alias}.{cond.FieldPath} is not an integer type.");
+		}
+		if (cond.Operation.HasFlag(FO.CaseInsensitive))
+		{
+			throw new InvalidOperationException("Such an operation cannot be case sensitive or insensitive.");
 		}
 		if (value == null)
 		{
@@ -489,77 +765,74 @@ internal abstract class QueryBuilder<TDocument, TProjection> : IQueryBuilder<TDo
 				throw new ArgumentNullException(nameof(value), $"Field {cond.Alias}.{cond.FieldPath} does not support null values.");
 			}
 
-			return BsonNull.Value;
+			return 0L;
 		}
 
 		var type = value.GetType();
-		if (type != cond.FieldType && type != cond.FieldUnderlyingType)
+		if (type != cond.FieldType && type != cond.FieldUnderlyingType && !_integerTypes.Contains(type))
 		{
-			if (!_integerTypes.Contains(type) && !_integerTypes.Contains(type.GetUnderlyingSystemType()))
-			{
-				throw new ArgumentException($"Field {cond.Alias}.{cond.FieldPath} has type {cond.FieldType.ToPretty()} not {type.ToPretty()}.", nameof(value));
-			}
+			throw new ArgumentException($"Field {cond.Alias}.{cond.FieldPath} has type {cond.FieldType.ToPretty()} not {type.ToPretty()}.", nameof(value));
 		}
 
-		long longValue = unchecked((long)value);
-		return new BsonInt64(longValue);
+		return unchecked((long)value);
 	}
-	private static BsonValue RenderToBsonArray(QBCondition cond, object? value, bool allowCaseInsensitive)
+	private static IEnumerable<long> RenderToLongArray(QBCondition cond, object values)
 	{
-		if (value == null)
+		if (!_integerTypes.Contains(cond.FieldUnderlyingType))
 		{
-			throw new ArgumentNullException(nameof(value), "IEnumerable<> is expected.");
+			throw new InvalidOperationException($"Field {cond.Alias}.{cond.FieldPath} is not an integer type.");
 		}
-
-		var array = new BsonArray();
-		IBsonSerializer? serializer = null;
-
-		foreach (var obj in (IEnumerable)value)
+		if (cond.Operation.HasFlag(FO.CaseInsensitive))
 		{
-			if (obj == null)
+			throw new InvalidOperationException("Such an operation cannot be case sensitive or insensitive.");
+		}
+		
+		if (values is IEnumerable<int> intValues)
+		{
+			return intValues.Cast<long>();
+		}
+		else if (values is IEnumerable<long> longValues)
+		{
+			return longValues;
+		}
+		else if (values == null)
+		{
+			throw new ArgumentNullException(nameof(values), "IEnumerable<> is expected.");
+		}
+		else if (values is IEnumerable<object?> objectValues)
+		{
+			return RenderToLongArray(cond, objectValues);
+		}
+		else
+		{
+			throw new ArgumentException("IEnumerable<> is expected.", nameof(values));
+		}
+	}
+	private static IEnumerable<long> RenderToLongArray(QBCondition cond, IEnumerable<object?> objectValues)
+	{
+		Type type;
+		foreach (var objectValue in objectValues)
+		{
+			if (objectValue == null)
 			{
 				if (!cond.IsFieldNullable)
 				{
-					throw new ArgumentNullException(nameof(value), $"Field {cond.Alias}.{cond.FieldPath} does not support null values.");
+					throw new ArgumentNullException(nameof(objectValues), $"Field {cond.Alias}.{cond.FieldPath} does not support null values.");
 				}
-				
-				array.Add(BsonNull.Value);
+
+				yield return 0L;
 			}
 			else
 			{
-				if (obj.GetType() != cond.FieldType && obj.GetType() != cond.FieldUnderlyingType)
+				type = objectValue.GetType();
+				if (type != cond.FieldType && type != cond.FieldUnderlyingType && !_integerTypes.Contains(type))
 				{
-					if (!allowCaseInsensitive)
-					{
-						object convertedValue;
-						if (TryConvertIntegerToOtherInteger(obj, cond.FieldUnderlyingType, out convertedValue))
-						{
-							array.Add(new BsonDocumentWrapper(obj, serializer ?? (serializer = BsonSerializer.SerializerRegistry.GetSerializer(cond.FieldType))));
-						}
-					}
-					throw new ArgumentException($"Field {cond.Alias}.{cond.FieldPath} has type {cond.FieldType.ToPretty()} not {obj.GetType().ToPretty()}.", nameof(value));
+					throw new ArgumentException($"Field {cond.Alias}.{cond.FieldPath} has type {cond.FieldType.ToPretty()} not {type.ToPretty()}.", nameof(objectValues));
 				}
 
-				if (cond.Operation.HasFlag(FO.CaseInsensitive))
-				{
-					if (!allowCaseInsensitive)
-					{
-						throw new InvalidOperationException("Such an operation cannot be case sensitive or insensitive.");
-					}
-					if (obj is string stringValue)
-					{
-						array.Add(new BsonRegularExpression(string.Concat("^", Regex.Escape(stringValue.ToLower()), "$"), "i"));// !!! localization
-					}
-					throw new ArgumentException($"Such operations can only be performed on strings. Field {cond.Alias}.{cond.FieldPath} is not a string type.", nameof(value));
-				}
-				else
-				{
-					array.Add(new BsonDocumentWrapper(obj, serializer ?? (serializer = BsonSerializer.SerializerRegistry.GetSerializer(cond.FieldType))));
-				}
+				yield return unchecked((long)objectValue);
 			}
 		}
-
-		return array;
 	}
 
 	private static BsonDocument MakeBsonConditionOnFields(bool rightIsVar, string command, string leftField, string rightField)
@@ -580,40 +853,142 @@ internal abstract class QueryBuilder<TDocument, TProjection> : IQueryBuilder<TDo
 
 			return new BsonDocument { { command, bsonValue } };
 		}
+		else if (command == "$eq")
+		{
+			return new BsonDocument { { leftField, value } };
+		}
 		else
 		{
 			return new BsonDocument { { leftField, new BsonDocument { { command, value } } } };
 		}
 	}
-	private static BsonDocument MakeEqBsonCondition(bool useExprFormat, string leftField, BsonValue value)
+	private static BsonDocument MakeBsonArrayCondition(bool useExprFormat, string command, string leftField, BsonArray values)
 	{
+		var countUpTo2 = values.CountUpTo(2);
+		if (countUpTo2 <= 0)
+		{
+			if (values == null)
+			{
+				throw new ArgumentNullException(nameof(values));
+			}
+			else
+			{
+				throw new ArgumentException(nameof(values));
+			}
+		}
+
+		if (countUpTo2 == 1)
+		{
+			return MakeBsonCondition(useExprFormat, command, leftField, values.First());
+		}
+
 		if (useExprFormat)
 		{
-			var bsonValue = new BsonArray();
-			bsonValue.Add("$" + leftField);
-			bsonValue.Add(value);
-
-			return new BsonDocument { { "$eq", bsonValue } };
+			BsonArray bsonValue, bsonArray = new BsonArray();
+			foreach (var value in values)
+			{
+				bsonValue = new BsonArray();
+				bsonValue.Add("$" + leftField);
+				bsonValue.Add(value);
+				bsonArray.Add(new BsonDocument { { command, bsonValue } });
+			}
+			return new BsonDocument { { "$or", bsonArray } };
 		}
 		else
 		{
-			return new BsonDocument { { leftField, value } };
+			var bsonArray = new BsonArray();
+			foreach (var value in values)
+			{
+				bsonArray.Add(new BsonDocument { { leftField, new BsonDocument { { command, value } } } });
+			}
+			return new BsonDocument { { "$or", bsonArray } };
+		}
+	}
+	private static BsonDocument MakeBsonBetweenCondition(bool useExprFormat, bool betweenOrNotBetween, string leftField, BsonArray values)
+	{
+		if (useExprFormat)
+		{
+			BsonArray bsonValue, bsonArray = new BsonArray();
+
+			if (betweenOrNotBetween)
+			{
+				bsonValue = new BsonArray();
+				bsonValue.Add("$" + leftField);
+				bsonValue.Add(values[0]);
+				bsonArray.Add(new BsonDocument { { "$gte", bsonValue } });
+
+				bsonValue = new BsonArray();
+				bsonValue.Add("$" + leftField);
+				bsonValue.Add(values[1]);
+				bsonArray.Add(new BsonDocument { { "$lte", bsonValue } });
+
+				return new BsonDocument { { "$and", bsonArray } };
+			}
+			else
+			{
+				bsonValue = new BsonArray();
+				bsonValue.Add("$" + leftField);
+				bsonValue.Add(values[0]);
+				bsonArray.Add(new BsonDocument { { "$lt", bsonValue } });
+
+				bsonValue = new BsonArray();
+				bsonValue.Add("$" + leftField);
+				bsonValue.Add(values[1]);
+				bsonArray.Add(new BsonDocument { { "$gt", bsonValue } });
+
+				return new BsonDocument { { "$or", bsonArray } };
+			}
+		}
+		else
+		{
+			var bsonArray = new BsonArray();
+			if (betweenOrNotBetween)
+			{
+				bsonArray.Add(new BsonDocument { { leftField, new BsonDocument { { "$gte", values[0] } } } });
+				bsonArray.Add(new BsonDocument { { leftField, new BsonDocument { { "$lte", values[1] } } } });
+				return new BsonDocument { { "$and", bsonArray } };
+			}
+			else
+			{
+				bsonArray.Add(new BsonDocument { { leftField, new BsonDocument { { "$lt", values[0] } } } });
+				bsonArray.Add(new BsonDocument { { leftField, new BsonDocument { { "$gt", values[1] } } } });
+				return new BsonDocument { { "$or", bsonArray } };
+			}
+			
 		}
 	}
 
 	internal static string MakeVariableName(string name) => name?.ToUnderScoresCase()!.Replace('.', '_')!;
 
-	private static bool TryConvertIntegerToOtherInteger(object fromValue, Type toType, out object toValue)
+	private static Type? GetEnumerationItemType(object? value)
+	{
+		if (value is not IEnumerable objectEnumeration)
+		{
+			return null;
+		}
+		
+		foreach (var item in objectEnumeration)
+		{
+			if (item == null)
+			{
+				continue;
+			}
+
+			return item.GetType();
+		}
+
+		var types = value.GetType().GetInterfacesOf(typeof(IEnumerable<>)).Select(x => x.GetGenericArguments()[0]);
+		
+		return types.FirstOrDefault(x => x != typeof(object)) ?? types.FirstOrDefault();
+	}
+
+	private static bool TryConvertIntegerToOtherInteger(object fromValue, Type toType, [NotNullWhen(true)] ref object? toValue)
 	{
 		var trueType = fromValue.GetType().GetUnderlyingSystemType();
 		if (_integerTypes.Contains(trueType) && _integerTypes.Contains(toType))
 		{
 			toValue = Convert.ChangeType(fromValue, toType);
 			return true;
-		}
-		else
-		{
-			toValue = null!;
 		}
 		return false;
 	}

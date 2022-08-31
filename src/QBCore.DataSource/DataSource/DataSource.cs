@@ -227,16 +227,50 @@ public abstract partial class DataSource<TKey, TDocument, TCreate, TSelect, TUpd
 		return await qb.SelectAsync(skip, take, options, cancellationToken).ConfigureAwait(false);
 	}
 
-	public Task<TUpdate> UpdateAsync(
+	public async Task UpdateAsync(
 		TKey id,
 		TUpdate document,
-		IReadOnlyCollection<string>? modifiedFieldNames = null,
+		IReadOnlySet<string>? modifiedFieldNames = null,
 		IReadOnlyDictionary<string, object?>? arguments = null,
 		DataSourceUpdateOptions? options = null,
 		CancellationToken cancellationToken = default(CancellationToken)
 	)
 	{
-		throw new NotImplementedException();
+		if (!DSInfo.Options.HasFlag(DataSourceOptions.CanUpdate))
+		{
+			throw new InvalidOperationException($"DataSource {DSInfo.Name} does not support the update operation.");
+		}
+
+		var qb = DSInfo.QBFactory.CreateQBUpdate<TDocument, TUpdate>(_dataContext);
+		var builder = qb.Builder;
+
+		object? value;
+		foreach (var param in builder.Parameters)
+		{
+			param.ResetValue();
+			if (arguments != null && arguments.TryGetValue(param.Name, out value))
+			{
+				param.Value = value;
+			}
+			else if (param.Name == "id")
+			{
+				param.Value = id;
+			}
+		}
+
+		TDocument result;
+		if (typeof(TDocument) != typeof(TUpdate))
+		{
+			modifiedFieldNames ??= builder.ProjectionInfo!.DataEntries.Keys.ToHashSet();
+
+			result = _mapper.Map<TDocument>(document);
+			await qb.UpdateAsync(id!, result, modifiedFieldNames, options, cancellationToken).ConfigureAwait(false);
+		}
+		else
+		{
+			result = (TDocument)(object)document!;
+			await qb.UpdateAsync(id!, result, modifiedFieldNames, options, cancellationToken).ConfigureAwait(false);
+		}
 	}
 
 	public async Task DeleteAsync(
@@ -265,6 +299,10 @@ public abstract partial class DataSource<TKey, TDocument, TCreate, TSelect, TUpd
 				{
 					param.Value = value;
 				}
+				else if (param.Name == "id")
+				{
+					param.Value = id;
+				}
 			}
 
 			await qb.DeleteAsync(id!, document, options, cancellationToken).ConfigureAwait(false);
@@ -281,6 +319,10 @@ public abstract partial class DataSource<TKey, TDocument, TCreate, TSelect, TUpd
 				if (arguments != null && arguments.TryGetValue(param.Name, out value))
 				{
 					param.Value = value;
+				}
+				else if (param.Name == "id")
+				{
+					param.Value = id;
 				}
 			}
 
@@ -311,6 +353,10 @@ public abstract partial class DataSource<TKey, TDocument, TCreate, TSelect, TUpd
 			if (arguments != null && arguments.TryGetValue(param.Name, out value))
 			{
 				param.Value = value;
+			}
+			else if (param.Name == "id")
+			{
+				param.Value = id;
 			}
 		}
 

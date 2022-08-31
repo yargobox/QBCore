@@ -9,6 +9,6 @@ public class ProductUpdateDto
 
 	static void Builder(IQBMongoUpdateBuilder<Product, ProductUpdateDto> builder)
 	{
-		//builder.UpdateTable("products");
+		builder.Update("products");
 	}
 }

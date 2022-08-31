@@ -20,6 +20,6 @@ public class OrderPositionSelectDto
 
 	static void Builder(IQBMongoSelectBuilder<OrderPosition, OrderPositionSelectDto> builder)
 	{
-		builder.SelectFrom("order_positions");
+		builder.Select("order_positions");
 	}
 }

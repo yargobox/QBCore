@@ -21,11 +21,7 @@ public interface IQueryBuilder<TDocument, TProjection> : IQueryBuilder
 
 public interface IInsertQueryBuilder<TDocument, TCreate> : IQueryBuilder<TDocument, TCreate>
 {
-	Task<TDocument> InsertAsync(
-		TDocument document,
-		DataSourceInsertOptions? options = null,
-		CancellationToken cancellationToken = default(CancellationToken)
-	);
+	Task<TDocument> InsertAsync(TDocument document, DataSourceInsertOptions? options = null, CancellationToken cancellationToken = default(CancellationToken));
 }
 
 public interface ISelectQueryBuilder<TDocument, TSelect> : IQueryBuilder<TDocument, TSelect>
@@ -37,14 +33,7 @@ public interface ISelectQueryBuilder<TDocument, TSelect> : IQueryBuilder<TDocume
 
 public interface IUpdateQueryBuilder<TDocument, TUpdate> : IQueryBuilder<TDocument, TUpdate>
 {
-	Task<TUpdate> UpdateAsync(
-		TUpdate document,
-		IReadOnlyCollection<QBCondition> conditions,
-		IReadOnlyCollection<string>? modifiedFieldNames = null,
-		IReadOnlyCollection<QBArgument>? parameters = null,
-		DataSourceUpdateOptions? options = null,
-		CancellationToken cancellationToken = default(CancellationToken)
-	);
+	Task<TDocument> UpdateAsync(object id, TDocument document, IReadOnlySet<string>? modifiedFieldNames = null, DataSourceUpdateOptions? options = null, CancellationToken cancellationToken = default(CancellationToken));
 }
 
 public interface IDeleteQueryBuilder<TDocument, TDelete> : IQueryBuilder<TDocument, TDelete>

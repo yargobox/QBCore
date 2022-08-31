@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Reflection;
 using System.Text.RegularExpressions;
 using MongoDB.Bson;
 using QBCore.Configuration;
@@ -13,11 +14,41 @@ public sealed class MongoDataLayer : IDataLayerInfo
 
 	public string Name => "Mongo";
 	public Type DatabaseContextInterface => typeof(IMongoDbContext);
-	public Func<Type, bool> IsDocumentType { get; set; }
+	
+	public Func<Type, bool> IsDocumentType
+	{
+		get => _isDocumentType;
+		set
+		{
+			if (value == null)
+			{
+				throw new ArgumentNullException(nameof(value));
+			}
+
+			Interlocked.Exchange(ref _isDocumentType, value);
+		}
+	}
+	private Func<Type, bool> _isDocumentType;
+
+	public Func<Type, string> GetDefaultDBSideContainerName
+	{
+		get => _getDefaultDBSideContainerName;
+		set
+		{
+			if (value == null)
+			{
+				throw new ArgumentNullException(nameof(value));
+			}
+
+			Interlocked.Exchange(ref _getDefaultDBSideContainerName, value);
+		}
+	}
+	private Func<Type, string> _getDefaultDBSideContainerName;
 
 	private MongoDataLayer()
 	{
-		IsDocumentType = IsDocumentTypeImplementation;
+		_isDocumentType = IsDocumentTypeImplementation;
+		_getDefaultDBSideContainerName = type => type.GetCustomAttribute<BsonCollectionAttribute>(true)?.Name ?? type.Name;
 	}
 
 	public DSDocumentInfo CreateDocumentInfo(Type documentType)

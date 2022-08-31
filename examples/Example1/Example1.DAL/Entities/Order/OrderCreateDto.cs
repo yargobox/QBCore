@@ -22,7 +22,7 @@ public class OrderCreateDto
 
 	private static void QBBuilder(IQBMongoInsertBuilder<Order, OrderCreateDto> builder)
 	{
-		builder.InsertTo("orders");
+		builder.Insert("orders");
 
 		builder.IdGenerator = () => new PesemisticSequentialIdGenerator<Order>(1, 1, 8);
 	}

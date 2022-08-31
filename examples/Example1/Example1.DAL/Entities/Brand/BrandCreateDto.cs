@@ -9,7 +9,7 @@ public class BrandCreateDto
 	public static void Builder(IQBMongoInsertBuilder<Brand, BrandCreateDto> builder)
 	{
 		builder
-			.InsertTo("brands")
+			.Insert("brands")
 			.IdGenerator = () => new PesemisticSequentialIdGenerator<Brand>(1, 1, 8);
 	}
 }
