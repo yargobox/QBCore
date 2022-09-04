@@ -6,7 +6,11 @@ internal sealed class QBUpdateBuilder<TDoc, TDto> : QBCommonBuilder<TDoc, TDto>,
 {
 	public override QueryBuilderTypes QueryBuilderType => QueryBuilderTypes.Update;
 
-	public QBUpdateBuilder() { }
+	public QBUpdateBuilder()
+	{
+		if (DocumentInfo.IdField == null)
+			throw new InvalidOperationException($"Document '{typeof(TDoc).ToPretty()}' does not have an id field.");
+	}
 	public QBUpdateBuilder(QBUpdateBuilder<TDoc, TDto> other) : base(other) { }
 	public QBUpdateBuilder(IQBBuilder other)
 	{
@@ -15,19 +19,13 @@ internal sealed class QBUpdateBuilder<TDoc, TDto> : QBCommonBuilder<TDoc, TDto>,
 			throw new InvalidOperationException($"Could not make update query builder '{typeof(TDoc).ToPretty()}, {typeof(TDto).ToPretty()}' from '{other.DocumentType.ToPretty()}, {other.ProjectionType.ToPretty()}'.");
 		}
 
-		if (other.Containers.Count > 0)
+		var container = other.Containers.FirstOrDefault();
+		if (container?.DocumentType == null || container.DocumentType != typeof(TDoc) || container.ContainerType != ContainerTypes.Table)
 		{
-			var c = other.Containers.First();
-			if (c.DocumentType != typeof(TDoc) || c.ContainerType != ContainerTypes.Table)
-			{
-				throw new InvalidOperationException($"Could not make update query builder '{typeof(TDoc).ToPretty()}, {typeof(TDto).ToPretty()}' from '{other.DocumentType.ToPretty()}, {other.ProjectionType.ToPretty()}'.");
-			}
-
-			var deId = DocumentInfo.IdField
-				?? throw new InvalidOperationException($"Document '{typeof(TDoc).ToPretty()}' does not have an id field.");
-
-			Update(c.DBSideName).Condition(deId, FO.In, deId.Name);
+			throw new InvalidOperationException($"Could not make update query builder '{typeof(TDoc).ToPretty()}, {typeof(TDto).ToPretty()}' from '{other.DocumentType.ToPretty()}, {other.ProjectionType.ToPretty()}'.");
 		}
+
+		AutoBuildSetup(container.DBSideName);
 	}
 	public override QBBuilder<TDoc, TDto> AutoBuild()
 	{
@@ -36,12 +34,15 @@ internal sealed class QBUpdateBuilder<TDoc, TDto> : QBCommonBuilder<TDoc, TDto>,
 			throw new InvalidOperationException($"Update query builder '{typeof(TDto).ToPretty()}' has already been initialized.");
 		}
 
+		AutoBuildSetup(null);
+		return this;
+	}
+	private void AutoBuildSetup(string? tableName)
+	{
 		var deId = DocumentInfo.IdField
 			?? throw new InvalidOperationException($"Document '{typeof(TDoc).ToPretty()}' does not have an id field.");
 
-		Update().Condition(deId, FO.In, deId.Name);
-
-		return this;
+		Update(tableName).Condition(deId, FO.Equal, "id");
 	}
 
 	protected override void OnNormalize()

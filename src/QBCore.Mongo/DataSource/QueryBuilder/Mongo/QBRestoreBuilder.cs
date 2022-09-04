@@ -6,7 +6,15 @@ internal sealed class QBRestoreBuilder<TDoc, TDto> : QBCommonBuilder<TDoc, TDto>
 {
 	public override QueryBuilderTypes QueryBuilderType => QueryBuilderTypes.Restore;
 
-	public QBRestoreBuilder() { }
+	public QBRestoreBuilder()
+	{
+		if (DocumentInfo.IdField == null)
+			throw new InvalidOperationException($"Document '{typeof(TDoc).ToPretty()}' does not have an id field.");
+		var deDeleted = DocumentInfo.DateDeletedField
+			?? throw new InvalidOperationException($"Document '{typeof(TDoc).ToPretty()}' does not have a date deletion field.");
+		if (deDeleted.Flags.HasFlag(DataEntryFlags.ReadOnly))
+			throw new InvalidOperationException($"Document '{typeof(TDoc).ToPretty()}' has a readonly date deletion field!");
+	}
 	public QBRestoreBuilder(QBRestoreBuilder<TDoc, TDto> other) : base(other) { }
 	public QBRestoreBuilder(IQBBuilder other)
 	{
@@ -15,23 +23,13 @@ internal sealed class QBRestoreBuilder<TDoc, TDto> : QBCommonBuilder<TDoc, TDto>
 			throw new InvalidOperationException($"Could not make restore query builder '{typeof(TDoc).ToPretty()}, {typeof(TDto).ToPretty()}' from '{other.DocumentType.ToPretty()}, {other.ProjectionType.ToPretty()}'.");
 		}
 
-		if (other.Containers.Count > 0)
+		var container = other.Containers.FirstOrDefault();
+		if (container?.DocumentType == null || container.DocumentType != typeof(TDoc) || container.ContainerType != ContainerTypes.Table)
 		{
-			var c = other.Containers.First();
-			if (c.DocumentType != typeof(TDoc) || c.ContainerType != ContainerTypes.Table)
-			{
-				throw new InvalidOperationException($"Could not make restore query builder '{typeof(TDoc).ToPretty()}, {typeof(TDto).ToPretty()}' from '{other.DocumentType.ToPretty()}, {other.ProjectionType.ToPretty()}'.");
-			}
-
-			var deId = DocumentInfo.IdField
-				?? throw new InvalidOperationException($"Document '{typeof(TDoc).ToPretty()}' does not have an id field.");
-			var deDeleted = DocumentInfo.DateDeletedField
-				?? throw new InvalidOperationException($"Document '{typeof(TDoc).ToPretty()}' does not have a date deletion field.");
-			if (deDeleted.Flags.HasFlag(DataEntryFlags.ReadOnly))
-				throw new InvalidOperationException($"Document '{typeof(TDoc).ToPretty()}' has a readonly date deletion field!");
-
-			Update(c.DBSideName).Condition(deId, FO.In, deId.Name).Condition(deDeleted, null, FO.NotEqual);
+			throw new InvalidOperationException($"Could not make restore query builder '{typeof(TDoc).ToPretty()}, {typeof(TDto).ToPretty()}' from '{other.DocumentType.ToPretty()}, {other.ProjectionType.ToPretty()}'.");
 		}
+
+		AutoBuildSetup(container.DBSideName);
 	}
 	public override QBBuilder<TDoc, TDto> AutoBuild()
 	{
@@ -40,6 +38,11 @@ internal sealed class QBRestoreBuilder<TDoc, TDto> : QBCommonBuilder<TDoc, TDto>
 			throw new InvalidOperationException($"Restore query builder '{typeof(TDto).ToPretty()}' has already been initialized.");
 		}
 
+		AutoBuildSetup(null);
+		return this;
+	}
+	private void AutoBuildSetup(string? tableName)
+	{
 		var deId = DocumentInfo.IdField
 			?? throw new InvalidOperationException($"Document '{typeof(TDoc).ToPretty()}' does not have an id field.");
 		var deDeleted = DocumentInfo.DateDeletedField
@@ -47,9 +50,7 @@ internal sealed class QBRestoreBuilder<TDoc, TDto> : QBCommonBuilder<TDoc, TDto>
 		if (deDeleted.Flags.HasFlag(DataEntryFlags.ReadOnly))
 			throw new InvalidOperationException($"Document '{typeof(TDoc).ToPretty()}' has a readonly date deletion field!");
 
-		Update().Condition(deId, FO.In, deId.Name).Condition(deDeleted, null, FO.NotEqual);
-
-		return this;
+		Update(tableName).Condition(deId, FO.Equal, "id").Condition(deDeleted, null, FO.NotEqual);
 	}
 
 	protected override void OnNormalize()

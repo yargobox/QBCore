@@ -46,16 +46,13 @@ internal sealed class QBSelectBuilder<TDoc, TDto> : QBBuilder<TDoc, TDto>, IQBMo
 			throw new InvalidOperationException($"Could not make select query builder '{typeof(TDoc).ToPretty()}, {typeof(TDto).ToPretty()}' from '{other.DocumentType.ToPretty()}, {other.ProjectionType.ToPretty()}'.");
 		}
 
-		if (other.Containers.Count > 0)
+		var container = other.Containers.FirstOrDefault();
+		if (container?.DocumentType == null || container.DocumentType != typeof(TDoc) || container.ContainerType != ContainerTypes.Table)
 		{
-			var c = other.Containers.First();
-			if (c.DocumentType != typeof(TDoc) || c.ContainerType != ContainerTypes.Table)
-			{
-				throw new InvalidOperationException($"Could not make select query builder '{typeof(TDoc).ToPretty()}, {typeof(TDto).ToPretty()}' from '{other.DocumentType.ToPretty()}, {other.ProjectionType.ToPretty()}'.");
-			}
-
-			Select(c.DBSideName);//!!!
+			throw new InvalidOperationException($"Could not make select query builder '{typeof(TDoc).ToPretty()}, {typeof(TDto).ToPretty()}' from '{other.DocumentType.ToPretty()}, {other.ProjectionType.ToPretty()}'.");
 		}
+
+		Select(container.DBSideName);
 	}
 	public override QBBuilder<TDoc, TDto> AutoBuild()
 	{
@@ -64,7 +61,8 @@ internal sealed class QBSelectBuilder<TDoc, TDto> : QBBuilder<TDoc, TDto>, IQBMo
 			throw new InvalidOperationException($"Select query builder '{typeof(TDto).ToPretty()}' has already been initialized.");
 		}
 
-		return Select();//!!!
+		Select();
+		return this;
 	}
 
 	protected override void OnNormalize()

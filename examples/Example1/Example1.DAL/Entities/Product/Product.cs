@@ -1,19 +1,20 @@
 using Example1.DAL.Entities.Brands;
 using Example1.DAL.Entities.OrderPositions;
+using QBCore.DataSource;
 
 namespace Example1.DAL.Entities.Products;
 
 public class Product
 {
-	public int? Id { get; set; }
+	[DeId] public int? Id { get; set; }
 	public string? Name { get; set; }
 
 	public int? BrandId { get; set; }
 	public Brand? Brand { get; set; }
 
-	public DateTimeOffset? Created { get; set; }
-	public DateTimeOffset? Updated { get; set; }
-	public DateTimeOffset? Deleted { get; set; }
+	[DeCreated] public DateTimeOffset? Created { get; set; }
+	[DeUpdated] public DateTimeOffset? Updated { get; set; }
+	[DeDeleted] public DateTimeOffset? Deleted { get; set; }
 
 	public virtual IEnumerable<OrderPosition> OrderPositions { get; set; } = new List<OrderPosition>();
 }

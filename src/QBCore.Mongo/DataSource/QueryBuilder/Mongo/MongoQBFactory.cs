@@ -6,320 +6,466 @@ namespace QBCore.DataSource.QueryBuilder.Mongo;
 
 internal class MongoQBFactory : IQueryBuilderFactory
 {
-	public Type DataSourceConcrete { get; }
 	public IDataLayerInfo DataLayer => MongoDataLayer.Default;
-	public QueryBuilderTypes SupportedQueryBuilders { get; }
+	public Type DataSourceConcrete => _dataSourceConcrete;
+	public QueryBuilderTypes SupportedQueryBuilders => _supportedQueryBuilders;
 
-	private Delegate? _insertBuilderMethod;
-	private Delegate? _selectBuilderMethod;
-	private Delegate? _updateBuilderMethod;
-	private Delegate? _deleteBuilderMethod;
-	private Delegate? _softDelBuilderMethod;
-	private Delegate? _restoreBuilderMethod;
+	public IQBBuilder? DefaultInsertBuilder => GetInsertBuilder();
+	public IQBBuilder? DefaultSelectBuilder => GetSelectBuilder();
+	public IQBBuilder? DefaultUpdateBuilder => GetUpdateBuilder();
+	public IQBBuilder? DefaultDeleteBuilder => GetDeleteBuilder();
+	public IQBBuilder? DefaultSoftDelBuilder => GetSoftDelBuilder();
+	public IQBBuilder? DefaultRestoreBuilder => GetRestoreBuilder();
 
-	private object? _insert;
-	private object? _select;
-	private object? _update;
-	private object? _delete;
-	private object? _restore;
+	private readonly Type _dataSourceConcrete;
+	private readonly (Type TKey, Type TDocument, Type TCreate, Type TSelect, Type TUpdate, Type TDelete, Type TRestore) _dataSourceTypes;
+	private readonly QueryBuilderTypes _supportedQueryBuilders;
+
+	private readonly Delegate? _insertBuilderMethod;
+	private readonly Delegate? _selectBuilderMethod;
+	private readonly Delegate? _updateBuilderMethod;
+	private readonly Delegate? _deleteBuilderMethod;
+	private readonly Delegate? _restoreBuilderMethod;
+
+	private IQBBuilder? _insertBuilder;
+	private IQBBuilder? _selectBuilder;
+	private IQBBuilder? _updateBuilder;
+	private IQBBuilder? _deleteBuilder;
+	private IQBBuilder? _softDelBuilder;
+	private IQBBuilder? _restoreBuilder;
+
+	private static readonly MethodInfo _getInsertBuilder = typeof(MongoQBFactory)
+		.GetMethod(nameof(GetInsertBuilder), 2, BindingFlags.Instance | BindingFlags.NonPublic, null, CallingConventions.Standard, Array.Empty<Type>(), null)
+			?? throw new ArgumentNullException(nameof(_getInsertBuilder));
+	private static readonly MethodInfo _getSelectBuilder = typeof(MongoQBFactory)
+		.GetMethod(nameof(GetSelectBuilder), 2, BindingFlags.Instance | BindingFlags.NonPublic, null, CallingConventions.Standard, Array.Empty<Type>(), null)
+			?? throw new ArgumentNullException(nameof(_getSelectBuilder));
+	private static readonly MethodInfo _getUpdateBuilder = typeof(MongoQBFactory)
+		.GetMethod(nameof(GetUpdateBuilder), 2, BindingFlags.Instance | BindingFlags.NonPublic, null, CallingConventions.Standard, Array.Empty<Type>(), null)
+			?? throw new ArgumentNullException(nameof(_getUpdateBuilder));
+	private static readonly MethodInfo _getDeleteBuilder = typeof(MongoQBFactory)
+		.GetMethod(nameof(GetDeleteBuilder), 2, BindingFlags.Instance | BindingFlags.NonPublic, null, CallingConventions.Standard, Array.Empty<Type>(), null)
+			?? throw new ArgumentNullException(nameof(_getDeleteBuilder));
+	private static readonly MethodInfo _getSoftDelBuilder = typeof(MongoQBFactory)
+		.GetMethod(nameof(GetSoftDelBuilder), 2, BindingFlags.Instance | BindingFlags.NonPublic, null, CallingConventions.Standard, Array.Empty<Type>(), null)
+			?? throw new ArgumentNullException(nameof(_getSoftDelBuilder));
+	private static readonly MethodInfo _getRestoreBuilder = typeof(MongoQBFactory)
+		.GetMethod(nameof(GetRestoreBuilder), 2, BindingFlags.Instance | BindingFlags.NonPublic, null, CallingConventions.Standard, Array.Empty<Type>(), null)
+			?? throw new ArgumentNullException(nameof(_getRestoreBuilder));
 
 	public MongoQBFactory(Type dataSourceConcrete, DataSourceOptions options, Delegate? insertBuilderMethod, Delegate? selectBuilderMethod, Delegate? updateBuilderMethod, Delegate? deleteBuilderMethod, Delegate? softDelBuilderMethod, Delegate? restoreBuilderMethod, bool lazyInitialization)
 	{
-		DataSourceConcrete = dataSourceConcrete;
+		_dataSourceConcrete = dataSourceConcrete;
+		_dataSourceTypes = dataSourceConcrete.GetDataSourceTypes();
 
-		_insertBuilderMethod = insertBuilderMethod;
-		_selectBuilderMethod = selectBuilderMethod;
-		_updateBuilderMethod = updateBuilderMethod;
-		_deleteBuilderMethod = deleteBuilderMethod;
-		_softDelBuilderMethod = softDelBuilderMethod;
-		_restoreBuilderMethod = restoreBuilderMethod;
-
-		if (options.HasFlag(DataSourceOptions.CanInsert)) SupportedQueryBuilders |= QueryBuilderTypes.Insert;
-		if (options.HasFlag(DataSourceOptions.CanSelect)) SupportedQueryBuilders |= QueryBuilderTypes.Select;
-		if (options.HasFlag(DataSourceOptions.CanUpdate)) SupportedQueryBuilders |= QueryBuilderTypes.Update;
-		if (options.HasFlag(DataSourceOptions.CanDelete | DataSourceOptions.SoftDelete)) SupportedQueryBuilders |= QueryBuilderTypes.SoftDel;
-		else if (options.HasFlag(DataSourceOptions.CanDelete)) SupportedQueryBuilders |= QueryBuilderTypes.Delete;
-		if (options.HasFlag(DataSourceOptions.CanRestore)) SupportedQueryBuilders |= QueryBuilderTypes.Restore;
-
-		if (!lazyInitialization)
+		if (options.HasFlag(DataSourceOptions.CanInsert))
 		{
-			var types = DataSourceConcrete.GetDataSourceTypes();
+			_supportedQueryBuilders |= QueryBuilderTypes.Insert;
 
-			_insert = !SupportedQueryBuilders.HasFlag(QueryBuilderTypes.Insert) ? false :
-				GetType()
-					.GetMethod(nameof(MakeInsertFactoryMethod), BindingFlags.Instance | BindingFlags.NonPublic)!
-					.MakeGenericMethod(types.TDocument, types.TCreate)
-					.Invoke(this, null);
-
-			_select = !SupportedQueryBuilders.HasFlag(QueryBuilderTypes.Select) ? false :
-				GetType()
-					.GetMethod(nameof(MakeSelectFactoryMethod), BindingFlags.Instance | BindingFlags.NonPublic)!
-					.MakeGenericMethod(types.TDocument, types.TSelect)
-					.Invoke(this, null);
-			
-			_update = !SupportedQueryBuilders.HasFlag(QueryBuilderTypes.Update) ? false :
-				GetType()
-					.GetMethod(nameof(MakeUpdateFactoryMethod), BindingFlags.Instance | BindingFlags.NonPublic)!
-					.MakeGenericMethod(types.TDocument, types.TUpdate)
-					.Invoke(this, null);
-
-			if (SupportedQueryBuilders.HasFlag(QueryBuilderTypes.Delete))
+			if (insertBuilderMethod != null)
 			{
-				_delete =
-					GetType()
-						.GetMethod(nameof(MakeDeleteFactoryMethod), BindingFlags.Instance | BindingFlags.NonPublic)!
-						.MakeGenericMethod(types.TDocument, types.TDelete)
-						.Invoke(this, null);
-			}
-			else if (SupportedQueryBuilders.HasFlag(QueryBuilderTypes.SoftDel))
-			{
-				_delete =
-					GetType()
-						.GetMethod(nameof(MakeSoftDelFactoryMethod), BindingFlags.Instance | BindingFlags.NonPublic)!
-						.MakeGenericMethod(types.TDocument, types.TDelete)
-						.Invoke(this, null);
+				_insertBuilderMethod = insertBuilderMethod;
 			}
 			else
 			{
-				_delete = false;
+				var setupActionArgType = typeof(IQBMongoInsertBuilder<,>).MakeGenericType(_dataSourceTypes.TDocument, _dataSourceTypes.TCreate);
+				_insertBuilderMethod = FactoryHelper.FindBuilder(setupActionArgType, DataSourceConcrete, null)
+									?? FactoryHelper.FindBuilder(setupActionArgType, _dataSourceTypes.TCreate, null);
+			}
+		}
+
+		if (options.HasFlag(DataSourceOptions.CanSelect))
+		{
+			_supportedQueryBuilders |= QueryBuilderTypes.Select;
+
+			if (selectBuilderMethod != null)
+			{
+				_selectBuilderMethod = selectBuilderMethod;
+			}
+			else
+			{
+				var setupActionArgType = typeof(IQBMongoSelectBuilder<,>).MakeGenericType(_dataSourceTypes.TDocument, _dataSourceTypes.TSelect);
+				_selectBuilderMethod = FactoryHelper.FindBuilder(setupActionArgType, DataSourceConcrete, null)
+									?? FactoryHelper.FindBuilder(setupActionArgType, _dataSourceTypes.TSelect, null);
+			}
+		}
+
+		if (options.HasFlag(DataSourceOptions.CanUpdate))
+		{
+			_supportedQueryBuilders |= QueryBuilderTypes.Update;
+
+			if (updateBuilderMethod != null)
+			{
+				_updateBuilderMethod = updateBuilderMethod;
+			}
+			else
+			{
+				var setupActionArgType = typeof(IQBMongoUpdateBuilder<,>).MakeGenericType(_dataSourceTypes.TDocument, _dataSourceTypes.TUpdate);
+				_updateBuilderMethod = FactoryHelper.FindBuilder(setupActionArgType, DataSourceConcrete, null)
+									?? FactoryHelper.FindBuilder(setupActionArgType, _dataSourceTypes.TUpdate, null);
+			}
+		}
+
+		if (options.HasFlag(DataSourceOptions.SoftDelete))
+		{
+			if (options.HasFlag(DataSourceOptions.CanDelete))
+			{
+				_supportedQueryBuilders |= QueryBuilderTypes.SoftDel;
+
+				if (softDelBuilderMethod != null)
+				{
+					_deleteBuilderMethod = softDelBuilderMethod;
+				}
+				else
+				{
+					var setupActionArgType = typeof(IQBMongoSoftDelBuilder<,>).MakeGenericType(_dataSourceTypes.TDocument, _dataSourceTypes.TDelete);
+					_deleteBuilderMethod = FactoryHelper.FindBuilder(setupActionArgType, DataSourceConcrete, null)
+										?? FactoryHelper.FindBuilder(setupActionArgType, _dataSourceTypes.TDelete, null);
+				}
 			}
 
-			_restore = !SupportedQueryBuilders.HasFlag(QueryBuilderTypes.Restore) ? false :
-				GetType()
-					.GetMethod(nameof(MakeRestoreFactoryMethod), BindingFlags.Instance | BindingFlags.NonPublic)!
-					.MakeGenericMethod(types.TDocument, types.TRestore)
-					.Invoke(this, null);
+			if (options.HasFlag(DataSourceOptions.CanRestore))
+			{
+				_supportedQueryBuilders |= QueryBuilderTypes.Restore;
 
-			// they're no longer needed
-			_insertBuilderMethod = null;
-			_selectBuilderMethod = null;
-			_updateBuilderMethod = null;
-			_deleteBuilderMethod = null;
-			_softDelBuilderMethod = null;
-			_restoreBuilderMethod = null;
+				if (restoreBuilderMethod != null)
+				{
+					_restoreBuilderMethod = restoreBuilderMethod;
+				}
+				else
+				{
+					var setupActionArgType = typeof(IQBMongoRestoreBuilder<,>).MakeGenericType(_dataSourceTypes.TDocument, _dataSourceTypes.TRestore);
+					_restoreBuilderMethod = FactoryHelper.FindBuilder(setupActionArgType, DataSourceConcrete, null)
+										?? FactoryHelper.FindBuilder(setupActionArgType, _dataSourceTypes.TRestore, null);
+				}
+			}
+		}
+		else if (options.HasFlag(DataSourceOptions.CanDelete))
+		{
+			_supportedQueryBuilders |= QueryBuilderTypes.Delete;
+
+			if (deleteBuilderMethod != null)
+			{
+				_deleteBuilderMethod = deleteBuilderMethod;
+			}
+			else
+			{
+				var setupActionArgType = typeof(IQBMongoDeleteBuilder<,>).MakeGenericType(_dataSourceTypes.TDocument, _dataSourceTypes.TDelete);
+				_deleteBuilderMethod = FactoryHelper.FindBuilder(setupActionArgType, DataSourceConcrete, null)
+									?? FactoryHelper.FindBuilder(setupActionArgType, _dataSourceTypes.TDelete, null);
+			}
+		}
+
+		if (!lazyInitialization)
+		{
+			if (SupportedQueryBuilders.HasFlag(QueryBuilderTypes.Insert)) GetInsertBuilder();
+			if (SupportedQueryBuilders.HasFlag(QueryBuilderTypes.Select)) GetSelectBuilder();
+			if (SupportedQueryBuilders.HasFlag(QueryBuilderTypes.Update)) GetUpdateBuilder();
+			if (SupportedQueryBuilders.HasFlag(QueryBuilderTypes.Delete)) GetDeleteBuilder();
+			if (SupportedQueryBuilders.HasFlag(QueryBuilderTypes.SoftDel)) GetSoftDelBuilder();
+			if (SupportedQueryBuilders.HasFlag(QueryBuilderTypes.Restore)) GetRestoreBuilder();
 		}
 	}
 
 	public IInsertQueryBuilder<TDocument, TCreate> CreateQBInsert<TDocument, TCreate>(IDataContext dataContext)
 	{
-		if (_insert == null)
-		{
-			var types = DataSourceConcrete.GetDataSourceTypes();
+		var setup = (QBInsertBuilder<TDocument, TCreate>?)GetInsertBuilder()
+			?? throw new NotSupportedException($"DataSource '{DataSourceConcrete.ToPretty()}' does not support the insert operation.");
 
-			_insert = !SupportedQueryBuilders.HasFlag(QueryBuilderTypes.Insert) ? false :
-				GetType()
-					.GetMethod(nameof(MakeInsertFactoryMethod), BindingFlags.Instance | BindingFlags.NonPublic)!
-					.MakeGenericMethod(types.TDocument, types.TCreate)
-					.Invoke(this, null);
-		}
-
-		if (_insert is Func<IDataContext, IInsertQueryBuilder<TDocument, TCreate>> creator)
-		{
-			return creator(dataContext);
-		}
-		throw new InvalidOperationException($"DataSource {DataSourceConcrete.ToPretty()} does not have a query builder like {typeof(IInsertQueryBuilder<TDocument, TCreate>).ToPretty()}.");
+		return new InsertQueryBuilder<TDocument, TCreate>(new QBInsertBuilder<TDocument, TCreate>(setup), dataContext);
 	}
-
 	public ISelectQueryBuilder<TDocument, TSelect> CreateQBSelect<TDocument, TSelect>(IDataContext dataContext)
 	{
-		if (_select == null)
-		{
-			var types = DataSourceConcrete.GetDataSourceTypes();
+		var setup = (QBSelectBuilder<TDocument, TSelect>?)GetSelectBuilder()
+			?? throw new NotSupportedException($"DataSource '{DataSourceConcrete.ToPretty()}' does not support the select operation.");
 
-			_select = !SupportedQueryBuilders.HasFlag(QueryBuilderTypes.Select) ? false :
-				GetType()
-					.GetMethod(nameof(MakeSelectFactoryMethod), BindingFlags.Instance | BindingFlags.NonPublic)!
-					.MakeGenericMethod(types.TDocument, types.TSelect)
-					.Invoke(this, null);
-		}
-
-		if (_select is Func<IDataContext, ISelectQueryBuilder<TDocument, TSelect>> creator)
-		{
-			return creator(dataContext);
-		}
-		throw new InvalidOperationException($"DataSource {DataSourceConcrete.ToPretty()} does not have a query builder like {typeof(ISelectQueryBuilder<TDocument, TSelect>).ToPretty()}.");
+		return new SelectQueryBuilder<TDocument, TSelect>(new QBSelectBuilder<TDocument, TSelect>(setup), dataContext);
 	}
-
 	public IUpdateQueryBuilder<TDocument, TUpdate> CreateQBUpdate<TDocument, TUpdate>(IDataContext dataContext)
 	{
-		if (_update == null)
-		{
-			var types = DataSourceConcrete.GetDataSourceTypes();
+		var setup = (QBUpdateBuilder<TDocument, TUpdate>?)GetUpdateBuilder()
+			?? throw new NotSupportedException($"DataSource '{DataSourceConcrete.ToPretty()}' does not support the update operation.");
 
-			_update = !SupportedQueryBuilders.HasFlag(QueryBuilderTypes.Update) ? false :
-				GetType()
-					.GetMethod(nameof(MakeUpdateFactoryMethod), BindingFlags.Instance | BindingFlags.NonPublic)!
-					.MakeGenericMethod(types.TDocument, types.TUpdate)
-					.Invoke(this, null);
-		}
-
-		if (_update is Func<IDataContext, IUpdateQueryBuilder<TDocument, TUpdate>> creator)
-		{
-			return creator(dataContext);
-		}
-		throw new InvalidOperationException($"DataSource {DataSourceConcrete.ToPretty()} does not have a query builder like {typeof(IUpdateQueryBuilder<TDocument, TUpdate>).ToPretty()}.");
+		return new UpdateQueryBuilder<TDocument, TUpdate>(new QBUpdateBuilder<TDocument, TUpdate>(setup), dataContext);
 	}
-
 	public IDeleteQueryBuilder<TDocument, TDelete> CreateQBDelete<TDocument, TDelete>(IDataContext dataContext)
 	{
-		if (_delete == null && !SupportedQueryBuilders.HasFlag(QueryBuilderTypes.SoftDel))
-		{
-			var types = DataSourceConcrete.GetDataSourceTypes();
+		var setup = (QBDeleteBuilder<TDocument, TDelete>?)GetDeleteBuilder()
+			?? throw new NotSupportedException($"DataSource '{DataSourceConcrete.ToPretty()}' does not support the delete operation.");
 
-			_delete = !SupportedQueryBuilders.HasFlag(QueryBuilderTypes.Delete) ? false :
-				GetType()
-					.GetMethod(nameof(MakeDeleteFactoryMethod), BindingFlags.Instance | BindingFlags.NonPublic)!
-					.MakeGenericMethod(types.TDocument, types.TDelete)
-					.Invoke(this, null);
-		}
-
-		if (_delete is Func<IDataContext, IDeleteQueryBuilder<TDocument, TDelete>> creator)
-		{
-			return creator(dataContext);
-		}
-		throw new InvalidOperationException($"DataSource {DataSourceConcrete.ToPretty()} does not have a query builder like {typeof(IDeleteQueryBuilder<TDocument, TDelete>).ToPretty()}.");
+		return new DeleteQueryBuilder<TDocument, TDelete>(new QBDeleteBuilder<TDocument, TDelete>(setup), dataContext);
 	}
-
 	public IDeleteQueryBuilder<TDocument, TDelete> CreateQBSoftDel<TDocument, TDelete>(IDataContext dataContext)
 	{
-		if (_delete == null && !SupportedQueryBuilders.HasFlag(QueryBuilderTypes.Delete))
-		{
-			var types = DataSourceConcrete.GetDataSourceTypes();
+		var setup = (QBSoftDelBuilder<TDocument, TDelete>?)GetSoftDelBuilder()
+			?? throw new NotSupportedException($"DataSource '{DataSourceConcrete.ToPretty()}' does not support the soft delete operation.");
 
-			_delete = !SupportedQueryBuilders.HasFlag(QueryBuilderTypes.SoftDel) ? false :
-				GetType()
-					.GetMethod(nameof(MakeSoftDelFactoryMethod), BindingFlags.Instance | BindingFlags.NonPublic)!
-					.MakeGenericMethod(types.TDocument, types.TDelete)
-					.Invoke(this, null);
-		}
-
-		if (_delete is Func<IDataContext, IDeleteQueryBuilder<TDocument, TDelete>> creator)
-		{
-			return creator(dataContext);
-		}
-		throw new InvalidOperationException($"DataSource {DataSourceConcrete.ToPretty()} does not have a query builder like {typeof(IDeleteQueryBuilder<TDocument, TDelete>).ToPretty()}.");
+		return new SoftDelQueryBuilder<TDocument, TDelete>(new QBSoftDelBuilder<TDocument, TDelete>(setup), dataContext);
 	}
-
 	public IRestoreQueryBuilder<TDocument, TRestore> CreateQBRestore<TDocument, TRestore>(IDataContext dataContext)
 	{
-		if (_restore == null)
-		{
-			var types = DataSourceConcrete.GetDataSourceTypes();
+		var setup = (QBRestoreBuilder<TDocument, TRestore>?)GetRestoreBuilder()
+			?? throw new NotSupportedException($"DataSource '{DataSourceConcrete.ToPretty()}' does not support the restore operation.");
 
-			_restore = !SupportedQueryBuilders.HasFlag(QueryBuilderTypes.Restore) ? false :
-				GetType()
-					.GetMethod(nameof(MakeRestoreFactoryMethod), BindingFlags.Instance | BindingFlags.NonPublic)!
-					.MakeGenericMethod(types.TDocument, types.TRestore)
-					.Invoke(this, null);
+		return new RestoreQueryBuilder<TDocument, TRestore>(new QBRestoreBuilder<TDocument, TRestore>(setup), dataContext);
+	}
+
+	private IQBBuilder? GetInsertBuilder()
+		=> (IQBBuilder?) _getInsertBuilder.MakeGenericMethod(_dataSourceTypes.TDocument, _dataSourceTypes.TCreate).Invoke(this, null);
+	private IQBBuilder? GetSelectBuilder()
+		=> (IQBBuilder?) _getSelectBuilder.MakeGenericMethod(_dataSourceTypes.TDocument, _dataSourceTypes.TSelect).Invoke(this, null);
+	private IQBBuilder? GetUpdateBuilder()
+		=> (IQBBuilder?) _getUpdateBuilder.MakeGenericMethod(_dataSourceTypes.TDocument, _dataSourceTypes.TUpdate).Invoke(this, null);
+	private IQBBuilder? GetDeleteBuilder()
+		=> (IQBBuilder?) _getDeleteBuilder.MakeGenericMethod(_dataSourceTypes.TDocument, _dataSourceTypes.TDelete).Invoke(this, null);
+	private IQBBuilder? GetSoftDelBuilder()
+		=> (IQBBuilder?) _getSoftDelBuilder.MakeGenericMethod(_dataSourceTypes.TDocument, _dataSourceTypes.TDelete).Invoke(this, null);
+	private IQBBuilder? GetRestoreBuilder()
+		=> (IQBBuilder?) _getRestoreBuilder.MakeGenericMethod(_dataSourceTypes.TDocument, _dataSourceTypes.TRestore).Invoke(this, null);
+
+	private IQBBuilder? GetInsertBuilder<TDocument, TCreate>()
+	{
+		if (_insertBuilder != null)
+		{
+			return _insertBuilder;
+		}
+		if (!SupportedQueryBuilders.HasFlag(QueryBuilderTypes.Insert))
+		{
+			return null;
 		}
 
-		if (_restore is Func<IDataContext, IRestoreQueryBuilder<TDocument, TRestore>> creator)
+		QBInsertBuilder<TDocument, TCreate>? setup = null;
+		var setupAction = (Action<IQBMongoInsertBuilder<TDocument, TCreate>>?)_insertBuilderMethod;
+		if (setupAction != null)
 		{
-			return creator(dataContext);
+			setup = new QBInsertBuilder<TDocument, TCreate>();
+			setupAction(setup);
 		}
-		throw new InvalidOperationException($"DataSource {DataSourceConcrete.ToPretty()} does not have a query builder like {typeof(IRestoreQueryBuilder<TDocument, TRestore>).ToPretty()}.");
-	}
+		else
+		{
+			var other =
+				(_updateBuilderMethod != null ? GetUpdateBuilder() : null) ??
+				(_selectBuilderMethod != null ? GetSelectBuilder() : null) ??
+				(_deleteBuilderMethod != null ? GetSoftDelBuilder() ?? GetDeleteBuilder() : null) ??
+				(_restoreBuilderMethod != null ? GetRestoreBuilder() : null);
 
-	private Func<IDataContext, IInsertQueryBuilder<TDocument, TCreate>> MakeInsertFactoryMethod<TDocument, TCreate>()
-	{
-		var setupAction =
-		(
-			_insertBuilderMethod != null
-				? _insertBuilderMethod as Action<IQBMongoInsertBuilder<TDocument, TCreate>>
-				: FactoryHelper.FindBuilder<IQBMongoInsertBuilder<TDocument, TCreate>>(typeof(TCreate), null)
-					?? FactoryHelper.FindBuilder<IQBMongoInsertBuilder<TDocument, TCreate>>(DataSourceConcrete, null)
-		)
-		?? throw new InvalidOperationException($"DataSource {DataSourceConcrete.ToPretty()} does not have a query builder setup {typeof(IQBMongoInsertBuilder<TDocument, TCreate>).ToPretty()}.");
+			if (other != null)
+			{
+				setup = new QBInsertBuilder<TDocument, TCreate>(other);
+			}
+			else
+			{
+				setup = new QBInsertBuilder<TDocument, TCreate>();
+				setup.AutoBuild();
+			}
+		}
 
-		var setup = new QBInsertBuilder<TDocument, TCreate>();
-		setupAction(setup);
 		setup.Normalize();
-
-		return (IDataContext dataContext) => new InsertQueryBuilder<TDocument, TCreate>(new QBInsertBuilder<TDocument, TCreate>(setup), dataContext);
+		Interlocked.CompareExchange(ref _insertBuilder, setup, null);
+		return _insertBuilder;
 	}
-	private Func<IDataContext, ISelectQueryBuilder<TDocument, TSelect>> MakeSelectFactoryMethod<TDocument, TSelect>()
+	private IQBBuilder? GetSelectBuilder<TDocument, TSelect>()
 	{
-		var setupAction =
-		(
-			_selectBuilderMethod != null
-				? _selectBuilderMethod as Action<IQBMongoSelectBuilder<TDocument, TSelect>>
-				: FactoryHelper.FindBuilder<IQBMongoSelectBuilder<TDocument, TSelect>>(typeof(TSelect), null)
-					?? FactoryHelper.FindBuilder<IQBMongoSelectBuilder<TDocument, TSelect>>(DataSourceConcrete, null)
-		)
-		?? throw new InvalidOperationException($"DataSource {DataSourceConcrete.ToPretty()} does not have a query builder setup {typeof(IQBMongoSelectBuilder<TDocument, TSelect>).ToPretty()}.");
+		if (_selectBuilder != null)
+		{
+			return _selectBuilder;
+		}
+		if (!SupportedQueryBuilders.HasFlag(QueryBuilderTypes.Select))
+		{
+			return null;
+		}
 
-		var setup = new QBSelectBuilder<TDocument, TSelect>();
-		setupAction(setup);
+		QBSelectBuilder<TDocument, TSelect>? setup = null;
+		var setupAction = (Action<IQBMongoSelectBuilder<TDocument, TSelect>>?)_selectBuilderMethod;
+		if (setupAction != null)
+		{
+			setup = new QBSelectBuilder<TDocument, TSelect>();
+			setupAction(setup);
+		}
+		else
+		{
+			var other =
+				(_updateBuilderMethod != null ? GetUpdateBuilder() : null) ??
+				(_insertBuilderMethod != null ? GetInsertBuilder() : null) ??
+				(_deleteBuilderMethod != null ? GetSoftDelBuilder() ?? GetDeleteBuilder() : null) ??
+				(_restoreBuilderMethod != null ? GetRestoreBuilder() : null);
+
+			if (other != null)
+			{
+				setup = new QBSelectBuilder<TDocument, TSelect>(other);
+			}
+			else
+			{
+				setup = new QBSelectBuilder<TDocument, TSelect>();
+				setup.AutoBuild();
+			}
+		}
+
 		setup.Normalize();
-
-		return (IDataContext dataContext) => new SelectQueryBuilder<TDocument, TSelect>(new QBSelectBuilder<TDocument, TSelect>(setup), dataContext);
+		Interlocked.CompareExchange(ref _selectBuilder, setup, null);
+		return _selectBuilder;
 	}
-	private Func<IDataContext, IUpdateQueryBuilder<TDocument, TUpdate>> MakeUpdateFactoryMethod<TDocument, TUpdate>()
+	private IQBBuilder? GetUpdateBuilder<TDocument, TUpdate>()
 	{
-		var setupAction =
-		(
-			_updateBuilderMethod != null
-				? _updateBuilderMethod as Action<IQBMongoUpdateBuilder<TDocument, TUpdate>>
-				: FactoryHelper.FindBuilder<IQBMongoUpdateBuilder<TDocument, TUpdate>>(typeof(TUpdate), null)
-					?? FactoryHelper.FindBuilder<IQBMongoUpdateBuilder<TDocument, TUpdate>>(DataSourceConcrete, null)
-		)
-		?? throw new InvalidOperationException($"DataSource {DataSourceConcrete.ToPretty()} does not have a query builder setup {typeof(IQBMongoUpdateBuilder<TDocument, TUpdate>).ToPretty()}.");
+		if (_updateBuilder != null)
+		{
+			return _updateBuilder;
+		}
+		if (!SupportedQueryBuilders.HasFlag(QueryBuilderTypes.Update))
+		{
+			return null;
+		}
 
-		var setup = new QBUpdateBuilder<TDocument, TUpdate>();
-		setupAction(setup);
+		QBUpdateBuilder<TDocument, TUpdate>? setup = null;
+		var setupAction = (Action<IQBMongoUpdateBuilder<TDocument, TUpdate>>?)_updateBuilderMethod;
+		if (setupAction != null)
+		{
+			setup = new QBUpdateBuilder<TDocument, TUpdate>();
+			setupAction(setup);
+		}
+		else
+		{
+			var other =
+				(_insertBuilderMethod != null ? GetInsertBuilder() : null) ??
+				(_selectBuilderMethod != null ? GetSelectBuilder() : null) ??
+				(_deleteBuilderMethod != null ? GetSoftDelBuilder() ?? GetDeleteBuilder() : null) ??
+				(_restoreBuilderMethod != null ? GetRestoreBuilder() : null);
+
+			if (other != null)
+			{
+				setup = new QBUpdateBuilder<TDocument, TUpdate>(other);
+			}
+			else
+			{
+				setup = new QBUpdateBuilder<TDocument, TUpdate>();
+				setup.AutoBuild();
+			}
+		}
+
 		setup.Normalize();
-
-		return (IDataContext dataContext) => new UpdateQueryBuilder<TDocument, TUpdate>(new QBUpdateBuilder<TDocument, TUpdate>(setup), dataContext);
+		Interlocked.CompareExchange(ref _updateBuilder, setup, null);
+		return _updateBuilder;
 	}
-	private Func<IDataContext, IDeleteQueryBuilder<TDocument, TDelete>> MakeDeleteFactoryMethod<TDocument, TDelete>()
+	private IQBBuilder? GetDeleteBuilder<TDocument, TDelete>()
 	{
-		var setupAction =
-		(
-			_deleteBuilderMethod != null
-				? _deleteBuilderMethod as Action<IQBMongoDeleteBuilder<TDocument, TDelete>>
-				: FactoryHelper.FindBuilder<IQBMongoDeleteBuilder<TDocument, TDelete>>(typeof(TDelete), null)
-					?? FactoryHelper.FindBuilder<IQBMongoDeleteBuilder<TDocument, TDelete>>(DataSourceConcrete, null)
-		)
-		?? throw new InvalidOperationException($"DataSource {DataSourceConcrete.ToPretty()} does not have a query builder setup {typeof(IQBMongoDeleteBuilder<TDocument, TDelete>).ToPretty()}.");
+		if (_deleteBuilder != null)
+		{
+			return _deleteBuilder;
+		}
+		if (!SupportedQueryBuilders.HasFlag(QueryBuilderTypes.Delete))
+		{
+			return null;
+		}
 
-		var setup = new QBDeleteBuilder<TDocument, TDelete>();
-		setupAction(setup);
+		QBDeleteBuilder<TDocument, TDelete>? setup = null;
+		var setupAction = (Action<IQBMongoDeleteBuilder<TDocument, TDelete>>?)_deleteBuilderMethod;
+		if (setupAction != null)
+		{
+			setup = new QBDeleteBuilder<TDocument, TDelete>();
+			setupAction(setup);
+		}
+		else
+		{
+			var other =
+				(_updateBuilderMethod != null ? GetUpdateBuilder() : null) ??
+				(_insertBuilderMethod != null ? GetInsertBuilder() : null) ??
+				(_selectBuilderMethod != null ? GetSelectBuilder() : null);
+
+			if (other != null)
+			{
+				setup = new QBDeleteBuilder<TDocument, TDelete>(other);
+			}
+			else
+			{
+				setup = new QBDeleteBuilder<TDocument, TDelete>();
+				setup.AutoBuild();
+			}
+		}
+
 		setup.Normalize();
-
-		return (IDataContext dataContext) => new DeleteQueryBuilder<TDocument, TDelete>(new QBDeleteBuilder<TDocument, TDelete>(setup), dataContext);
+		Interlocked.CompareExchange(ref _deleteBuilder, setup, null);
+		return _deleteBuilder;
 	}
-	private Func<IDataContext, IDeleteQueryBuilder<TDocument, TDelete>> MakeSoftDelFactoryMethod<TDocument, TDelete>()
+	private IQBBuilder? GetSoftDelBuilder<TDocument, TDelete>()
 	{
-		var setupAction =
-		(
-			_softDelBuilderMethod != null
-				? _softDelBuilderMethod as Action<IQBMongoSoftDelBuilder<TDocument, TDelete>>
-				: FactoryHelper.FindBuilder<IQBMongoSoftDelBuilder<TDocument, TDelete>>(typeof(TDelete), null)
-					?? FactoryHelper.FindBuilder<IQBMongoSoftDelBuilder<TDocument, TDelete>>(DataSourceConcrete, null)
-		)
-		?? throw new InvalidOperationException($"DataSource {DataSourceConcrete.ToPretty()} does not have a query builder setup {typeof(IQBMongoSoftDelBuilder<TDocument, TDelete>).ToPretty()}.");
+		if (_softDelBuilder != null)
+		{
+			return _softDelBuilder;
+		}
+		if (!SupportedQueryBuilders.HasFlag(QueryBuilderTypes.SoftDel))
+		{
+			return null;
+		}
 
-		var setup = new QBSoftDelBuilder<TDocument, TDelete>();
-		setupAction(setup);
+		QBSoftDelBuilder<TDocument, TDelete>? setup = null;
+		var setupAction = (Action<IQBMongoSoftDelBuilder<TDocument, TDelete>>?)_deleteBuilderMethod;
+		if (setupAction != null)
+		{
+			setup = new QBSoftDelBuilder<TDocument, TDelete>();
+			setupAction(setup);
+		}
+		else
+		{
+			var other =
+				(_restoreBuilderMethod != null ? GetRestoreBuilder() : null) ??
+				(_updateBuilderMethod != null ? GetUpdateBuilder() : null) ??
+				(_insertBuilderMethod != null ? GetInsertBuilder() : null) ??
+				(_selectBuilderMethod != null ? GetSelectBuilder() : null);
+
+			if (other != null)
+			{
+				setup = new QBSoftDelBuilder<TDocument, TDelete>(other);
+			}
+			else
+			{
+				setup = new QBSoftDelBuilder<TDocument, TDelete>();
+				setup.AutoBuild();
+			}
+		}
+
 		setup.Normalize();
-
-		return (IDataContext dataContext) => new SoftDelQueryBuilder<TDocument, TDelete>(new QBSoftDelBuilder<TDocument, TDelete>(setup), dataContext);
+		Interlocked.CompareExchange(ref _softDelBuilder, setup, null);
+		return _softDelBuilder;
 	}
-	private Func<IDataContext, IRestoreQueryBuilder<TDocument, TRestore>> MakeRestoreFactoryMethod<TDocument, TRestore>()
+	private IQBBuilder? GetRestoreBuilder<TDocument, TRestore>()
 	{
-		var setupAction =
-		(
-			_restoreBuilderMethod != null
-				? _restoreBuilderMethod as Action<IQBMongoRestoreBuilder<TDocument, TRestore>>
-				: FactoryHelper.FindBuilder<IQBMongoRestoreBuilder<TDocument, TRestore>>(typeof(TRestore), null)
-					?? FactoryHelper.FindBuilder<IQBMongoRestoreBuilder<TDocument, TRestore>>(DataSourceConcrete, null)
-		)
-		?? throw new InvalidOperationException($"DataSource {DataSourceConcrete.ToPretty()} does not have a query builder setup {typeof(IQBMongoRestoreBuilder<TDocument, TRestore>).ToPretty()}.");
+		if (_restoreBuilder != null)
+		{
+			return _restoreBuilder;
+		}
+		if (!SupportedQueryBuilders.HasFlag(QueryBuilderTypes.Restore))
+		{
+			return null;
+		}
 
-		var setup = new QBRestoreBuilder<TDocument, TRestore>();
-		setupAction(setup);
+		QBRestoreBuilder<TDocument, TRestore>? setup = null;
+		var setupAction = (Action<IQBMongoRestoreBuilder<TDocument, TRestore>>?)_restoreBuilderMethod;
+		if (setupAction != null)
+		{
+			setup = new QBRestoreBuilder<TDocument, TRestore>();
+			setupAction(setup);
+		}
+		else
+		{
+			var other =
+				(_deleteBuilderMethod != null ? GetSoftDelBuilder() : null) ??
+				(_updateBuilderMethod != null ? GetUpdateBuilder() : null) ??
+				(_insertBuilderMethod != null ? GetInsertBuilder() : null) ??
+				(_selectBuilderMethod != null ? GetSelectBuilder() : null);
+
+			if (other != null)
+			{
+				setup = new QBRestoreBuilder<TDocument, TRestore>(other);
+			}
+			else
+			{
+				setup = new QBRestoreBuilder<TDocument, TRestore>();
+				setup.AutoBuild();
+			}
+		}
+
 		setup.Normalize();
-
-		return (IDataContext dataContext) => new RestoreQueryBuilder<TDocument, TRestore>(new QBRestoreBuilder<TDocument, TRestore>(setup), dataContext);
+		Interlocked.CompareExchange(ref _restoreBuilder, setup, null);
+		return _restoreBuilder;
 	}
 }

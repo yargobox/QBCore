@@ -13,13 +13,13 @@ public static class FactoryHelper
 			throw new InvalidOperationException($"Could not find builder '{source.ToPretty()}.{methodOrField ?? "???"}{typeof(TBuilderActionParam).Name})'.");
 	}
 
-	public static object? FindRequiredBuilder(Type builderActionParam, Type source, string? methodOrField)
+	public static Delegate? FindRequiredBuilder(Type builderActionParam, Type source, string? methodOrField)
 	{
 		return FindBuilder(builderActionParam, source, methodOrField) ??
 			throw new InvalidOperationException($"Could not find builder '{source.ToPretty()}.{methodOrField ?? "???"}{builderActionParam.Name})'.");
 	}
 
-	public static object? FindBuilder(Type builderActionParam, Type source, string? methodOrField)
+	public static Delegate? FindBuilder(Type builderActionParam, Type source, string? methodOrField)
 	{
 		if (Nullable.GetUnderlyingType(builderActionParam) != null)
 		{
@@ -27,7 +27,7 @@ public static class FactoryHelper
 		}
 
 		var method = _findBuilderMethodInfo.MakeGenericMethod(builderActionParam);
-		return method.Invoke(null, new object?[] { source, methodOrField });
+		return (Delegate?)method.Invoke(null, new object?[] { source, methodOrField });
 	}
 
 	public static Action<TBuilderActionParam>? FindBuilder<TBuilderActionParam>(Type source, string? methodOrField) where TBuilderActionParam : notnull

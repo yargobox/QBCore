@@ -29,7 +29,7 @@ public sealed class BrandService : DataSource<int?, Brand, BrandCreateDto, Brand
 		//builder.SoftDelBuilder = SoftDelBuilder;
 		//builder.RestoreBuilder = RestoreBuilder;
 	}
-	static void SoftDelBuilder(IQBMongoSoftDelBuilder<Brand, SoftDelDto> qb)
+/* 	static void SoftDelBuilder(IQBMongoSoftDelBuilder<Brand, SoftDelDto> qb)
 	{
 		qb.Update("brands")
 			.Condition(doc => doc.Id, FO.Equal, "id")
@@ -47,5 +47,5 @@ public sealed class BrandService : DataSource<int?, Brand, BrandCreateDto, Brand
 	{
 		qb.Delete("brands")
 			.Condition(doc => doc.Id, FO.Equal, "id");
-	}
+	} */
 }

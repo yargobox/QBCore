@@ -25,34 +25,6 @@ internal abstract class QBCommonBuilder<TDoc, TDto> : QBBuilder<TDoc, TDto>
 		if (other._conditions != null) _conditions = new List<QBCondition>(other._conditions);
 		if (other._parameters != null) _parameters = new List<QBParameter>(other._parameters);
 	}
-/* 	public QBCommonBuilder(IQBBuilder other)
-	{
-		if (other.DocumentType != typeof(TDoc))
-		{
-			throw new InvalidOperationException($"Could not make query builder '{typeof(TDoc).ToPretty()}, {typeof(TDto).ToPretty()}' from '{other.DocumentType.ToPretty()}, {other.ProjectionType.ToPretty()}'.");
-		}
-
-		if (other.Containers.Count > 0)
-		{
-			var c = other.Containers.First();
-			if (c.DocumentType != typeof(TDoc) || c.ContainerType != ContainerTypes.Table)
-			{
-				throw new InvalidOperationException($"Could not make query builder '{typeof(TDoc).ToPretty()}, {typeof(TDto).ToPretty()}' from '{other.DocumentType.ToPretty()}, {other.ProjectionType.ToPretty()}'.");
-			}
-
-			Update(c.DBSideName);
-		}
-	}
-	public override QBBuilder<TDoc, TDto> AutoBuild()
-	{
-		if (Containers.Count > 0)
-		{
-			throw new InvalidOperationException($"Query builder '{typeof(TDto).ToPretty()}' has already been initialized.");
-		}
-
-		var collectionName = MongoDataLayer.Default.GetDefaultDBSideContainerName(typeof(TDoc));
-		return Update(collectionName);
-	} */
 
 	protected override void OnNormalize()
 	{

@@ -5,9 +5,15 @@ namespace QBCore.DataSource.QueryBuilder;
 public interface IQueryBuilderFactory
 {
 	IDataLayerInfo DataLayer { get; }
-
 	Type DataSourceConcrete { get; }
 	QueryBuilderTypes SupportedQueryBuilders { get; }
+
+	IQBBuilder? DefaultInsertBuilder { get; }
+	IQBBuilder? DefaultSelectBuilder { get; }
+	IQBBuilder? DefaultUpdateBuilder { get; }
+	IQBBuilder? DefaultDeleteBuilder { get; }
+	IQBBuilder? DefaultSoftDelBuilder { get; }
+	IQBBuilder? DefaultRestoreBuilder { get; }
 
 	IInsertQueryBuilder<TDocument, TCreate> CreateQBInsert<TDocument, TCreate>(IDataContext dataContext);
 	ISelectQueryBuilder<TDocument, TSelect> CreateQBSelect<TDocument, TSelect>(IDataContext dataContext);
