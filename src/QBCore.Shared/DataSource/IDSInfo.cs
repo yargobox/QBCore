@@ -6,13 +6,8 @@ public interface IDSInfo
 {
 	string Name { get; }
 
-	Type KeyType { get; }
-	Type DocumentType { get; }
-	Type CreateType { get; }
-	Type SelectType { get; }
-	Type UpdateType { get; }
-	Type DeleteType { get; }
-	Type RestoreType { get; }
+	DSTypeInfo DSTypeInfo { get; }
+	Type DataSourceServiceType { get; }
 
 	Lazy<DSDocumentInfo> DocumentInfo { get; }
 	Lazy<DSDocumentInfo>? CreateInfo { get; }
@@ -20,10 +15,6 @@ public interface IDSInfo
 	Lazy<DSDocumentInfo>? UpdateInfo { get; }
 	Lazy<DSDocumentInfo>? DeleteInfo { get; }
 	Lazy<DSDocumentInfo>? RestoreInfo { get; }
-
-	Type DataSourceConcrete { get; }
-	Type DataSourceInterface { get; }
-	Type DataSourceService { get; }
 
 	DataSourceOptions Options { get; }
 

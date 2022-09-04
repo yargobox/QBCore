@@ -5,7 +5,7 @@ namespace QBCore.DataSource.QueryBuilder;
 public interface IQueryBuilderFactory
 {
 	IDataLayerInfo DataLayer { get; }
-	Type DataSourceConcrete { get; }
+	DSTypeInfo DSTypeInfo { get; }
 	QueryBuilderTypes SupportedQueryBuilders { get; }
 
 	IQBBuilder? DefaultInsertBuilder { get; }

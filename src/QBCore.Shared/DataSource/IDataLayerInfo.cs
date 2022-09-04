@@ -11,7 +11,7 @@ public interface IDataLayerInfo
 
 	DSDocumentInfo CreateDocumentInfo(Type documentType);
 	IQueryBuilderFactory CreateQBFactory(
-		Type dataSourceConcrete,
+		DSTypeInfo dSTypeInfo,
 		DataSourceOptions options,
 		Delegate? insertBuilderMethod,
 		Delegate? selectBuilderMethod,

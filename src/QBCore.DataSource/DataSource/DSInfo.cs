@@ -1,7 +1,6 @@
 using System.Reflection;
 using QBCore.DataSource.QueryBuilder;
 using QBCore.Extensions.ComponentModel;
-using QBCore.Extensions.Linq;
 using QBCore.Extensions.Text;
 using QBCore.ObjectFactory;
 
@@ -11,13 +10,7 @@ internal sealed class DSInfo : IDSInfo
 {
 	public string Name { get; }
 
-	public Type KeyType { get; }
-	public Type DocumentType { get; }
-	public Type CreateType { get; }
-	public Type SelectType { get; }
-	public Type UpdateType { get; }
-	public Type DeleteType { get; }
-	public Type RestoreType { get; }
+	public DSTypeInfo DSTypeInfo { get; }
 
 	public Lazy<DSDocumentInfo> DocumentInfo { get; }
 	public Lazy<DSDocumentInfo>? CreateInfo { get; }
@@ -26,9 +19,7 @@ internal sealed class DSInfo : IDSInfo
 	public Lazy<DSDocumentInfo>? DeleteInfo { get; }
 	public Lazy<DSDocumentInfo>? RestoreInfo { get; }
 
-	public Type DataSourceConcrete { get; }
-	public Type DataSourceInterface { get; }
-	public Type DataSourceService { get; }
+	public Type DataSourceServiceType { get; }
 
 	public DataSourceOptions Options { get; }
 
@@ -50,29 +41,20 @@ internal sealed class DSInfo : IDSInfo
 		if (!dataSourceConcrete.IsClass || dataSourceConcrete.IsAbstract || dataSourceConcrete.IsGenericType || dataSourceConcrete.IsGenericTypeDefinition
 				|| dataSourceConcrete.GetSubclassOf(typeof(DataSource<,,,,,,,>)) == null || Nullable.GetUnderlyingType(dataSourceConcrete) != null)
 		{
-			throw new InvalidOperationException($"Invalid datasource type {dataSourceConcrete.ToPretty()}.");
+			throw new ArgumentException($"Invalid datasource type {dataSourceConcrete.ToPretty()}.", nameof(dataSourceConcrete));
 		}
-		DataSourceConcrete = dataSourceConcrete;
 
 		// Get document types from a generic interface IDataSource<,,,,,,,>
 		//
-		var types = DataSourceConcrete.GetDataSourceTypes();
-		KeyType = types.TKey;
-		DocumentType = types.TDocument;
-		CreateType = types.TCreate;
-		SelectType = types.TSelect;
-		UpdateType = types.TUpdate;
-		DeleteType = types.TDelete;
-		RestoreType = types.TRestore;
-		DataSourceInterface = DataSourceConcrete.GetInterfaceOf(typeof(IDataSource<,,,,,,>))!;
+		DSTypeInfo = new DSTypeInfo(dataSourceConcrete);
 
 		// Our building
 		//
-		var building = new DSBuilder(DataSourceConcrete);
+		var building = new DSBuilder(DSTypeInfo.Concrete);
 
 		// Load fields from [DataSource]
 		//
-		var dataSourceAttr = DataSourceConcrete.GetCustomAttribute<DataSourceAttribute>(false);
+		var dataSourceAttr = DSTypeInfo.Concrete.GetCustomAttribute<DataSourceAttribute>(false);
 		if (dataSourceAttr != null)
 		{
 			building.Name = dataSourceAttr.Name;
@@ -86,7 +68,7 @@ internal sealed class DSInfo : IDSInfo
 
 		// Load fields from [DsApiController]
 		//
-		var controllerAttr = DataSourceConcrete.GetCustomAttribute<DsApiControllerAttribute>(false);
+		var controllerAttr = DSTypeInfo.Concrete.GetCustomAttribute<DsApiControllerAttribute>(false);
 		if (controllerAttr != null)
 		{
 			building.ControllerName = controllerAttr.Name;
@@ -95,7 +77,7 @@ internal sealed class DSInfo : IDSInfo
 
 		// Find a builder and build if any
 		//
-		var builder = FactoryHelper.FindBuilder<IDSBuilder>(dataSourceAttr?.Builder ?? DataSourceConcrete, dataSourceAttr?.BuilderMethod);
+		var builder = FactoryHelper.FindBuilder<IDSBuilder>(dataSourceAttr?.Builder ?? DSTypeInfo.Concrete, dataSourceAttr?.BuilderMethod);
 		if (builder != null)
 		{
 			builder(building);
@@ -114,7 +96,7 @@ internal sealed class DSInfo : IDSInfo
 
 			if (name.Contains("[DS]", StringComparison.OrdinalIgnoreCase))
 			{
-				Name = name.Replace("[DS]", MakeDSNameFromType(DataSourceConcrete), StringComparison.OrdinalIgnoreCase);
+				Name = name.Replace("[DS]", MakeDSNameFromType(DSTypeInfo.Concrete), StringComparison.OrdinalIgnoreCase);
 			}
 			else
 			{
@@ -123,7 +105,7 @@ internal sealed class DSInfo : IDSInfo
 		}
 		else
 		{
-			Name = MakeDSNameFromType(DataSourceConcrete);
+			Name = MakeDSNameFromType(DSTypeInfo.Concrete);
 		}
 		Name = string.Intern(Name);
 		if (ReservedNames.Contains(Name, StringComparer.OrdinalIgnoreCase))
@@ -136,27 +118,27 @@ internal sealed class DSInfo : IDSInfo
 		Options = building.Options;
 		if ((Options & AllDSOperations) == DataSourceOptions.None)
 		{
-			if (CreateType != typeof(NotSupported)) Options |= DataSourceOptions.CanInsert;
-			if (SelectType != typeof(NotSupported)) Options |= DataSourceOptions.CanSelect;
-			if (UpdateType != typeof(NotSupported)) Options |= DataSourceOptions.CanUpdate;
-			if (DeleteType != typeof(NotSupported)) Options |= DataSourceOptions.CanDelete;
-			if (RestoreType != typeof(NotSupported)) Options |= DataSourceOptions.CanRestore;
+			if (DSTypeInfo.TCreate != typeof(NotSupported)) Options |= DataSourceOptions.CanInsert;
+			if (DSTypeInfo.TSelect != typeof(NotSupported)) Options |= DataSourceOptions.CanSelect;
+			if (DSTypeInfo.TUpdate != typeof(NotSupported)) Options |= DataSourceOptions.CanUpdate;
+			if (DSTypeInfo.TDelete != typeof(NotSupported)) Options |= DataSourceOptions.CanDelete;
+			if (DSTypeInfo.TRestore != typeof(NotSupported)) Options |= DataSourceOptions.CanRestore;
 		}
 		else if (
-			(Options.HasFlag(DataSourceOptions.CanInsert) && CreateType == typeof(NotSupported)) ||
-			(Options.HasFlag(DataSourceOptions.CanSelect) && SelectType == typeof(NotSupported)) ||
-			(Options.HasFlag(DataSourceOptions.CanUpdate) && UpdateType == typeof(NotSupported)) ||
-			(Options.HasFlag(DataSourceOptions.CanDelete) && DeleteType == typeof(NotSupported)) ||
-			(Options.HasFlag(DataSourceOptions.CanRestore) && RestoreType == typeof(NotSupported)))
+			(Options.HasFlag(DataSourceOptions.CanInsert) && DSTypeInfo.TCreate == typeof(NotSupported)) ||
+			(Options.HasFlag(DataSourceOptions.CanSelect) && DSTypeInfo.TSelect == typeof(NotSupported)) ||
+			(Options.HasFlag(DataSourceOptions.CanUpdate) && DSTypeInfo.TUpdate == typeof(NotSupported)) ||
+			(Options.HasFlag(DataSourceOptions.CanDelete) && DSTypeInfo.TDelete == typeof(NotSupported)) ||
+			(Options.HasFlag(DataSourceOptions.CanRestore) && DSTypeInfo.TRestore == typeof(NotSupported)))
 		{
-			throw new InvalidOperationException($"DataSource {DataSourceConcrete.ToPretty()} operation cannot be set on type '{nameof(NotSupported)}'.");
+			throw new InvalidOperationException($"DataSource {DSTypeInfo.Concrete.ToPretty()} operation cannot be set on type '{nameof(NotSupported)}'.");
 		}
 
 		// Validate options
 		//
 		if ((Options & AllDSOperations) == DataSourceOptions.None)
 		{
-			throw new InvalidOperationException($"DataSource {DataSourceConcrete.ToPretty()} must have at least one supported operation.");
+			throw new InvalidOperationException($"DataSource {DSTypeInfo.Concrete.ToPretty()} must have at least one supported operation.");
 		}
 
 		if ((Options.HasFlag(DataSourceOptions.RefreshAfterInsert) && !Options.HasFlag(DataSourceOptions.CanInsert))
@@ -164,13 +146,13 @@ internal sealed class DSInfo : IDSInfo
 			|| (Options.HasFlag(DataSourceOptions.RefreshAfterDelete) && !Options.HasFlag(DataSourceOptions.CanDelete))
 			|| (Options.HasFlag(DataSourceOptions.RefreshAfterRestore) && !Options.HasFlag(DataSourceOptions.CanRestore)))
 		{
-			throw new InvalidOperationException($"DataSource {DataSourceConcrete.ToPretty()} cannot be refreshed after the operation if the operation itself is not supported.");
+			throw new InvalidOperationException($"DataSource {DSTypeInfo.Concrete.ToPretty()} cannot be refreshed after the operation if the operation itself is not supported.");
 		}
 
 		if (Options.HasFlag(DataSourceOptions.CompositeId | DataSourceOptions.CompoundId)
 			|| Options.HasFlag(DataSourceOptions.SingleRecord | DataSourceOptions.FewRecords))
 		{
-			throw new InvalidOperationException($"DataSource {DataSourceConcrete.ToPretty()} is configured inproperly.");
+			throw new InvalidOperationException($"DataSource {DSTypeInfo.Concrete.ToPretty()} is configured inproperly.");
 		}
 
 		// DataContextName
@@ -222,11 +204,11 @@ internal sealed class DSInfo : IDSInfo
 		{
 			if (building.ServiceInterface == typeof(NotSupported))
 			{
-				DataSourceService = DataSourceConcrete;
+				DataSourceServiceType = DSTypeInfo.Concrete;
 			}
-			else if (building.ServiceInterface.GetInterfaces().Contains(DataSourceInterface))
+			else if (building.ServiceInterface.GetInterfaces().Contains(DSTypeInfo.Interface))
 			{
-				DataSourceService = building.ServiceInterface;
+				DataSourceServiceType = building.ServiceInterface;
 			}
 			else
 			{
@@ -235,14 +217,14 @@ internal sealed class DSInfo : IDSInfo
 		}
 		else
 		{
-			DataSourceService = TryFindDataSourceServiceInterfaceType() ?? DataSourceConcrete;
+			DataSourceServiceType = TryFindDataSourceServiceInterfaceType() ?? DSTypeInfo.Concrete;
 		}
 
 		// Get DataSource's data layer info
 		//
 		if (building.DataLayer == null)
 		{
-			throw new InvalidOperationException($"DataSource {DataSourceConcrete.ToPretty()} must have a specified data layer.");
+			throw new InvalidOperationException($"DataSource {DSTypeInfo.Concrete.ToPretty()} must have a specified data layer.");
 		}
 		if (building.DataLayer.GetInterfaceOf(typeof(IDataLayerInfo)) == null)
 		{
@@ -255,17 +237,17 @@ internal sealed class DSInfo : IDSInfo
 
 		// Register DataSource's document types, including nested ones.
 		//
-		DocumentInfo = DataSourceDocuments.GetOrRegister(DocumentType, dataLayer);
-		CreateInfo = CreateType != typeof(NotSupported) ? DataSourceDocuments.GetOrRegister(CreateType, dataLayer) : null;
-		SelectInfo = SelectType != typeof(NotSupported) ? DataSourceDocuments.GetOrRegister(SelectType, dataLayer) : null;
-		UpdateInfo = UpdateType != typeof(NotSupported) ? DataSourceDocuments.GetOrRegister(UpdateType, dataLayer) : null;
-		DeleteInfo = DeleteType != typeof(NotSupported) ? DataSourceDocuments.GetOrRegister(DeleteType, dataLayer) : null;
-		RestoreInfo = RestoreType != typeof(NotSupported) ? DataSourceDocuments.GetOrRegister(RestoreType, dataLayer) : null;
+		DocumentInfo = DataSourceDocuments.GetOrRegister(DSTypeInfo.TDocument, dataLayer);
+		CreateInfo = DSTypeInfo.TCreate != typeof(NotSupported) ? DataSourceDocuments.GetOrRegister(DSTypeInfo.TCreate, dataLayer) : null;
+		SelectInfo = DSTypeInfo.TSelect != typeof(NotSupported) ? DataSourceDocuments.GetOrRegister(DSTypeInfo.TSelect, dataLayer) : null;
+		UpdateInfo = DSTypeInfo.TUpdate != typeof(NotSupported) ? DataSourceDocuments.GetOrRegister(DSTypeInfo.TUpdate, dataLayer) : null;
+		DeleteInfo = DSTypeInfo.TDelete != typeof(NotSupported) ? DataSourceDocuments.GetOrRegister(DSTypeInfo.TDelete, dataLayer) : null;
+		RestoreInfo = DSTypeInfo.TRestore != typeof(NotSupported) ? DataSourceDocuments.GetOrRegister(DSTypeInfo.TRestore, dataLayer) : null;
 
 		// Create a query builder factory
 		//
 		QBFactory = dataLayer.CreateQBFactory(
-			DataSourceConcrete,
+			DSTypeInfo,
 			Options,
 			building.InsertBuilder,
 			building.SelectBuilder,
@@ -300,9 +282,9 @@ internal sealed class DSInfo : IDSInfo
 
 	private Type? TryFindDataSourceServiceInterfaceType()
 	{
-		return DataSourceConcrete
+		return DSTypeInfo.Concrete
 			.GetInterfaces()
-			.Where(x => x.GetInterfaces().Contains(DataSourceInterface))
+			.Where(x => x.GetInterfaces().Contains(DSTypeInfo.Interface))
 			.FirstOrDefault();
 	}
 
@@ -321,13 +303,13 @@ internal sealed class DSInfo : IDSInfo
 		}
 
 		var genericArgs = type.GetGenericArguments();
-		if (KeyType != genericArgs[0]
-			|| DocumentType != genericArgs[1]
-			|| CreateType != genericArgs[2]
-			|| SelectType != genericArgs[3]
-			|| UpdateType != genericArgs[4]
-			|| DeleteType != genericArgs[5]
-			|| RestoreType != genericArgs[6])
+		if (DSTypeInfo.TKey != genericArgs[0]
+			|| DSTypeInfo.TDocument != genericArgs[1]
+			|| DSTypeInfo.TCreate != genericArgs[2]
+			|| DSTypeInfo.TSelect != genericArgs[3]
+			|| DSTypeInfo.TUpdate != genericArgs[4]
+			|| DSTypeInfo.TDelete != genericArgs[5]
+			|| DSTypeInfo.TRestore != genericArgs[6])
 		{
 			throw new InvalidOperationException($"Incompatible datasource listener type {listener.ToPretty()}.");
 		}

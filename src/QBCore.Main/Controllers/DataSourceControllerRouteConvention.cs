@@ -36,7 +36,7 @@ public class DataSourceControllerRouteConvention : IControllerModelConvention
 
 			// A service type may be not a concrete type. If it is not, we have to find it :(
 			var definition = StaticFactory.DataSources.GetValueOrDefault(dataSourceServiceType) ??
-				StaticFactory.DataSources.Values.First(x => x.DataSourceService == dataSourceServiceType);
+				StaticFactory.DataSources.Values.First(x => x.DataSourceServiceType == dataSourceServiceType);
 
 			if (controllerSubclass == controller.ControllerType)
 			{
@@ -74,13 +74,13 @@ public class DataSourceControllerRouteConvention : IControllerModelConvention
 		}
 	}
 
-	protected virtual void ApplyToCustomDataSourceController(ControllerModel controller, IDSInfo definition)
+	protected virtual void ApplyToCustomDataSourceController(ControllerModel controller, IDSInfo info)
 	{
-		if (!string.IsNullOrEmpty(definition?.ControllerName))
+		if (!string.IsNullOrEmpty(info?.ControllerName))
 		{
-			if (definition.DataSourceConcrete.GetCustomAttribute<DsApiControllerAttribute>(false)?.IsAutoController == false)
+			if (info.DSTypeInfo.Concrete.GetCustomAttribute<DsApiControllerAttribute>(false)?.IsAutoController == false)
 			{
-				controller.ControllerName = definition.ControllerName;
+				controller.ControllerName = info.ControllerName;
 			}
 		}
 	}

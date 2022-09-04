@@ -18,17 +18,17 @@ public class DataSourceControllerFeatureProvider : IApplicationFeatureProvider<C
 			throw new InvalidOperationException(nameof(AddQBCoreExtensions.AddQBCore) + " must be called first.");
 		}
 
-		foreach (var definition in StaticFactory.DataSources.Values.Where(x => x.IsAutoController == true))
+		foreach (var info in StaticFactory.DataSources.Values.Where(x => x.IsAutoController == true))
 		{
 			var dataSourceControllerType = typeof(DataSourceController<,,,,,,,>).MakeGenericType(
-				definition.KeyType,
-				definition.DocumentType,
-				definition.CreateType,
-				definition.SelectType,
-				definition.UpdateType,
-				definition.DeleteType,
-				definition.RestoreType,
-				definition.DataSourceService);
+				info.DSTypeInfo.TKey,
+				info.DSTypeInfo.TDocument,
+				info.DSTypeInfo.TCreate,
+				info.DSTypeInfo.TSelect,
+				info.DSTypeInfo.TUpdate,
+				info.DSTypeInfo.TDelete,
+				info.DSTypeInfo.TRestore,
+				info.DataSourceServiceType);
 
 			feature.Controllers.Add(dataSourceControllerType.GetTypeInfo());
 		}

@@ -152,7 +152,7 @@ public static class AddQBCoreExtensions
 		
 		foreach (var definition in StaticFactory.DataSources)
 		{
-			bo = new BusinessObject("DS", string.Intern(definition.Value.Name), definition.Value.DataSourceConcrete);
+			bo = new BusinessObject("DS", string.Intern(definition.Value.Name), definition.Value.DSTypeInfo.Concrete);
 			
 			registry.TryRegisterObject(bo.Key, bo);
 		}
@@ -165,10 +165,10 @@ public static class AddQBCoreExtensions
 
 		foreach (var definition in StaticFactory.DataSources)
 		{
-			var dataSourceType = definition.Value.DataSourceConcrete;
+			var dataSourceType = definition.Value.DSTypeInfo.Concrete;
 			implementationFactory = sp => ActivatorUtilities.CreateInstance(sp, dataSourceType, sp, sp.GetRequiredService<IDataContextProvider>());
 
-			if (definition.Value.DataSourceService == dataSourceType)
+			if (definition.Value.DataSourceServiceType == dataSourceType)
 			{
 				if (definition.Value.IsServiceSingleton)
 				{
@@ -189,14 +189,14 @@ public static class AddQBCoreExtensions
 			{
 				if (definition.Value.IsServiceSingleton)
 				{
-					services.TryAddSingleton(definition.Value.DataSourceService, implementationFactory);
+					services.TryAddSingleton(definition.Value.DataSourceServiceType, implementationFactory);
 				}
 				else
 				{
-					services.TryAddScoped(definition.Value.DataSourceService, implementationFactory);
+					services.TryAddScoped(definition.Value.DataSourceServiceType, implementationFactory);
 				}
 
-				transientInterface = transientType.MakeGenericType(definition.Value.DataSourceService);
+				transientInterface = transientType.MakeGenericType(definition.Value.DataSourceServiceType);
 				if (transientInterface.IsAssignableFrom(dataSourceType))
 				{
 					services.TryAddTransient(transientInterface, implementationFactory);
