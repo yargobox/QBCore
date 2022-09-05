@@ -15,6 +15,7 @@ public sealed class DEPath : IEquatable<DEPath>, IReadOnlyList<DEInfo>
 	public string Name => _last?.Name ?? string.Empty;
 	public string Path => _path;
 	public Type DataEntryType => _last?.DataEntryType ?? typeof(NotSupported);
+	public Type UnderlyingType => _last?.UnderlyingType ?? typeof(NotSupported);
 	public bool IsNullable => _last?.IsNullable ?? false;
 	public int Count => _dataEntries?.Length ?? 1;
 	public Type DocumentType => _dataEntries == null
@@ -78,6 +79,41 @@ public sealed class DEPath : IEquatable<DEPath>, IReadOnlyList<DEInfo>
 			for (int i = 0; i < pathElements.Length; i++)
 			{
 				_dataEntries[i] = DEInfo.GetDataEntry(documentType, pathElements[i], dataLayer);
+			}
+			_last = _dataEntries[_dataEntries.Length - 1];
+			_path = path;
+		}
+	}
+
+	public DEPath(Type documentType, string path, bool ignoreCase, bool allowPointToSelf, IDataLayerInfo dataLayer)
+	{
+		if (documentType == null)
+		{
+			throw new ArgumentNullException(nameof(documentType));
+		}
+		if (path == null)
+		{
+			throw new ArgumentNullException(nameof(path));
+		}
+
+		var pathElements = path.Split('.');
+
+		if (pathElements.Length == 0)
+		{
+			_dataEntries = Array.Empty<DEInfo>();
+			_path = string.Empty;
+		}
+		else if (pathElements.Length == 1)
+		{
+			_last = DEInfo.GetDataEntry(documentType, pathElements[0], ignoreCase, dataLayer);
+			_path = _last.Name;
+		}
+		else
+		{
+			_dataEntries = new DEInfo[pathElements.Length];
+			for (int i = 0; i < pathElements.Length; i++)
+			{
+				_dataEntries[i] = DEInfo.GetDataEntry(documentType, pathElements[i], ignoreCase, dataLayer);
 			}
 			_last = _dataEntries[_dataEntries.Length - 1];
 			_path = path;
@@ -165,6 +201,8 @@ public readonly struct DEPathDefinition<TDocument> : IEquatable<DEPathDefinition
 {
 	public readonly string? Path;
 	public readonly DEPath? DataEntryPath;
+
+	public int Count => DataEntryPath?.Count ?? Path!.Count(x => x == '.') + 1;
 
 	public DEPathDefinition(string path)
 	{
@@ -273,6 +311,8 @@ public readonly struct DEPathDefinition<TDocument, TField> : IEquatable<DEPathDe
 {
 	public readonly string? Path;
 	public readonly DEPath? DataEntryPath;
+
+	public int Count => DataEntryPath?.Count ?? Path!.Count(x => x == '.') + 1;
 
 	public DEPathDefinition(string path)
 	{

@@ -212,6 +212,50 @@ public abstract class DEInfo : IComparable<DEInfo>, IEquatable<DEInfo>
 		var documentInfo = DataSourceDocuments.GetOrRegister(documentType, dataLayer);
 		return documentInfo.Value.DataEntries.GetValueOrDefault(propertyOrFieldName);
 	}
+
+	public static DEInfo GetDataEntry(Type documentType, string propertyOrFieldName, bool ignoreCase, IDataLayerInfo dataLayer)
+	{
+		return GetDataEntryOrDefault(documentType, propertyOrFieldName,ignoreCase, dataLayer)
+			?? throw new InvalidOperationException($"The document type '{documentType.ToPretty()}' does not have the specified data entry '{propertyOrFieldName}'.");
+	}
+
+	public static DEInfo? GetDataEntryOrDefault(Type documentType, string propertyOrFieldName, bool ignoreCase, IDataLayerInfo dataLayer)
+	{
+		if (dataLayer == null)
+		{
+			throw new ArgumentNullException(nameof(dataLayer));
+		}
+		if (documentType == null)
+		{
+			throw new ArgumentNullException(nameof(documentType));
+		}
+		if (propertyOrFieldName == null)
+		{
+			throw new ArgumentNullException(nameof(propertyOrFieldName));
+		}
+
+		var documentInfo = DataSourceDocuments.GetOrRegister(documentType, dataLayer);
+		if (ignoreCase)
+		{
+			var de = documentInfo.Value.DataEntries.GetValueOrDefault(propertyOrFieldName);
+			if (de != null)
+			{
+				return de;
+			}
+			
+			var key = documentInfo.Value.DataEntries.Keys.FirstOrDefault(x => x.Equals(propertyOrFieldName, StringComparison.OrdinalIgnoreCase));
+			if (key != null)
+			{
+				return documentInfo.Value.DataEntries[key];
+			}
+
+			return null;
+		}
+		else
+		{
+			return documentInfo.Value.DataEntries.GetValueOrDefault(propertyOrFieldName);
+		}
+	}
 }
 
 

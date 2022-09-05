@@ -4,7 +4,7 @@ namespace QBCore.DataSource;
 
 internal static class SOHelper
 {
-	public static string? SerializeToString<T>(DSSortOrder<T>[]? values)
+	public static string? SerializeToString<T>(DSSortOrder<T>[]? values, IDataLayerInfo dataLayer)
 	{
 		if (values == null || values.All(x => x.SortOrder == SO.None))
 		{
@@ -20,7 +20,7 @@ internal static class SOHelper
 		return stringValues.EscapeAndJoin(';', '\\');
 	}
 
-	public static DSSortOrder<T>[]? SerializeFromString<T>(string? sort)
+	public static DSSortOrder<T>[]? SerializeFromString<T>(string? sort, IDataLayerInfo dataLayer)
 	{
 		if (string.IsNullOrWhiteSpace(sort))
 		{

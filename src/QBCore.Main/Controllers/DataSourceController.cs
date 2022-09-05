@@ -47,7 +47,8 @@ public class DataSourceController<TKey, TDocument, TCreate, TSelect, TUpdate, TD
 		}
 
 		var softDelMode = SoftDelHelper.Parse(mode);
-		var sortOrders = SOHelper.SerializeFromString<TSelect>(sort);
+		var filterConditions = FOHelper.SerializeFromString<TSelect>(filter, _service.DSInfo.QBFactory.DataLayer);
+		var sortOrders = SOHelper.SerializeFromString<TSelect>(sort, _service.DSInfo.QBFactory.DataLayer);
 
 		var dataSourceResponse = new DataSourceResponse<TSelect>
 		{
@@ -61,7 +62,7 @@ public class DataSourceController<TKey, TDocument, TCreate, TSelect, TUpdate, TD
 		};
 
 		dataSourceResponse.Data =
-			await ( await _service.SelectAsync(softDelMode, null, sortOrders, null, skip, num ?? -1, options) )
+			await ( await _service.SelectAsync(softDelMode, filterConditions, sortOrders, null, skip, num ?? -1, options) )
 				.ToListAsync((bool x) => dataSourceResponse.IsLastPage = x ? 1 : 0);
 
 		return Ok(dataSourceResponse);

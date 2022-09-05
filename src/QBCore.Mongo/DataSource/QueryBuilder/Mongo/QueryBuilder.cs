@@ -314,7 +314,10 @@ internal abstract class QueryBuilder<TDocument, TProjection> : IQueryBuilder<TDo
 					else
 					{
 						var values = RenderToBsonArray(cond, constValue);
-						return MakeBsonArrayCondition(useExprFormat, "$in", leftField, values);
+						if (values.Count == 1)
+							return MakeBsonCondition(useExprFormat, "$eq", leftField, values.First());
+						else
+							return MakeBsonCondition(useExprFormat, "$in", leftField, values);
 					}
 				}
 			case FO.NotEqual:
@@ -328,7 +331,10 @@ internal abstract class QueryBuilder<TDocument, TProjection> : IQueryBuilder<TDo
 					else
 					{
 						var values = RenderToBsonArray(cond, constValue);
-						return MakeBsonArrayCondition(useExprFormat, "$nin", leftField, values);
+						if (values.Count == 1)
+							return MakeBsonCondition(useExprFormat, "$ne", leftField, values.First());
+						else
+							return MakeBsonCondition(useExprFormat, "$nin", leftField, values);
 					}
 				}
 			case FO.Greater:
@@ -402,7 +408,10 @@ internal abstract class QueryBuilder<TDocument, TProjection> : IQueryBuilder<TDo
 					else
 					{
 						var values = RenderToBsonRegexArrayForLike(cond, constValue);
-						return MakeBsonCondition(useExprFormat, "$in", leftField, values);
+						if (values.Count == 1)
+							return MakeBsonCondition(useExprFormat, "$eq", leftField, values.First());
+						else
+							return MakeBsonCondition(useExprFormat, "$in", leftField, values);
 					}
 				}
 			case FO.NotLike:
@@ -415,7 +424,10 @@ internal abstract class QueryBuilder<TDocument, TProjection> : IQueryBuilder<TDo
 					else
 					{
 						var values = RenderToBsonRegexArrayForLike(cond, constValue);
-						return MakeBsonCondition(useExprFormat, "$nin", leftField, values);
+						if (values.Count == 1)
+							return MakeBsonCondition(useExprFormat, "$ne", leftField, values.First());
+						else
+							return MakeBsonCondition(useExprFormat, "$nin", leftField, values);
 					}
 				}
 			case FO.BitsAnd:
@@ -552,7 +564,7 @@ internal abstract class QueryBuilder<TDocument, TProjection> : IQueryBuilder<TDo
 	}
 	private static BsonArray RenderToBsonArray(QBCondition cond, object values)
 	{
-		if (values is not IEnumerable<object?> objectValues)
+		if (values is not IEnumerable objectValues)
 		{
 			throw new ArgumentNullException(nameof(values), "IEnumerable<> is expected.");
 		}
@@ -698,7 +710,7 @@ internal abstract class QueryBuilder<TDocument, TProjection> : IQueryBuilder<TDo
 				}
 			}
 		}
-		else if (values is IEnumerable<object?> objectValues)
+		else if (values is IEnumerable objectValues)
 		{
 			foreach (var objectValue in objectValues)
 			{
@@ -773,7 +785,7 @@ internal abstract class QueryBuilder<TDocument, TProjection> : IQueryBuilder<TDo
 			throw new ArgumentException($"Field {cond.Alias}.{cond.FieldPath} has type {cond.FieldType.ToPretty()} not {type.ToPretty()}.", nameof(value));
 		}
 
-		return unchecked((long)value);
+		return Convert.ToInt64(value);
 	}
 	private static IEnumerable<long> RenderToLongArray(QBCondition cond, object values)
 	{
@@ -798,7 +810,7 @@ internal abstract class QueryBuilder<TDocument, TProjection> : IQueryBuilder<TDo
 		{
 			throw new ArgumentNullException(nameof(values), "IEnumerable<> is expected.");
 		}
-		else if (values is IEnumerable<object?> objectValues)
+		else if (values is IEnumerable objectValues)
 		{
 			return RenderToLongArray(cond, objectValues);
 		}
@@ -807,7 +819,7 @@ internal abstract class QueryBuilder<TDocument, TProjection> : IQueryBuilder<TDo
 			throw new ArgumentException("IEnumerable<> is expected.", nameof(values));
 		}
 	}
-	private static IEnumerable<long> RenderToLongArray(QBCondition cond, IEnumerable<object?> objectValues)
+	private static IEnumerable<long> RenderToLongArray(QBCondition cond, IEnumerable objectValues)
 	{
 		Type type;
 		foreach (var objectValue in objectValues)
@@ -829,7 +841,7 @@ internal abstract class QueryBuilder<TDocument, TProjection> : IQueryBuilder<TDo
 					throw new ArgumentException($"Field {cond.Alias}.{cond.FieldPath} has type {cond.FieldType.ToPretty()} not {type.ToPretty()}.", nameof(objectValues));
 				}
 
-				yield return unchecked((long)objectValue);
+				yield return Convert.ToInt64(objectValue);
 			}
 		}
 	}
