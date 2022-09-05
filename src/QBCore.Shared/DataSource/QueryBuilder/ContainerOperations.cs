@@ -12,7 +12,8 @@ public enum ContainerOperations
 	Join = 0x20,
 	LeftJoin = 0x40,
 	CrossJoin = 0x80,
+	Unwind = 0x0100,
 
 	MainMask = ContainerOperations.Insert | ContainerOperations.Select | ContainerOperations.Update | ContainerOperations.Delete | ContainerOperations.Exec,
-	SlaveMask = ContainerOperations.Join | ContainerOperations.LeftJoin | ContainerOperations.CrossJoin
+	SlaveMask = ContainerOperations.Join | ContainerOperations.LeftJoin | ContainerOperations.CrossJoin | ContainerOperations.Unwind
 }

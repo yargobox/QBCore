@@ -1,15 +1,22 @@
 using System.Linq.Expressions;
+using QBCore.DataSource.QueryBuilder;
+using QBCore.Extensions.Linq.Expressions;
 
 namespace QBCore.DataSource;
 
-public record DSSortOrder<TProjection>
+public record DSSortOrder<TDocument>
 {
-	public readonly Expression<Func<TProjection, object?>> Field;
-	public readonly bool Descending;
+	public readonly DEPathDefinition<TDocument> Field;
+	public readonly SO SortOrder;
 
-	public DSSortOrder(Expression<Func<TProjection, object?>> field, bool descending = false)
+	public DSSortOrder(DEPathDefinition<TDocument> field, SO sortOrder = SO.None)
 	{
 		Field = field;
-		Descending = descending;
+		SortOrder = sortOrder;
+	}
+	public DSSortOrder(Expression<Func<TDocument, object?>> field, SO sortOrder = SO.None)
+	{
+		Field = field.GetPropertyOrFieldPath();
+		SortOrder = sortOrder;
 	}
 }

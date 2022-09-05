@@ -3,6 +3,7 @@ using System.Text.Json;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
+using QBCore.Controllers.Helpers;
 using QBCore.Controllers.Models;
 using QBCore.DataSource;
 using QBCore.DataSource.Options;
@@ -45,6 +46,9 @@ public class DataSourceController<TKey, TDocument, TCreate, TSelect, TUpdate, TD
 			throw new ArgumentNullException(nameof(size));
 		}
 
+		var softDelMode = SoftDelHelper.Parse(mode);
+		var sortOrders = SOHelper.SerializeFromString<TSelect>(sort);
+
 		var dataSourceResponse = new DataSourceResponse<TSelect>
 		{
 			PageSize = size ?? -1,
@@ -57,7 +61,7 @@ public class DataSourceController<TKey, TDocument, TCreate, TSelect, TUpdate, TD
 		};
 
 		dataSourceResponse.Data =
-			await ( await _service.SelectAsync(SoftDel.Actual, null, null, null, skip, num ?? -1, options) )
+			await ( await _service.SelectAsync(softDelMode, null, sortOrders, null, skip, num ?? -1, options) )
 				.ToListAsync((bool x) => dataSourceResponse.IsLastPage = x ? 1 : 0);
 
 		return Ok(dataSourceResponse);

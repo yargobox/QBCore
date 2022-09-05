@@ -190,7 +190,7 @@ internal sealed partial class SelectQueryBuilder<TDocument, TSelect> : QueryBuil
 		else
 		{
 			// build query from scratch
-			var stages = BuildSelectPipelineStages(Builder.Containers, Builder.Connects, Builder.Conditions, Builder.Fields);
+			var stages = BuildSelectPipelineStages(Builder.Containers, Builder.Connects, Builder.Conditions, Builder.Fields, Array.Empty<QBSortOrder>());
 			
 			query = BuildSelectQuery(stages, Builder.Parameters);
 		}
@@ -266,7 +266,7 @@ internal sealed partial class SelectQueryBuilder<TDocument, TSelect> : QueryBuil
 
 		var aggregateOptions = (AggregateOptions?)options?.NativeOptions;
 		var clientSessionHandle = (IClientSessionHandle?)options?.NativeClientSession;
-		var stages = BuildSelectPipelineStages(Builder.Containers, Builder.Connects, Builder.Conditions, Builder.Fields);
+		var stages = BuildSelectPipelineStages(Builder.Containers, Builder.Connects, Builder.Conditions, Builder.Fields, Builder.SortOrders);
 		var query = BuildSelectQuery(stages, Builder.Parameters);
 
 		if (skip > 0L)
@@ -310,11 +310,12 @@ internal sealed partial class SelectQueryBuilder<TDocument, TSelect> : QueryBuil
 		}
 	}
 
-	private static List<StageInfo> BuildSelectPipelineStages(IReadOnlyList<QBContainer> containers, IReadOnlyList<QBCondition> connects, IReadOnlyList<QBCondition> conditions, IReadOnlyList<QBField> fields)
+	private static List<StageInfo> BuildSelectPipelineStages(IReadOnlyList<QBContainer> containers, IReadOnlyList<QBCondition> connects, IReadOnlyList<QBCondition> conditions, IReadOnlyList<QBField> fields, IReadOnlyList<QBSortOrder> sortOrders)
 	{
 		// Add pipeline stages for each container and clear the first stage's LookupAs (it musn't be used)
 		//
-		var stages = new List<StageInfo>(containers.Select(x => new StageInfo(x)));
+		var stages = new List<StageInfo>(containers.Select(x => new StageInfo(x,
+			x.ContainerOperation != ContainerOperations.Unwind ? StageOperations.Lookup : StageOperations.Unwind)));
 		stages[0].LookupAs = string.Empty;
 
 		// Fill the pipeline stages with connect conditions.
@@ -336,6 +337,10 @@ internal sealed partial class SelectQueryBuilder<TDocument, TSelect> : QueryBuil
 		// Fill the pipeline stages with information for the $project and $addField commands
 		//
 		FillPipelineStagesWithProjections(stages, fields);
+
+		// Fill the pipeline stages with information for the $sort commands
+		//
+		FillPipelineStagesWithSortOrders(stages, sortOrders);
 
 		return stages;
 	}
@@ -472,7 +477,9 @@ internal sealed partial class SelectQueryBuilder<TDocument, TSelect> : QueryBuil
 				}
 			}
 
+			OutputSortOrders(result, stage.SortBeforeProject);
 			OutputProjections(result, stage.ProjectAfter);
+			OutputSortOrders(result, stage.SortAfterProject);
 		}
 
 		return result;
@@ -689,6 +696,54 @@ internal sealed partial class SelectQueryBuilder<TDocument, TSelect> : QueryBuil
 			stages[stageIndex].ProjectAfter.Add((stages[i].LookupAs, null, null));
 		}
 	}
+	
+	/// <summary>
+	/// Fill the last pipeline stage with $sort if any
+	/// </summary>
+	private static void FillPipelineStagesWithSortOrders(List<StageInfo> stages, IReadOnlyList<QBSortOrder> sortOrders)
+	{
+		if (sortOrders.Count == 0)
+		{
+			return;
+		}
+
+		var lastStage = stages[stages.Count - 1];
+
+		if (sortOrders.Any(x => x.Alias.Length > 0))
+		{
+			lastStage.SortBeforeProject = new List<(string path, SO sortOrder)>(sortOrders.Count);
+
+			StageInfo stage;
+			string path;
+
+			foreach (var so in sortOrders)
+			{
+				if (so.Alias.Length > 0)
+				{
+					stage = stages.First(x => x.Container.Alias == so.Alias);
+					path = stage.LookupAs.Length == 0
+						? string.Concat(stage.LookupAs, ".", so.Field.GetDBSideName())
+						: so.Field.GetDBSideName();
+				}
+				else
+				{
+					path = so.Field.GetDBSideName();
+				}
+
+				lastStage.SortBeforeProject.Add((path, so.SortOrder));
+			}
+		}
+		else
+		{
+			lastStage.SortAfterProject = new List<(string path, SO sortOrder)>(sortOrders.Count);
+
+			foreach (var so in sortOrders)
+			{
+				lastStage.SortAfterProject.Add((so.Field.GetDBSideName(), so.SortOrder));
+			}
+		}
+	}
+
 	private static void OutputProjections(List<BsonDocument> result, List<(string fromPath, string? toPath, QBField? builderField)> projectInfo)
 	{
 		BsonDocument? projection = null;
@@ -745,5 +800,36 @@ internal sealed partial class SelectQueryBuilder<TDocument, TSelect> : QueryBuil
 		{
 			result.Add(new BsonDocument { { "$project", projection } });
 		}
+	}
+
+	private static void OutputSortOrders(List<BsonDocument> result, List<(string path, SO sortOrder)>? sortInfo)
+	{
+		if (sortInfo == null || sortInfo.Count == 0)
+		{
+			return;
+		}
+
+		var entries = new BsonDocument();
+		foreach (var sortEntry in sortInfo)
+		{
+			if (sortEntry.sortOrder.HasFlag(SO.Rank))
+			{
+				entries.Add("___textScore", new BsonDocument { { "$meta", "textScore" } });
+			}
+			else
+			{
+				entries.Add(
+					sortEntry.path,
+					sortEntry.sortOrder switch
+					{
+						SO.Ascending => 1,
+						SO.Descending => -1,
+						_ => throw new NotSupportedException()
+					}
+				);
+			}
+		}
+
+		result.Add(new BsonDocument { { "$sort", entries } });
 	}
 }

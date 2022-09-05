@@ -141,4 +141,9 @@ public abstract class QBBuilder<TDoc, TDto> : IQBBuilder
 	public virtual QBBuilder<TDoc, TDto> Exclude(DEPathDefinition<TDto> field) => throw new NotSupportedException();
 	public virtual QBBuilder<TDoc, TDto> Optional(Expression<Func<TDto, object?>> field) => throw new NotSupportedException();
 	public virtual QBBuilder<TDoc, TDto> Optional(DEPathDefinition<TDto> field) => throw new NotSupportedException();
+
+	public virtual QBBuilder<TDoc, TDto> SortBy(Expression<Func<TDto, object?>> field, SO sortOrder = SO.Ascending) => throw new NotSupportedException();
+	public virtual QBBuilder<TDoc, TDto> SortBy(DEPathDefinition<TDto> field, SO sortOrder = SO.Ascending) => throw new NotSupportedException();
+	public virtual QBBuilder<TDoc, TDto> SortBy<TLocal>(string alias, Expression<Func<TLocal, object?>> field, SO sortOrder = SO.Ascending) => throw new NotSupportedException();
+	public virtual QBBuilder<TDoc, TDto> SortBy<TLocal>(string alias, DEPathDefinition<TLocal> field, SO sortOrder = SO.Ascending) => throw new NotSupportedException();
 }

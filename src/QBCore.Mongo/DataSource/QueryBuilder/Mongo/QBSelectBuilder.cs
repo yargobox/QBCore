@@ -614,6 +614,50 @@ internal sealed class QBSelectBuilder<TDoc, TDto> : QBBuilder<TDoc, TDto>, IQBMo
 		return this;
 	}
 
+	private QBSelectBuilder<TDoc, TDto> AddSortBy<TLocal>(string? alias, DEPathDefinition<TLocal> field, SO sortOrder)
+	{
+		return AddSortBy<TLocal>(alias, field.ToDataEntryPath(MongoDataLayer.Default), sortOrder);
+	}
+	private QBSelectBuilder<TDoc, TDto> AddSortBy<TLocal>(string? alias, Expression<Func<TLocal, object?>> field, SO sortOrder)
+	{
+		return AddSortBy<TLocal>(alias, new DEPath(field, false, MongoDataLayer.Default), sortOrder);
+	}
+	private QBSelectBuilder<TDoc, TDto> AddSortBy<TLocal>(string? alias, DEPath field, SO sortOrder)
+	{
+		if (field == null)
+		{
+			throw new ArgumentNullException(nameof(field));
+		}
+		if (string.IsNullOrEmpty(alias))
+		{
+			if (typeof(TLocal) != typeof(TDto))
+			{
+				throw new ArgumentNullException(nameof(alias));
+			}
+
+			alias = string.Empty;
+		}
+		else if (!Containers.Any(x => x.Alias == alias && x.DocumentType == typeof(TLocal)))
+		{
+			throw new InvalidOperationException($"Incorrect sort order definition of select query builder '{typeof(TDto).ToPretty()}': referenced container '{alias}' of  document '{typeof(TLocal).ToPretty()}' has not been added yet.");
+		}
+		
+		if (_sortOrders == null)
+		{
+			_sortOrders = new List<QBSortOrder>(4);
+		}
+
+		if (_sortOrders.Any(x => x.Alias == alias && x.Field.Path == field.Path))
+		{
+			throw new InvalidOperationException($"Incorrect sort order definition of select query builder '{typeof(TDto).ToPretty()}': field '{field.Path}' already has a sort order.");
+		}
+
+		IsNormalized = false;
+		_sortOrders.Add(new QBSortOrder(alias, field, sortOrder));
+
+		return this;
+	}
+
 	public override QBBuilder<TDoc, TDto> Select(string? tableName = null, string? alias = null)
 		=> AddContainer(typeof(TDoc), alias, tableName, ContainerTypes.Table, ContainerOperations.Select);
 	IQBMongoSelectBuilder<TDoc, TDto> IQBMongoSelectBuilder<TDoc, TDto>.Select(string? tableName, string? alias)
@@ -849,6 +893,20 @@ internal sealed class QBSelectBuilder<TDoc, TDto> : QBBuilder<TDoc, TDto>, IQBMo
 		=> AddExclude(field, true);
 	IQBMongoSelectBuilder<TDoc, TDto> IQBMongoSelectBuilder<TDoc, TDto>.Optional(Expression<Func<TDto, object?>> field)
 		=> AddExclude(field, true);
+
+	public override QBBuilder<TDoc, TDto> SortBy(Expression<Func<TDto, object?>> field, SO sortOrder = SO.Ascending)
+		=> AddSortBy(null, field, sortOrder);
+	public override QBBuilder<TDoc, TDto> SortBy(DEPathDefinition<TDto> field, SO sortOrder = SO.Ascending)
+		=> AddSortBy(null, field, sortOrder);
+	IQBMongoSelectBuilder<TDoc, TDto> IQBMongoSelectBuilder<TDoc, TDto>.SortBy(Expression<Func<TDto, object?>> field, SO sortOrder)
+		=> AddSortBy(null, field, sortOrder);
+	public override QBBuilder<TDoc, TDto> SortBy<TLocal>(string alias, Expression<Func<TLocal, object?>> field, SO sortOrder = SO.Ascending)
+		=> AddSortBy(alias, field, sortOrder);
+	public override QBBuilder<TDoc, TDto> SortBy<TLocal>(string alias, DEPathDefinition<TLocal> field, SO sortOrder = SO.Ascending)
+		=> AddSortBy(alias, field, sortOrder);
+	IQBMongoSelectBuilder<TDoc, TDto> IQBMongoSelectBuilder<TDoc, TDto>.SortBy<TLocal>(string alias, Expression<Func<TLocal, object?>> field, SO sortOrder)
+		=> AddSortBy(alias, field, sortOrder);
+
 
 	private void CompleteAutoOpenedParentheses()
 	{

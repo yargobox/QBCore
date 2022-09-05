@@ -160,8 +160,8 @@ public abstract partial class DataSource<TKey, TDocument, TCreate, TSelect, TUpd
 
 	public async Task<IDSAsyncCursor<TSelect>> SelectAsync(
 		SoftDel mode = SoftDel.Actual,
-		IReadOnlyList<DSCondition<TSelect>>? conditions = null,
-		IReadOnlyList<DSSortOrder<TSelect>>? sortOrders = null,
+		IReadOnlyList<DSCondition<TSelect>>? filter = null,
+		IReadOnlyList<DSSortOrder<TSelect>>? sort = null,
 		IReadOnlyDictionary<string, object?>? arguments = null,
 		long skip = 0,
 		int take = -1,
@@ -193,10 +193,10 @@ public abstract partial class DataSource<TKey, TDocument, TCreate, TSelect, TUpd
 			}
 		}
 
-		if (conditions != null)
+		if (filter != null)
 		{
 			var rootAlias = builder.Containers.First().Alias;
-			foreach (var cond in conditions)
+			foreach (var cond in filter)
 			{
 				if (cond.IsByOr)
 				{
@@ -217,10 +217,16 @@ public abstract partial class DataSource<TKey, TDocument, TCreate, TSelect, TUpd
 			}
 		}
 
-		if (sortOrders != null)//!!!
+		if (sort != null)
 		{
-			foreach (var sort in sortOrders)
+			foreach (var so in sort)
 			{
+				if (builder.SortOrders.Any(x => x.SortOrder == so.SortOrder && x.Field.ToString() == so.Field.Path))
+				{
+					continue;
+				}
+
+				builder.SortBy(so.Field, so.SortOrder);
 			}
 		}
 

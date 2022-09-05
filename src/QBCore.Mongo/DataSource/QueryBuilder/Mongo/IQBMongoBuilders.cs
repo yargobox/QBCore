@@ -42,6 +42,9 @@ public interface IQBMongoSelectBuilder<TDoc, TSelect> : IQBBuilder
 	IQBMongoSelectBuilder<TDoc, TSelect> Include<TRef>(Expression<Func<TSelect, object?>> field, string refAlias, Expression<Func<TRef, object?>> refField);
 	IQBMongoSelectBuilder<TDoc, TSelect> Exclude(Expression<Func<TSelect, object?>> field);
 	IQBMongoSelectBuilder<TDoc, TSelect> Optional(Expression<Func<TSelect, object?>> field);
+
+	IQBMongoSelectBuilder<TDoc, TSelect> SortBy(Expression<Func<TSelect, object?>> field, SO sortOrder = SO.Ascending);
+	IQBMongoSelectBuilder<TDoc, TSelect> SortBy<TLocal>(string alias, Expression<Func<TLocal, object?>> field, SO sortOrder = SO.Ascending);
 }
 
 public interface IQBMongoUpdateBuilder<TDoc, TUpdate> : IQBBuilder

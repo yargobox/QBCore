@@ -15,8 +15,8 @@ public class BrandSelectDto
 
 	public virtual IEnumerable<Product> Products { get; set; } = new List<Product>();
 
-/* 	static void Builder(IQBMongoSelectBuilder<Brand, BrandSelectDto> builder)
+ 	static void Builder(IQBMongoSelectBuilder<Brand, BrandSelectDto> builder)
 	{
 		builder.Select("brands");
-	} */
+	}
 }

@@ -7,4 +7,5 @@ public class DataSourceResponse<T>
 	public long TotalCount { get; set; } = -1;
 	public int IsLastPage { get; set; } = -1;
 	public IEnumerable<T>? Data { get; set; }
+	public IReadOnlyDictionary<string, object?>? Aggregations { get; set; }
 }
