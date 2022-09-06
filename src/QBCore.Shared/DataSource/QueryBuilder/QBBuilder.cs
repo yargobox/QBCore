@@ -24,6 +24,7 @@ public interface IQBBuilder
 	IReadOnlyList<QBAggregation> Aggregations { get; }
 
 	bool IsNormalized { get; }
+	object SyncRoot { get; }
 
 	void Normalize();
 }
@@ -56,6 +57,9 @@ public abstract class QBBuilder<TDoc, TDto> : IQBBuilder
 	public virtual IReadOnlyList<QBSortOrder> SortOrders => EmptyLists.SortOrders;
 	public virtual IReadOnlyList<QBAggregation> Aggregations => EmptyLists.Aggregations;
 
+	public object SyncRoot => _syncRoot != null ? _syncRoot : Interlocked.CompareExchange(ref _syncRoot, new object(), null)!;
+
+	private object? _syncRoot;
 	private readonly DSDocumentInfo _documentInfo;
 	private readonly DSDocumentInfo? _projectionInfo;
 

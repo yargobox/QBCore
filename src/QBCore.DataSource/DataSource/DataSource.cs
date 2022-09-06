@@ -3,7 +3,6 @@ using AutoMapper;
 using Microsoft.Extensions.DependencyInjection;
 using QBCore.Configuration;
 using QBCore.DataSource.Options;
-using QBCore.DataSource.QueryBuilder;
 using QBCore.Extensions.Threading.Tasks;
 using QBCore.ObjectFactory;
 
@@ -16,21 +15,14 @@ public abstract partial class DataSource<TKey, TDocument, TCreate, TSelect, TUpd
 	IAsyncDisposable,
 	IDisposable
 {
+	public IDSInfo DSInfo { get; }
+	public object SyncRoot => _syncRoot != null ? _syncRoot : Interlocked.CompareExchange(ref _syncRoot, new object(), null)!;
+
 	private readonly IServiceProvider _serviceProvider;
 	private readonly IMapper _mapper;
 	private readonly IDataContext _dataContext;
 	protected DataSourceListener<TKey, TDocument, TCreate, TSelect, TUpdate, TDelete, TRestore>? _listener;
 	private object? _syncRoot;
-
-	public IDSInfo DSInfo { get; }
-	public object SyncRoot
-	{
-		get
-		{
-			if (_syncRoot == null) System.Threading.Interlocked.CompareExchange<Object>(ref _syncRoot!, new Object(), null!);
-			return _syncRoot;
-		}
-	}
 
 	public DataSource(IServiceProvider serviceProvider, IDataContextProvider dataContextProvider)
 	{
@@ -49,7 +41,7 @@ public abstract partial class DataSource<TKey, TDocument, TCreate, TSelect, TUpd
 
 	public async Task<TKey> InsertAsync(
 		TCreate document,
-		IReadOnlyDictionary<string, object?>? arguments = null,
+		IDictionary<string, object?>? parameters = null,
 		DataSourceInsertOptions? options = null,
 		CancellationToken cancellationToken = default(CancellationToken))
 	{
@@ -69,7 +61,7 @@ public abstract partial class DataSource<TKey, TDocument, TCreate, TSelect, TUpd
 		foreach (var param in builder.Parameters.Where(x => x.Direction.HasFlag(ParameterDirection.Input)))
 		{
 			param.ResetValue();
-			if (arguments != null && arguments.TryGetValue(param.Name, out value))
+			if (parameters != null && parameters.TryGetValue(param.Name, out value))
 			{
 				param.Value = value;
 			}
@@ -102,7 +94,7 @@ public abstract partial class DataSource<TKey, TDocument, TCreate, TSelect, TUpd
 		IReadOnlyCollection<IDSAggregation> aggregations,
 		SoftDel mode = SoftDel.Actual,
 		IReadOnlyCollection<DSCondition<TSelect>>? conditions = null,
-		IReadOnlyDictionary<string, object?>? arguments = null,
+		IDictionary<string, object?>? parameters = null,
 		DataSourceSelectOptions? options = null,
 		CancellationToken cancellationToken = default(CancellationToken))
 	{
@@ -112,7 +104,7 @@ public abstract partial class DataSource<TKey, TDocument, TCreate, TSelect, TUpd
 	public Task<long> CountAsync(
 		SoftDel mode = SoftDel.Actual,
 		IReadOnlyList<DSCondition<TSelect>>? conditions = null,
-		IReadOnlyDictionary<string, object?>? arguments = null,
+		IDictionary<string, object?>? parameters = null,
 		DataSourceCountOptions? options = null,
 		CancellationToken cancellationToken = default(CancellationToken))
 	{
@@ -121,7 +113,7 @@ public abstract partial class DataSource<TKey, TDocument, TCreate, TSelect, TUpd
 
 	public async Task<TSelect?> SelectAsync(
 		TKey id,
-		IReadOnlyDictionary<string, object?>? arguments = null,
+		IDictionary<string, object?>? parameters = null,
 		DataSourceSelectOptions? options = null,
 		CancellationToken cancellationToken = default(CancellationToken))
 	{
@@ -147,7 +139,7 @@ public abstract partial class DataSource<TKey, TDocument, TCreate, TSelect, TUpd
 		foreach (var param in builder.Parameters.Where(x => x.Direction.HasFlag(ParameterDirection.Input)))
 		{
 			param.ResetValue();
-			if (arguments != null && arguments.TryGetValue(param.Name, out value))
+			if (parameters != null && parameters.TryGetValue(param.Name, out value))
 			{
 				param.Value = value;
 			}
@@ -162,7 +154,7 @@ public abstract partial class DataSource<TKey, TDocument, TCreate, TSelect, TUpd
 		SoftDel mode = SoftDel.Actual,
 		IReadOnlyList<DSCondition<TSelect>>? filter = null,
 		IReadOnlyList<DSSortOrder<TSelect>>? sort = null,
-		IReadOnlyDictionary<string, object?>? arguments = null,
+		IDictionary<string, object?>? parameters = null,
 		long skip = 0,
 		int take = -1,
 		DataSourceSelectOptions? options = null,
@@ -234,7 +226,7 @@ public abstract partial class DataSource<TKey, TDocument, TCreate, TSelect, TUpd
 		foreach (var param in builder.Parameters.Where(x => x.Direction.HasFlag(ParameterDirection.Input)))
 		{
 			param.ResetValue();
-			if (arguments != null && arguments.TryGetValue(param.Name, out value))
+			if (parameters != null && parameters.TryGetValue(param.Name, out value))
 			{
 				param.Value = value;
 			}
@@ -247,7 +239,7 @@ public abstract partial class DataSource<TKey, TDocument, TCreate, TSelect, TUpd
 		TKey id,
 		TUpdate document,
 		IReadOnlySet<string>? modifiedFieldNames = null,
-		IReadOnlyDictionary<string, object?>? arguments = null,
+		IDictionary<string, object?>? parameters = null,
 		DataSourceUpdateOptions? options = null,
 		CancellationToken cancellationToken = default(CancellationToken)
 	)
@@ -265,7 +257,7 @@ public abstract partial class DataSource<TKey, TDocument, TCreate, TSelect, TUpd
 		foreach (var param in builder.Parameters.Where(x => x.Direction.HasFlag(ParameterDirection.Input)))
 		{
 			param.ResetValue();
-			if (arguments != null && arguments.TryGetValue(param.Name, out value))
+			if (parameters != null && parameters.TryGetValue(param.Name, out value))
 			{
 				param.Value = value;
 			}
@@ -301,7 +293,7 @@ public abstract partial class DataSource<TKey, TDocument, TCreate, TSelect, TUpd
 	public async Task DeleteAsync(
 		TKey id,
 		TDelete? document = default(TDelete?),
-		IReadOnlyDictionary<string, object?>? arguments = null,
+		IDictionary<string, object?>? parameters = null,
 		DataSourceDeleteOptions? options = null,
 		CancellationToken cancellationToken = default(CancellationToken)
 	)
@@ -321,7 +313,7 @@ public abstract partial class DataSource<TKey, TDocument, TCreate, TSelect, TUpd
 			foreach (var param in builder.Parameters.Where(x => x.Direction.HasFlag(ParameterDirection.Input)))
 			{
 				param.ResetValue();
-				if (arguments != null && arguments.TryGetValue(param.Name, out value))
+				if (parameters != null && parameters.TryGetValue(param.Name, out value))
 				{
 					param.Value = value;
 				}
@@ -351,7 +343,7 @@ public abstract partial class DataSource<TKey, TDocument, TCreate, TSelect, TUpd
 			foreach (var param in builder.Parameters.Where(x => x.Direction.HasFlag(ParameterDirection.Input)))
 			{
 				param.ResetValue();
-				if (arguments != null && arguments.TryGetValue(param.Name, out value))
+				if (parameters != null && parameters.TryGetValue(param.Name, out value))
 				{
 					param.Value = value;
 				}
@@ -376,7 +368,7 @@ public abstract partial class DataSource<TKey, TDocument, TCreate, TSelect, TUpd
 	public async Task RestoreAsync(
 		TKey id,
 		TRestore? document = default(TRestore?),
-		IReadOnlyDictionary<string, object?>? arguments = null,
+		IDictionary<string, object?>? parameters = null,
 		DataSourceRestoreOptions? options = null,
 		CancellationToken cancellationToken = default(CancellationToken)
 	)
@@ -394,7 +386,7 @@ public abstract partial class DataSource<TKey, TDocument, TCreate, TSelect, TUpd
 		foreach (var param in builder.Parameters.Where(x => x.Direction.HasFlag(ParameterDirection.Input)))
 		{
 			param.ResetValue();
-			if (arguments != null && arguments.TryGetValue(param.Name, out value))
+			if (parameters != null && parameters.TryGetValue(param.Name, out value))
 			{
 				param.Value = value;
 			}
