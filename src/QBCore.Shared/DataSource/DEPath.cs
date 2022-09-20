@@ -50,7 +50,7 @@ public sealed class DEPath : IEquatable<DEPath>, IReadOnlyList<DEInfo>
 		}
 	}
 
-	public DEPath(Type documentType, string path, bool allowPointToSelf, IDataLayerInfo dataLayer)
+	public DEPath(Type documentType, string path, bool allowPointToSelf, IDataLayerInfo? dataLayer = null)
 	{
 		if (documentType == null)
 		{
@@ -85,7 +85,7 @@ public sealed class DEPath : IEquatable<DEPath>, IReadOnlyList<DEInfo>
 		}
 	}
 
-	public DEPath(Type documentType, string path, bool ignoreCase, bool allowPointToSelf, IDataLayerInfo dataLayer)
+	public DEPath(Type documentType, string path, bool ignoreCase, bool allowPointToSelf, IDataLayerInfo? dataLayer = null)
 	{
 		if (documentType == null)
 		{

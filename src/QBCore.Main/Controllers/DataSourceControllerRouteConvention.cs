@@ -15,17 +15,17 @@ public class DataSourceControllerRouteConvention : IControllerModelConvention
 {
 	public string RoutePrefix
 	{
-		get => AddQBCoreExtensions.RoutePrefix;
-		init => AddQBCoreExtensions.RoutePrefix = value;
+		get => ExtensionsForAddQBCore.RoutePrefix;
+		init => ExtensionsForAddQBCore.RoutePrefix = value;
 	}
 
 	public virtual void Apply(ControllerModel controller)
 	{
-		if (!AddQBCoreExtensions.IsAddQBCoreCalled)
+		if (!ExtensionsForAddQBCore.IsAddQBCoreCalled)
 		{
-			throw new InvalidOperationException(nameof(AddQBCoreExtensions.AddQBCore) + " must be called first.");
+			throw new InvalidOperationException(nameof(ExtensionsForAddQBCore.AddQBCore) + " must be called first.");
 		}
-		AddQBCoreExtensions.IsDataSourceControllerRouteConventionCreated = true;
+		ExtensionsForAddQBCore.IsDataSourceControllerRouteConventionCreated = true;
 
 		var controllerSubclass = controller.ControllerType.GetSubclassOf(typeof(DataSourceController<,,,,,,,>));
 
@@ -78,7 +78,7 @@ public class DataSourceControllerRouteConvention : IControllerModelConvention
 	{
 		if (!string.IsNullOrEmpty(info?.ControllerName))
 		{
-			if (info.DSTypeInfo.Concrete.GetCustomAttribute<DsApiControllerAttribute>(false)?.IsAutoController == false)
+			if (info.ConcreteType.GetCustomAttribute<DsApiControllerAttribute>(false)?.BuildAutoController == false)
 			{
 				controller.ControllerName = info.ControllerName;
 			}

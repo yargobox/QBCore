@@ -9,6 +9,9 @@ namespace QBCore.DataSource;
 internal sealed class DSInfo : IDSInfo
 {
 	public string Name { get; }
+	public string Tech => "DS";
+	public Type ConcreteType => DSTypeInfo.Concrete;
+	public string? ControllerName { get; }
 
 	public DSTypeInfo DSTypeInfo { get; }
 
@@ -30,8 +33,7 @@ internal sealed class DSInfo : IDSInfo
 
 	public bool IsServiceSingleton { get; }
 
-	public string? ControllerName { get; }
-	public bool? IsAutoController { get; }
+	public bool BuildAutoController { get; }
 
 	internal static readonly string[] ReservedNames = { "area", "controller", "action", "page", "filter", "cell", "id" };
 	internal const DataSourceOptions AllDSOperations = DataSourceOptions.CanInsert | DataSourceOptions.CanSelect | DataSourceOptions.CanUpdate | DataSourceOptions.CanDelete | DataSourceOptions.CanRestore;
@@ -72,7 +74,7 @@ internal sealed class DSInfo : IDSInfo
 		if (controllerAttr != null)
 		{
 			building.ControllerName = controllerAttr.Name;
-			building.IsAutoController = controllerAttr.IsAutoController;
+			building.BuildAutoController = controllerAttr.BuildAutoController;
 		}
 
 		// Find a builder and build if any
@@ -107,7 +109,9 @@ internal sealed class DSInfo : IDSInfo
 		{
 			Name = MakeDSNameFromType(DSTypeInfo.Concrete);
 		}
+
 		Name = string.Intern(Name);
+
 		if (ReservedNames.Contains(Name, StringComparer.OrdinalIgnoreCase))
 		{
 			throw new ArgumentException("These names are reserved and cannot be used as names for a datasource, CDS, or controller: " + string.Join(", ", ReservedNames));
@@ -166,7 +170,7 @@ internal sealed class DSInfo : IDSInfo
 
 		// ControllerName
 		//
-		if (building.ControllerName != null || building.IsAutoController != null)
+		if (building.ControllerName != null || building.BuildAutoController != null)
 		{
 			var controllerName = building.ControllerName?.Trim() ?? "[DS]";
 			
@@ -195,7 +199,7 @@ internal sealed class DSInfo : IDSInfo
 				throw new ArgumentException("These names are reserved and cannot be used as names for a datasource, CDS, or controller: " + string.Join(", ", ReservedNames));
 			}
 
-			IsAutoController = building.IsAutoController ?? true;
+			BuildAutoController = building.BuildAutoController ?? true;
 		}
 
 		// DataSourceService
@@ -341,7 +345,7 @@ internal sealed class DSInfo : IDSInfo
 
 	private static readonly string[] _pluralEndingsType1 = { "s", "ss", "sh", "ch", "x", "z" };
 	private static readonly char[] _pluralEndingsType2 = { 'a', 'e', 'i', 'o', 'u' };
-	private static string GuessPluralName(string name)
+	internal static string GuessPluralName(string name)
 	{
 		if (name.Length <= 2)
 		{

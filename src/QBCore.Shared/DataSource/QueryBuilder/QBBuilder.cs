@@ -57,7 +57,7 @@ public abstract class QBBuilder<TDoc, TDto> : IQBBuilder
 	public virtual IReadOnlyList<QBSortOrder> SortOrders => EmptyLists.SortOrders;
 	public virtual IReadOnlyList<QBAggregation> Aggregations => EmptyLists.Aggregations;
 
-	public object SyncRoot => _syncRoot != null ? _syncRoot : Interlocked.CompareExchange(ref _syncRoot, new object(), null)!;
+	public object SyncRoot => _syncRoot ?? Interlocked.CompareExchange(ref _syncRoot, new object(), null) ?? _syncRoot;
 
 	private object? _syncRoot;
 	private readonly DSDocumentInfo _documentInfo;

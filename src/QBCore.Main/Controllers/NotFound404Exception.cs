@@ -1,4 +1,4 @@
-namespace Example1.BLL.Exceptions;
+namespace QBCore.Controllers;
 
 public class NotFound404Exception : ApplicationException
 {

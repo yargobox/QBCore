@@ -17,7 +17,7 @@ public class DsApiControllerAttribute : Attribute
 	/// <summary>
 	/// Whether or not to build a generic datasource controller for the datasource. True by default.
 	/// </summary>
-	public bool IsAutoController { get; init; } = true;
+	public bool BuildAutoController { get; init; } = true;
 
 	public DsApiControllerAttribute(string name = "[DS:guessPlural]")
 	{

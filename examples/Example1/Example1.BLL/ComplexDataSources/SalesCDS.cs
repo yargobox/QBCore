@@ -5,12 +5,17 @@ using QBCore.DataSource;
 
 namespace Example1.BLL.Services;
 
+[CdsApiController("sales")]
 [ComplexDataSource]
 public class SalesCDS : ComplexDataSource<SalesCDS>
 {
+	public SalesCDS(IServiceProvider serviceProvider) : base(serviceProvider) { }
+
 	static void CDSBuilder(ICDSBuilder builder)
 	{
-//		builder.Name = "sales";
+//		builder.Name = "Sales";
+//		builder.ControllerName = "sales";
+
 		builder.NodeBuilder
 
 			.AddNode<StoreService>("stores")

@@ -32,7 +32,7 @@ public record AddQBCoreOptions
 		=> type.IsClass && !type.IsAbstract && !type.IsGenericType && !type.IsGenericTypeDefinition && type.GetSubclassOf(typeof(ComplexDataSource<>)) != null;
 }
 
-public static class AddQBCoreExtensions
+public static class ExtensionsForAddQBCore
 {
 	internal static volatile bool IsAddQBCoreCalled;
 	internal static volatile bool IsDataSourceControllerRouteConventionCreated;
@@ -123,23 +123,24 @@ public static class AddQBCoreExtensions
 
 		DataSourceDocuments.DocumentExclusionSelector = options.DocumentExclusionSelector;
 
-#if DEBUG
-		foreach (var type in types.Where(x => options.DataSourceSelector(x)))
+		IDSInfo pDSInfo;
+		foreach (var type in atypes.Where(x => options.DataSourceSelector(x)))
 		{
-			DataSources.TryRegister(type);
+			pDSInfo = StaticFactory.DataSources.GetOrRegisterObject(type);
+			StaticFactory.AppObjects.RegisterObject(pDSInfo);
 		}
-		foreach (var type in types.Where(x => options.ComplexDataSourceSelector(x)))
+
+		ICDSInfo pCDSInfo;
+		foreach (var type in atypes.Where(x => options.ComplexDataSourceSelector(x)))
 		{
-			ComplexDataSources.TryRegister(type);
+			pCDSInfo = StaticFactory.ComplexDataSources.GetOrRegisterObject(type);
+			StaticFactory.AppObjects.RegisterObject(pCDSInfo);
 		}
-#else
-		types.AsParallel().Where(x => options.DataSourceSelector(x)).ForAll(x => DataSources.TryRegister(x));
-		types.AsParallel().Where(x => options.ComplexDataSourceSelector(x)).ForAll(x => ComplexDataSources.TryRegister(x));
-#endif
 
 		AddBusinessObjects();
 
 		services.TryAddSingleton<DataSourceRouteValueTransformer>();
+		services.TryAddScoped<IDSRequestContext>(_ => new DSRequestContext());
 		AddDataSourcesAsServices(services);
 
 		return services;
@@ -152,7 +153,7 @@ public static class AddQBCoreExtensions
 		
 		foreach (var definition in StaticFactory.DataSources)
 		{
-			bo = new BusinessObject("DS", string.Intern(definition.Value.Name), definition.Value.DSTypeInfo.Concrete);
+			bo = new BusinessObject("DS", string.Intern(definition.Value.Name), definition.Value.ConcreteType);
 			
 			registry.TryRegisterObject(bo.Key, bo);
 		}
@@ -165,7 +166,7 @@ public static class AddQBCoreExtensions
 
 		foreach (var definition in StaticFactory.DataSources)
 		{
-			var dataSourceType = definition.Value.DSTypeInfo.Concrete;
+			var dataSourceType = definition.Value.ConcreteType;
 			implementationFactory = sp => ActivatorUtilities.CreateInstance(sp, dataSourceType, sp, sp.GetRequiredService<IDataContextProvider>());
 
 			if (definition.Value.DataSourceServiceType == dataSourceType)
@@ -219,26 +220,26 @@ public static class AddQBCoreExtensions
 */
 /*
 (default)	{controller}/{id?}
-			{c0}/{field}/filter/{controller}/{id?}
-			{c0}/{field}/cell/{controller}/{id?}
+			{c0}/{filter_field}/filter/{controller}/{id?}
+			{c0}/{cell_field}/cell/{controller}/{id?}
 
 			{c0}/{i0}/{controller}/{id?}
-			{c0}/{i0}/{c1}/{field}/filter/{controller}/{id?}
-			{c0}/{i0}/{c1}/{field}/cell/{controller}/{id?}
+			{c0}/{i0}/{c1}/{filter_field}/filter/{controller}/{id?}
+			{c0}/{i0}/{c1}/{cell_field}/cell/{controller}/{id?}
 
 			{c0}/{i0}/{c1}/{i1}/{controller}/{id?}
-			{c0}/{i0}/{c1}/{i1}/{c2}/{field}/filter/{controller}/{id?}
-			{c0}/{i0}/{c1}/{i1}/{c2}/{field}/cell/{controller}/{id?}
+			{c0}/{i0}/{c1}/{i1}/{c2}/{filter_field}/filter/{controller}/{id?}
+			{c0}/{i0}/{c1}/{i1}/{c2}/{cell_field}/cell/{controller}/{id?}
 
 			{c0}/{i0}/{c1}/{i1}/{c2}/{i2}/{controller}/{id?}
-			{c0}/{i0}/{c1}/{i1}/{c2}/{i2}/{c3}/{field}/filter/{controller}/{id?}
-			{c0}/{i0}/{c1}/{i1}/{c2}/{i2}/{c3}/{field}/filter/{controller}/{id?}
+			{c0}/{i0}/{c1}/{i1}/{c2}/{i2}/{c3}/{filter_field}/filter/{controller}/{id?}
+			{c0}/{i0}/{c1}/{i1}/{c2}/{i2}/{c3}/{cell_field}/cell/{controller}/{id?}
 */
 
 		int nestedNodeLevel = 6;
 
-		endpoints.MapDynamicControllerRoute<DataSourceRouteValueTransformer>(RoutePrefix + "{c0}/{field}/filter/{controller}/{id?}", null!, orderStart++);
-		endpoints.MapDynamicControllerRoute<DataSourceRouteValueTransformer>(RoutePrefix + "{c0}/{field}/cell/{controller}/{id?}", null!, orderStart++);
+		endpoints.MapDynamicControllerRoute<DataSourceRouteValueTransformer>(RoutePrefix + "{c0}/{filter_field}/filter/{controller}/{id?}", null!, orderStart++);
+		endpoints.MapDynamicControllerRoute<DataSourceRouteValueTransformer>(RoutePrefix + "{c0}/{cell_field}/cell/{controller}/{id?}", null!, orderStart++);
 
 		var br = new StringBuilder();
 		for (int i = 0; i < nestedNodeLevel; i++)
@@ -251,12 +252,12 @@ public static class AddQBCoreExtensions
 				orderStart++);
 
 			endpoints.MapDynamicControllerRoute<DataSourceRouteValueTransformer>(
-				string.Concat(RoutePrefix, br.ToString(), "{c", (i + 1).ToString(), "}/{field}/filter/{controller}/{id?}"),
+				string.Concat(RoutePrefix, br.ToString(), "{c", (i + 1).ToString(), "}/{filter_field}/filter/{controller}/{id?}"),
 				null!,
 				orderStart++);
 			
 			endpoints.MapDynamicControllerRoute<DataSourceRouteValueTransformer>(
-				string.Concat(RoutePrefix, br.ToString(), "{c", (i + 1).ToString(), "}/{field}/cell/{controller}/{id?}"),
+				string.Concat(RoutePrefix, br.ToString(), "{c", (i + 1).ToString(), "}/{cell_field}/cell/{controller}/{id?}"),
 				null!,
 				orderStart++);
 		}

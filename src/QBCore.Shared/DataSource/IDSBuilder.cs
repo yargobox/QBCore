@@ -6,14 +6,15 @@ public interface IDSBuilder
 {
 	public Type ConcreteType { get; }
 	string? Name { get; set; }
+	string? ControllerName { get; set; }
+
 	DataSourceOptions Options { get; set; }
 	Type? Listener { get; set; }
 
 	Type? ServiceInterface { get; set; }
 	bool? IsServiceSingleton { get; set; }
-	
-	string? ControllerName { get; set; }
-	bool? IsAutoController { get; set; }
+
+	bool? BuildAutoController { get; set; }
 	
 	string? DataContextName { get; set; }
 

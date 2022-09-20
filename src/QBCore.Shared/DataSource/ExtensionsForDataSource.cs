@@ -1,3 +1,5 @@
+using QBCore.ObjectFactory;
+
 namespace QBCore.DataSource;
 
 public static class ExtensionsForDataSource
@@ -19,4 +21,18 @@ public static class ExtensionsForDataSource
 		=> dataSourceType.GetDataSourceInterface().GetGenericArguments()[5];
 	public static Type GetDataSourceTRestore(this Type dataSourceType)
 		=> dataSourceType.GetDataSourceInterface().GetGenericArguments()[6];
+
+	public static T AsInfo<T>(this IAppObjectInfo appObject)
+	{
+		if (appObject is not T tvalue)
+		{
+			throw new InvalidOperationException($"Property '{nameof(appObject)}' has type '{appObject.GetType().ToPretty()}' not requested '{typeof(T).ToPretty()}'.");
+		}
+
+		return tvalue;
+	}
+
+	public static IDSInfo AsDSInfo(this IAppObjectInfo appObject) => AsInfo<IDSInfo>(appObject);
+
+	public static ICDSInfo AsCDSInfo(this IAppObjectInfo appObject) => AsInfo<ICDSInfo>(appObject);
 }

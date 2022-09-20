@@ -1,8 +1,8 @@
+using QBCore.ObjectFactory;
+
 namespace QBCore.DataSource;
 
-public interface ICDSInfo
+public interface ICDSInfo : IAppObjectInfo
 {
-	string Name { get; }
-	Type ComplexDataSourceConcrete { get; }
-	IReadOnlyDictionary<string, ICDSNode> Nodes { get; }
+	IReadOnlyDictionary<string, ICDSNodeInfo> Nodes { get; }
 }

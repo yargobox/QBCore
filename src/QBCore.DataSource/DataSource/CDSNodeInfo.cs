@@ -3,38 +3,41 @@ using System.Diagnostics.CodeAnalysis;
 using System.Linq.Expressions;
 using QBCore.Extensions.Collections.Generic;
 using QBCore.Extensions.Linq.Expressions;
+using QBCore.ObjectFactory;
 
 namespace QBCore.DataSource;
 
-internal sealed class CDSNode : ICDSNode
+internal sealed class CDSNodeInfo : ICDSNodeInfo
 {
-	private static readonly IReadOnlyDictionary<string, ICDSNode> _emptyReadOnlyDictionary = new Dictionary<string, ICDSNode>();
-	private const string _rootName = "<ROOT>";
-
-	private readonly OrderedDictionary<string, ICDSNode> _collection;
-	private ICDSNode[]? _children;
-	private ICDSCondition[]? _conditions;
-
 	public string Name { get; }
 	public Type DataSourceType { get; }
+	public IDSInfo DSInfo => _dsInfo ?? (_dsInfo = StaticFactory.DataSources[DataSourceType]) ?? throw new InvalidOperationException($"'{nameof(DSInfo)}' is not available in the builder.");
 	public IEnumerable<ICDSCondition> Conditions => _conditions ?? Enumerable.Empty<ICDSCondition>();
 	public bool Hidden { get; set; }
-	public ICDSNode? Parent { get; }
-	public ICDSNode Root => _collection.Values.First();
-	public IReadOnlyDictionary<string, ICDSNode> All => _collection;
-	public IReadOnlyDictionary<string, ICDSNode> Parents => Parent != null ? new NodeDictionary(GetParents(this)) : _emptyReadOnlyDictionary;
-	public IReadOnlyDictionary<string, ICDSNode> Children => _children != null ? new NodeDictionary(_children) : _emptyReadOnlyDictionary;
+	public ICDSNodeInfo? Parent { get; }
+	public ICDSNodeInfo Root => _collection.Values.First();
+	public IReadOnlyDictionary<string, ICDSNodeInfo> All => _collection;
+	public IReadOnlyDictionary<string, ICDSNodeInfo> Parents => Parent != null ? new NodeDictionary(GetParents(this)) : _emptyReadOnlyDictionary;
+	public IReadOnlyDictionary<string, ICDSNodeInfo> Children => _children != null ? new NodeDictionary(_children) : _emptyReadOnlyDictionary;
+
+	private static readonly IReadOnlyDictionary<string, ICDSNodeInfo> _emptyReadOnlyDictionary = new Dictionary<string, ICDSNodeInfo>();
+	private const string _rootName = "<ROOT>";
+
+	private readonly OrderedDictionary<string, ICDSNodeInfo> _collection;
+	private ICDSNodeInfo[]? _children;
+	private ICDSCondition[]? _conditions;
+	private IDSInfo? _dsInfo;
 
 	// root node ctor to start collection
-	public CDSNode()
+	public CDSNodeInfo()
 	{
-		_collection = new OrderedDictionary<string, ICDSNode>(StringComparer.OrdinalIgnoreCase);
+		_collection = new OrderedDictionary<string, ICDSNodeInfo>(StringComparer.OrdinalIgnoreCase);
 		Name = _rootName;
 		DataSourceType = typeof(void);
 	}
 
 	// regular node ctor
-	public CDSNode(OrderedDictionary<string, ICDSNode> collection, Type dataSourceType, string name, ICDSNode? parent)
+	public CDSNodeInfo(OrderedDictionary<string, ICDSNodeInfo> collection, Type dataSourceType, string name, ICDSNodeInfo? parent)
 	{
 		_collection = collection;
 		Parent = parent;
@@ -42,7 +45,7 @@ internal sealed class CDSNode : ICDSNode
 		DataSourceType = dataSourceType;
 	}
 
-	private IEnumerable<ICDSNode> GetParents(ICDSNode node)
+	private IEnumerable<ICDSNodeInfo> GetParents(ICDSNodeInfo node)
 	{
 		while (node.Parent != null)
 		{
@@ -51,7 +54,7 @@ internal sealed class CDSNode : ICDSNode
 		}
 	}
 
-	public ICDSNode AddNode(Type dataSourceConcreteType, string name)
+	public ICDSNodeInfo AddNode(Type dataSourceConcreteType, string name)
 	{
 		if (name == null)
 		{
@@ -71,14 +74,14 @@ internal sealed class CDSNode : ICDSNode
 			throw new InvalidOperationException($"Invalid datasource type {dataSourceConcreteType.ToPretty()}.");
 		}
 
-		var node = new CDSNode(_collection, dataSourceConcreteType, name, Name != _rootName ? this : null);
+		var node = new CDSNodeInfo(_collection, dataSourceConcreteType, name, Name != _rootName ? this : null);
 		_collection.Add(name, node);
 
 		AddNode(node);
 
 		return node;
 	}
-	public ICDSNode AddCondition<TDocument, TParentDocument>(Expression<Func<TDocument, object?>> field, Expression<Func<TParentDocument, object?>> parentField, FO operation = FO.Equal, object? defaultValue = null)
+	public ICDSNodeInfo AddCondition<TDocument, TParentDocument>(Expression<Func<TDocument, object?>> field, Expression<Func<TParentDocument, object?>> parentField, FO operation = FO.Equal, object? defaultValue = null)
 	{
 		var parentNodes = Parents
 			.Where(x =>
@@ -97,7 +100,7 @@ internal sealed class CDSNode : ICDSNode
 
 		return AddCondition<TDocument, TParentDocument>(field, parentNodes[0].Value, parentField, operation, null);
 	}
-	public ICDSNode AddCondition<TDocument, TParentDocument>(Expression<Func<TDocument, object?>> field, ICDSNode parentNode, Expression<Func<TParentDocument, object?>> parentField, FO operation = FO.Equal, object? defaultValue = null)
+	public ICDSNodeInfo AddCondition<TDocument, TParentDocument>(Expression<Func<TDocument, object?>> field, ICDSNodeInfo parentNode, Expression<Func<TParentDocument, object?>> parentField, FO operation = FO.Equal, object? defaultValue = null)
 	{
 		if (DataSourceType.GetDataSourceTDocument() != typeof(TDocument) && DataSourceType.GetDataSourceTSelect() != typeof(TDocument))
 		{
@@ -122,7 +125,7 @@ internal sealed class CDSNode : ICDSNode
 
 		return this;
 	}
-	public ICDSNode AddCondition<TDocument>(Expression<Func<TDocument, object?>> field, object? constValue, FO operation = FO.Equal, object? defaultValue = null)
+	public ICDSNodeInfo AddCondition<TDocument>(Expression<Func<TDocument, object?>> field, object? constValue, FO operation = FO.Equal, object? defaultValue = null)
 	{
 		if (DataSourceType.GetDataSourceTDocument() != typeof(TDocument) || DataSourceType.GetDataSourceTSelect() != typeof(TDocument))
 		{
@@ -142,11 +145,11 @@ internal sealed class CDSNode : ICDSNode
 		return this;
 	}
 
-	private void AddNode(ICDSNode node)
+	private void AddNode(ICDSNodeInfo node)
 	{
 		if (_children == null)
 		{
-			_children = new ICDSNode[] { node };
+			_children = new ICDSNodeInfo[] { node };
 		}
 		else
 		{
@@ -168,18 +171,18 @@ internal sealed class CDSNode : ICDSNode
 		}
 	}
 
-	internal class NodeDictionary : IReadOnlyDictionary<string, ICDSNode>
+	internal class NodeDictionary : IReadOnlyDictionary<string, ICDSNodeInfo>
 	{
-		public readonly IEnumerable<ICDSNode> Nodes;
-		public NodeDictionary(IEnumerable<ICDSNode> nodes) => Nodes = nodes;
-		public ICDSNode this[string key] => Nodes.First(x => x.Name.Equals(key, StringComparison.OrdinalIgnoreCase));
+		public readonly IEnumerable<ICDSNodeInfo> Nodes;
+		public NodeDictionary(IEnumerable<ICDSNodeInfo> nodes) => Nodes = nodes;
+		public ICDSNodeInfo this[string key] => Nodes.First(x => x.Name.Equals(key, StringComparison.OrdinalIgnoreCase));
 		public IEnumerable<string> Keys => Nodes.Select(x => x.Name);
-		public IEnumerable<ICDSNode> Values => Nodes;
-		public int Count => (Nodes as ICDSNode[])?.Length ?? Nodes.Count();
+		public IEnumerable<ICDSNodeInfo> Values => Nodes;
+		public int Count => (Nodes as ICDSNodeInfo[])?.Length ?? Nodes.Count();
 		public bool ContainsKey(string key) => Nodes.Any(x => x.Name.Equals(key, StringComparison.OrdinalIgnoreCase));
-		public IEnumerator<KeyValuePair<string, ICDSNode>> GetEnumerator()
+		public IEnumerator<KeyValuePair<string, ICDSNodeInfo>> GetEnumerator()
 			=> Nodes.Select(x => KeyValuePair.Create(x.Name, x)).GetEnumerator();
-		public bool TryGetValue(string key, [MaybeNullWhen(false)] out ICDSNode value)
+		public bool TryGetValue(string key, [MaybeNullWhen(false)] out ICDSNodeInfo value)
 		{
 			value = Nodes.FirstOrDefault(x => x.Name.Equals(key, StringComparison.OrdinalIgnoreCase));
 			return value != null;

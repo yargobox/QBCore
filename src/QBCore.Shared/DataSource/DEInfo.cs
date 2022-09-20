@@ -133,13 +133,13 @@ public abstract class DEInfo : IComparable<DEInfo>, IEquatable<DEInfo>
 		throw new ArgumentException(nameof(memberInfo));
 	}
 
-	public static DEInfo GetDataEntry(LambdaExpression memberSelector, IDataLayerInfo dataLayer)
+	public static DEInfo GetDataEntry(LambdaExpression memberSelector, IDataLayerInfo? dataLayer = null)
 	{
 		return GetDataEntryOrDefault(memberSelector, dataLayer)
 			?? throw new InvalidOperationException($"The document type '{memberSelector.Parameters[0].Type.ToPretty()}' does not have the specified data entry '{memberSelector.GetMemberName()}'.");
 	}
 
-	public static DEInfo? GetDataEntryOrDefault(LambdaExpression memberSelector, IDataLayerInfo dataLayer)
+	public static DEInfo? GetDataEntryOrDefault(LambdaExpression memberSelector, IDataLayerInfo? dataLayer = null)
 	{
 		if (memberSelector == null)
 		{
@@ -162,44 +162,46 @@ public abstract class DEInfo : IComparable<DEInfo>, IEquatable<DEInfo>
 			throw new ArgumentException($"The lambda expression parameter must be of type '{documentType.ToPretty()}' or vice versa.", nameof(memberSelector));
 		}
 
-		return DataSourceDocuments.GetOrRegister(documentType, dataLayer).Value.DataEntries.GetValueOrDefault(memberInfos[0].Name);
+		var documentInfo = dataLayer != null
+			? DataSourceDocuments.GetOrRegister(documentType, dataLayer).Value
+			: DataSourceDocuments.Collection[documentType].Value;
+
+		return documentInfo.DataEntries.GetValueOrDefault(memberInfos[0].Name);
 	}
 
-	public static DEInfo GetDataEntry(MemberInfo memberInfo, IDataLayerInfo dataLayer)
+	public static DEInfo GetDataEntry(MemberInfo memberInfo, IDataLayerInfo? dataLayer = null)
 	{
 		return GetDataEntryOrDefault(memberInfo, dataLayer)
 			?? throw new InvalidOperationException($"The document type '{memberInfo.GetPropertyOrFieldDeclaringType().ToPretty()}' does not have the specified data entry '{memberInfo.Name}'.");
 	}
 
-	public static DEInfo? GetDataEntryOrDefault(MemberInfo memberInfo, IDataLayerInfo dataLayer)
+	public static DEInfo? GetDataEntryOrDefault(MemberInfo memberInfo, IDataLayerInfo? dataLayer = null)
 	{
 		var documentType = memberInfo.GetPropertyOrFieldDeclaringType();
-		var documentInfo = DataSourceDocuments.GetOrRegister(documentType, dataLayer);
-		return documentInfo.Value.DataEntries.GetValueOrDefault(memberInfo.Name);
+		var documentInfo = dataLayer != null
+			? DataSourceDocuments.GetOrRegister(documentType, dataLayer).Value
+			: DataSourceDocuments.Collection[documentType].Value;
+		return documentInfo.DataEntries.GetValueOrDefault(memberInfo.Name);
 	}
 
-	public static DEInfo GetDataEntryInfo<TDocument>(string propertyOrFieldName, IDataLayerInfo dataLayer)
+	public static DEInfo GetDataEntryInfo<TDocument>(string propertyOrFieldName, IDataLayerInfo? dataLayer = null)
 	{
 		return GetDataEntry(typeof(TDocument), propertyOrFieldName, dataLayer);
 	}
 
-	public static DEInfo? GetDataEntryOrDefault<TDocument>(string propertyOrFieldName, IDataLayerInfo dataLayer)
+	public static DEInfo? GetDataEntryOrDefault<TDocument>(string propertyOrFieldName, IDataLayerInfo? dataLayer = null)
 	{
 		return GetDataEntryOrDefault(typeof(TDocument), propertyOrFieldName, dataLayer);
 	}
 
-	public static DEInfo GetDataEntry(Type documentType, string propertyOrFieldName, IDataLayerInfo dataLayer)
+	public static DEInfo GetDataEntry(Type documentType, string propertyOrFieldName, IDataLayerInfo? dataLayer = null)
 	{
 		return GetDataEntryOrDefault(documentType, propertyOrFieldName, dataLayer)
 			?? throw new InvalidOperationException($"The document type '{documentType.ToPretty()}' does not have the specified data entry '{propertyOrFieldName}'.");
 	}
 
-	public static DEInfo? GetDataEntryOrDefault(Type documentType, string propertyOrFieldName, IDataLayerInfo dataLayer)
+	public static DEInfo? GetDataEntryOrDefault(Type documentType, string propertyOrFieldName, IDataLayerInfo? dataLayer = null)
 	{
-		if (dataLayer == null)
-		{
-			throw new ArgumentNullException(nameof(dataLayer));
-		}
 		if (documentType == null)
 		{
 			throw new ArgumentNullException(nameof(documentType));
@@ -209,22 +211,20 @@ public abstract class DEInfo : IComparable<DEInfo>, IEquatable<DEInfo>
 			throw new ArgumentNullException(nameof(propertyOrFieldName));
 		}
 
-		var documentInfo = DataSourceDocuments.GetOrRegister(documentType, dataLayer);
-		return documentInfo.Value.DataEntries.GetValueOrDefault(propertyOrFieldName);
+		var documentInfo = dataLayer != null
+			? DataSourceDocuments.GetOrRegister(documentType, dataLayer).Value
+			: DataSourceDocuments.Collection[documentType].Value;
+		return documentInfo.DataEntries.GetValueOrDefault(propertyOrFieldName);
 	}
 
-	public static DEInfo GetDataEntry(Type documentType, string propertyOrFieldName, bool ignoreCase, IDataLayerInfo dataLayer)
+	public static DEInfo GetDataEntry(Type documentType, string propertyOrFieldName, bool ignoreCase, IDataLayerInfo? dataLayer = null)
 	{
 		return GetDataEntryOrDefault(documentType, propertyOrFieldName,ignoreCase, dataLayer)
 			?? throw new InvalidOperationException($"The document type '{documentType.ToPretty()}' does not have the specified data entry '{propertyOrFieldName}'.");
 	}
 
-	public static DEInfo? GetDataEntryOrDefault(Type documentType, string propertyOrFieldName, bool ignoreCase, IDataLayerInfo dataLayer)
+	public static DEInfo? GetDataEntryOrDefault(Type documentType, string propertyOrFieldName, bool ignoreCase, IDataLayerInfo? dataLayer = null)
 	{
-		if (dataLayer == null)
-		{
-			throw new ArgumentNullException(nameof(dataLayer));
-		}
 		if (documentType == null)
 		{
 			throw new ArgumentNullException(nameof(documentType));
@@ -234,26 +234,28 @@ public abstract class DEInfo : IComparable<DEInfo>, IEquatable<DEInfo>
 			throw new ArgumentNullException(nameof(propertyOrFieldName));
 		}
 
-		var documentInfo = DataSourceDocuments.GetOrRegister(documentType, dataLayer);
+		var documentInfo = dataLayer != null
+			? DataSourceDocuments.GetOrRegister(documentType, dataLayer).Value
+			: DataSourceDocuments.Collection[documentType].Value;
 		if (ignoreCase)
 		{
-			var de = documentInfo.Value.DataEntries.GetValueOrDefault(propertyOrFieldName);
+			var de = documentInfo.DataEntries.GetValueOrDefault(propertyOrFieldName);
 			if (de != null)
 			{
 				return de;
 			}
 			
-			var key = documentInfo.Value.DataEntries.Keys.FirstOrDefault(x => x.Equals(propertyOrFieldName, StringComparison.OrdinalIgnoreCase));
+			var key = documentInfo.DataEntries.Keys.FirstOrDefault(x => x.Equals(propertyOrFieldName, StringComparison.OrdinalIgnoreCase));
 			if (key != null)
 			{
-				return documentInfo.Value.DataEntries[key];
+				return documentInfo.DataEntries[key];
 			}
 
 			return null;
 		}
 		else
 		{
-			return documentInfo.Value.DataEntries.GetValueOrDefault(propertyOrFieldName);
+			return documentInfo.DataEntries.GetValueOrDefault(propertyOrFieldName);
 		}
 	}
 }

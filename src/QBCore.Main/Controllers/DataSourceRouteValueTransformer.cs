@@ -7,24 +7,16 @@ namespace QBCore.Controllers;
 
 public class DataSourceRouteValueTransformer : DynamicRouteValueTransformer
 {
-	protected HashSet<string> DataSourceControllerNames;
-
 	public DataSourceRouteValueTransformer()
 	{
-		if (!AddQBCoreExtensions.IsAddQBCoreCalled)
+		if (!ExtensionsForAddQBCore.IsAddQBCoreCalled)
 		{
-			throw new InvalidOperationException(nameof(AddQBCoreExtensions.AddQBCore) + " must be called first.");
+			throw new InvalidOperationException(nameof(ExtensionsForAddQBCore.AddQBCore) + " must be called first.");
 		}
-		if (!AddQBCoreExtensions.IsDataSourceControllerRouteConventionCreated)
+		if (!ExtensionsForAddQBCore.IsDataSourceControllerRouteConventionCreated)
 		{
 			throw new InvalidOperationException(nameof(DataSourceControllerRouteConvention) + " must be applied first.");
 		}
-
-		var dataSourceControllerNames = StaticFactory.DataSources.Values
-			.Where(x => !string.IsNullOrEmpty(x.ControllerName))
-			.Select(x => x.ControllerName!);
-
-		DataSourceControllerNames = new HashSet<string>(dataSourceControllerNames, StringComparer.OrdinalIgnoreCase);
 	}
 
 	public override async ValueTask<RouteValueDictionary> TransformAsync(HttpContext httpContext, RouteValueDictionary values)
@@ -35,14 +27,14 @@ public class DataSourceRouteValueTransformer : DynamicRouteValueTransformer
 		{
 			return values;
 		}
-		if (!DataSourceControllerNames.Contains(controllerName))
+		if (!StaticFactory.AppObjectByControllerNames.ContainsKey(controllerName))
 		{
 			return values;
 		}
 
 		// check c0 (root) controller
 		var rootControllerName = values.GetValueOrDefault("c0") as string;
-		if (rootControllerName != null && !DataSourceControllerNames.Contains(rootControllerName))
+		if (rootControllerName != null && !StaticFactory.AppObjectByControllerNames.ContainsKey(rootControllerName))
 		{
 			return values;
 		}

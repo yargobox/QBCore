@@ -1,6 +1,6 @@
 using System.Net;
 using Example1.API.Models;
-using Example1.BLL.Exceptions;
+using QBCore.Controllers;
 
 namespace Example1.API.Middlewares;
 

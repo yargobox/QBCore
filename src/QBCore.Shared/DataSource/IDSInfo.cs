@@ -1,11 +1,10 @@
 using QBCore.DataSource.QueryBuilder;
+using QBCore.ObjectFactory;
 
 namespace QBCore.DataSource;
 
-public interface IDSInfo
+public interface IDSInfo : IAppObjectInfo
 {
-	string Name { get; }
-
 	DSTypeInfo DSTypeInfo { get; }
 	Type DataSourceServiceType { get; }
 
@@ -25,6 +24,5 @@ public interface IDSInfo
 
 	bool IsServiceSingleton { get; }
 
-	string? ControllerName { get; }
-	bool? IsAutoController { get; }
+	bool BuildAutoController { get; }
 }

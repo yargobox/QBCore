@@ -7,7 +7,7 @@ namespace QBCore.DataSource;
 
 internal sealed class CDSNodeBuilder : ICDSNodeBuilder
 {
-	private readonly CDSNode _node;
+	private readonly CDSNodeInfo _node;
 
 	public string Name => _node.Name;
 	public Type DataSourceType => _node.DataSourceType;
@@ -19,9 +19,9 @@ internal sealed class CDSNodeBuilder : ICDSNodeBuilder
 	public IReadOnlyDictionary<string, ICDSNodeBuilder> Parents => new NodeDictionary(_node.Parents);
 	public IReadOnlyDictionary<string, ICDSNodeBuilder> Children => new NodeDictionary(_node.Children);
 
-	public CDSNodeBuilder(ICDSNode node) => _node = (CDSNode)node;
+	public CDSNodeBuilder(ICDSNodeInfo node) => _node = (CDSNodeInfo)node;
 
-	public ICDSNode AsNode() => _node;
+	public ICDSNodeInfo AsNode() => _node;
 
 	public ICDSNodeBuilder AddNode<TDataSource>() where TDataSource : IDataSource
 	{
@@ -58,8 +58,8 @@ internal sealed class CDSNodeBuilder : ICDSNodeBuilder
 
 	internal class NodeDictionary : IReadOnlyDictionary<string, ICDSNodeBuilder>
 	{
-		public readonly IReadOnlyDictionary<string, ICDSNode> Nodes;
-		public NodeDictionary(IReadOnlyDictionary<string, ICDSNode> nodes) => Nodes = nodes;
+		public readonly IReadOnlyDictionary<string, ICDSNodeInfo> Nodes;
+		public NodeDictionary(IReadOnlyDictionary<string, ICDSNodeInfo> nodes) => Nodes = nodes;
 		public ICDSNodeBuilder this[string key] => new CDSNodeBuilder(Nodes[key]);
 		public IEnumerable<string> Keys => Nodes.Keys;
 		public IEnumerable<ICDSNodeBuilder> Values => Nodes.Values.Select(x => new CDSNodeBuilder(x));
@@ -69,7 +69,7 @@ internal sealed class CDSNodeBuilder : ICDSNodeBuilder
 			=> Nodes.Select(x => KeyValuePair.Create(x.Key, (ICDSNodeBuilder)new CDSNodeBuilder(x.Value))).GetEnumerator();
 		public bool TryGetValue(string key, [MaybeNullWhen(false)] out ICDSNodeBuilder value)
 		{
-			ICDSNode? node;
+			ICDSNodeInfo? node;
 			if (Nodes.TryGetValue(key, out node))
 			{
 				value = new CDSNodeBuilder(node);

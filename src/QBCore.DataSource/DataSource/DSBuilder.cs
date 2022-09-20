@@ -61,24 +61,24 @@ internal sealed class DSBuilder : IDSBuilder
 		}
 	}
 
-	public bool? IsAutoController
+	public bool? BuildAutoController
 	{
 		get => _isAutoController;
 		set
 		{
 			if (_isAutoController != null)
-				throw new InvalidOperationException($"DataSource '{ConcreteType.ToPretty()}' builder option '{nameof(IsAutoController)}' is already set.");
+				throw new InvalidOperationException($"DataSource '{ConcreteType.ToPretty()}' builder option '{nameof(BuildAutoController)}' is already set.");
 			_isAutoController = value;
 		}
 	}
 	public string? ControllerName
 	{
-		get => _controllerName;
+		get => _webName;
 		set
 		{
-			if (_controllerName != null)
+			if (_webName != null)
 				throw new InvalidOperationException($"DataSource '{ConcreteType.ToPretty()}' builder option '{nameof(ControllerName)}' is already set.");
-			_controllerName = value;
+			_webName = value;
 		}
 	}
 
@@ -178,7 +178,7 @@ internal sealed class DSBuilder : IDSBuilder
 	private bool? _isServiceSingleton;
 
 	private bool? _isAutoController;
-	private string? _controllerName;
+	private string? _webName;
 
 	private string? _dataContextName;
 

@@ -15,13 +15,25 @@ internal sealed class CDSBuilder : ICDSBuilder
 		}
 	}
 
+	public string? ControllerName
+	{
+		get => _webName;
+		set
+		{
+			if (_webName != null)
+				throw new InvalidOperationException($"Complex datasource '{ConcreteType.ToPretty()}' builder option '{nameof(ControllerName)}' is already set.");
+			_webName = value;
+		}
+	}
+
 	public ICDSNodeBuilder NodeBuilder { get; }
 
 	private string? _name;
+	private string? _webName;
 
 	public CDSBuilder(Type concreteType)
 	{
 		ConcreteType = concreteType;
-		NodeBuilder = new CDSNodeBuilder(new CDSNode());
+		NodeBuilder = new CDSNodeBuilder(new CDSNodeInfo());
 	}
 }

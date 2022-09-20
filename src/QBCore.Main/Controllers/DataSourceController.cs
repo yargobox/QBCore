@@ -2,11 +2,14 @@ using System.ComponentModel.DataAnnotations;
 using System.Text.Json;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Routing;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using QBCore.Controllers.Helpers;
 using QBCore.Controllers.Models;
 using QBCore.DataSource;
 using QBCore.DataSource.Options;
+using QBCore.ObjectFactory;
 
 namespace QBCore.Controllers;
 
@@ -14,12 +17,16 @@ namespace QBCore.Controllers;
 public class DataSourceController<TKey, TDocument, TCreate, TSelect, TUpdate, TDelete, TRestore, TDataSource> : ControllerBase
 	where TDataSource : IDataSource<TKey, TDocument, TCreate, TSelect, TUpdate, TDelete, TRestore>
 {
-	protected ILogger<TDataSource> _logger;
-	protected TDataSource _service;
+	protected readonly IServiceProvider _serviceProvider;
+	protected readonly IDSRequestContext _requestContext;
+	protected readonly ILogger<TDataSource> _logger;
+	protected TDataSource _ds => (TDataSource)_requestContext.Request.DS;
+	protected IComplexDataSource? _cds => _requestContext.Request.CDS;
 
-	public DataSourceController(TDataSource service, ILogger<TDataSource> logger)
+	public DataSourceController(IServiceProvider serviceProvider, IDSRequestContext requestContext, ILogger<TDataSource> logger)
 	{
-		_service = service;
+		_serviceProvider = serviceProvider;
+		_requestContext = requestContext;
 		_logger = logger;
 	}
 
@@ -29,31 +36,33 @@ public class DataSourceController<TKey, TDocument, TCreate, TSelect, TUpdate, TD
 		[FromQuery, MaxLength(7)] string? mode,
 		[FromQuery, MaxLength(8192)] string? filter,
 		[FromQuery, MaxLength(2048)] string? sort,
-		[FromQuery, Range(1, int.MaxValue)] int? size,
-		[FromQuery, Range(1, int.MaxValue)] int? num)
+		[FromQuery, Range(1, int.MaxValue)] int? psize,
+		[FromQuery, Range(1, int.MaxValue)] int? pnum)
 	{
+		_requestContext.Request = new DSWebRequest(_serviceProvider, ControllerContext);
+
 		long skip = 0;
-		if (size != null)
+		if (psize != null)
 		{
-			if (num == null)
+			if (pnum == null)
 			{
-				throw new ArgumentNullException(nameof(num));
+				throw new ArgumentNullException(nameof(pnum));
 			}
-			skip = (long)size.Value * (num.Value - 1);
+			skip = (long)psize.Value * (pnum.Value - 1);
 		}
-		else if (num != null)
+		else if (pnum != null)
 		{
-			throw new ArgumentNullException(nameof(size));
+			throw new ArgumentNullException(nameof(psize));
 		}
 
 		var softDelMode = SoftDelHelper.Parse(mode);
-		var filterConditions = FOHelper.SerializeFromString<TSelect>(filter, _service.DSInfo.QBFactory.DataLayer);
-		var sortOrders = SOHelper.SerializeFromString<TSelect>(sort, _service.DSInfo.QBFactory.DataLayer);
+		var filterConditions = FOHelper.SerializeFromString<TSelect>(filter, _ds.DSInfo.QBFactory.DataLayer);
+		var sortOrders = SOHelper.SerializeFromString<TSelect>(sort, _ds.DSInfo.QBFactory.DataLayer);
 
 		var dataSourceResponse = new DataSourceResponse<TSelect>
 		{
-			PageSize = size ?? -1,
-			PageNumber = num ?? -1
+			PageSize = psize ?? -1,
+			PageNumber = pnum ?? -1
 		};
 		var options = new DataSourceSelectOptions
 		{
@@ -62,7 +71,7 @@ public class DataSourceController<TKey, TDocument, TCreate, TSelect, TUpdate, TD
 		};
 
 		dataSourceResponse.Data =
-			await ( await _service.SelectAsync(softDelMode, filterConditions, sortOrders, null, skip, num ?? -1, options) )
+			await ( await _ds.SelectAsync(softDelMode, filterConditions, sortOrders, null, skip, pnum ?? -1, options) )
 				.ToListAsync((bool x) => dataSourceResponse.IsLastPage = x ? 1 : 0);
 
 		return Ok(dataSourceResponse);
@@ -80,23 +89,27 @@ public class DataSourceController<TKey, TDocument, TCreate, TSelect, TUpdate, TD
 	[HttpGet("{id}"), ActionName("get")]
 	public async Task<ActionResult<TSelect?>> GetAsync(TKey id)
 	{
+		_requestContext.Request = new DSWebRequest(_serviceProvider, ControllerContext);
+
 		var options = new DataSourceSelectOptions
 		{
 			QueryStringCallback = x => Console.WriteLine(x)//!!!
 		};
 
-		return await _service.SelectAsync(id, null, options);
+		return await _ds.SelectAsync(id, null, options);
 	}
 
 	[HttpPost, ActionName("create")/* , ValidateAntiForgeryToken */]
 	public async Task<ActionResult<TKey>> CreateAsync([FromBody] TCreate model, [FromQuery, Range(0, 1)] int? depends)
 	{
+		_requestContext.Request = new DSWebRequest(_serviceProvider, ControllerContext);
+
 		var options = new DataSourceInsertOptions
 		{
 			QueryStringCallback = x => Console.WriteLine(x)//!!!
 		};
 
-		var id = await _service.InsertAsync(model, null, options);
+		var id = await _ds.InsertAsync(model, null, options);
 		return CreatedAtAction("create", new { id = id });
 
 /*		Console.WriteLine(ControllerContext.ActionDescriptor.ActionName);
@@ -108,36 +121,42 @@ public class DataSourceController<TKey, TDocument, TCreate, TSelect, TUpdate, TD
 	[HttpPut("{id}"), ActionName("update")]
 	public async Task<ActionResult> UpdateAsync(TKey id, [FromBody] TUpdate model, [FromQuery, Range(0, 1)] int? depends)
 	{
+		_requestContext.Request = new DSWebRequest(_serviceProvider, ControllerContext);
+
 		var options = new DataSourceUpdateOptions
 		{
 			QueryStringCallback = x => Console.WriteLine(x)//!!!
 		};
 
-		await _service.UpdateAsync(id, model, null, null, options);
+		await _ds.UpdateAsync(id, model, null, null, options);
 		return Ok();
 	}
 
 	[HttpDelete("{id}"), ActionName("delete")]
 	public async Task<ActionResult> DeleteAsync(TKey id, [FromBody] TDelete? model)
 	{
+		_requestContext.Request = new DSWebRequest(_serviceProvider, ControllerContext);
+
 		var options = new DataSourceDeleteOptions
 		{
 			QueryStringCallback = x => Console.WriteLine(x)//!!!
 		};
 
-		await _service.DeleteAsync(id, model, null, options);
+		await _ds.DeleteAsync(id, model, null, options);
 		return Ok();
 	}
 
 	[HttpPatch("{id}"), ActionName("restore")]
 	public async Task<ActionResult> RestoreAsync(TKey id, [FromBody] TRestore? model)
 	{
+		_requestContext.Request = new DSWebRequest(_serviceProvider, ControllerContext);
+
 		var options = new DataSourceRestoreOptions
 		{
 			QueryStringCallback = x => Console.WriteLine(x)//!!!
 		};
 
-		await _service.RestoreAsync(id, model, null, options);
+		await _ds.RestoreAsync(id, model, null, options);
 		return Ok();
 	}
 }

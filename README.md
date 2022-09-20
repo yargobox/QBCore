@@ -6,12 +6,12 @@ QBCore is short for **Q**uery **B**uilder **Core**. This is an attempt to bring 
 
 ### QUERY VARIABLES
 
-- `_de`	- Soft delete mode if any
-- `_fl`	- Filter
-- `_so`	- Sort order
-- `_ps`	- Page size
-- `_pn`	- Page number
-- `_dp`	- Process document field dependencies on the server side (insert or update is not performed in this case)
+- `mode`	- Soft delete mode if any
+- `filter`	- Filter
+- `sort`	- Sort order
+- `psize`	- Page size
+- `pnum`	- Page number
+- `depends`	- Process document field dependencies on the server side (insert or update is not performed in this case)
 
 
 ### DATASOURCE ROUTING
@@ -29,12 +29,12 @@ product { product_id, brand_id }
 
 ```
 GET, POST                   /api/product
-POST                        /api/product?_dp=1
+POST                        /api/product?depends=1
 GET, PUT, DELETE, PATCH     /api/product/{product_id}
-PUT                         /api/product/{product_id}?_dp=1
+PUT                         /api/product/{product_id}?depends=1
 GET                         /api/product/filter/brand_id/brand/
 GET                         /api/product/filter/brand_id/brand/{brand_id}
-GET                         /api/product/cell/brand_id/brand/?_fl=product_id={product_id};depend1={depend1};depend2={depend2};...
+GET                         /api/product/cell/brand_id/brand/?filter=product_id={product_id};depend1={depend1};depend2={depend2};...
 GET                         /api/product/cell/brand_id/brand/{brand_id}
 ```
 
@@ -64,41 +64,41 @@ store-sales:                                                    // CDS
 
 ```
 GET, POST                  /api/store-sales
-POST                       /api/store-sales?_dp=1
+POST                       /api/store-sales?depends=1
 GET                        /api/store-sales/filter/region_id/region
 GET                        /api/store-sales/filter/region_id/region/{region_id}
-GET                        /api/store-sales/cell/region_id/region?_fl=stock.depend1={depend1};stock.depend2={depend2};...
+GET                        /api/store-sales/cell/region_id/region?filter=stock.depend1={depend1};stock.depend2={depend2};...
 GET                        /api/store-sales/cell/region_id/region/{region_id}
 GET, PUT, DELETE, PATCH    /api/store-sales/{store_id}
-PUT                        /api/store-sales/{store_id}?_dp=1
+PUT                        /api/store-sales/{store_id}?depends=1
 GET, POST                  /api/store-sales/{store_id}/order
-POST                       /api/store-sales/{store_id}/order?_dp=1
+POST                       /api/store-sales/{store_id}/order?depends=1
 GET, PUT, DELETE, PATCH    /api/store-sales/{store_id}/order/{order_id}
-PUT                        /api/store-sales/{store_id}/order/{order_id}?_dp=1
+PUT                        /api/store-sales/{store_id}/order/{order_id}?depends=1
 
 GET, POST                  /api/store-sales/{store_id}/order/{order_id}/position
-POST                       /api/store-sales/{store_id}/order/{order_id}/position?_dp=1
+POST                       /api/store-sales/{store_id}/order/{order_id}/position?depends=1
 GET, PUT, DELETE, PATCH    /api/store-sales/{store_id}/order/{order_id}/position/{position_id}
-PUT                        /api/store-sales/{store_id}/order/{order_id}/position/{position_id}?_dp=1
+PUT                        /api/store-sales/{store_id}/order/{order_id}/position/{position_id}?depends=1
 
-GET                        /api/store-sales/{store_id}/order/{order_id}/position/filter/carrier_id/carrier?_fl=stock.region_id={region_id}
+GET                        /api/store-sales/{store_id}/order/{order_id}/position/filter/carrier_id/carrier?filter=stock.region_id={region_id}
 GET                        /api/store-sales/{store_id}/order/{order_id}/position/filter/carrier_id/carrier/{carrier_id}
-GET                        /api/store-sales/{store_id}/order/{order_id}/position/cell/carrier_id/carrier?_fl=stock.region_id={region_id}
+GET                        /api/store-sales/{store_id}/order/{order_id}/position/cell/carrier_id/carrier?filter=stock.region_id={region_id}
 GET                        /api/store-sales/{store_id}/order/{order_id}/position/cell/carrier_id/carrier/{carrier_id}
 
 GET, POST                  /api/store-sales/_/other-root
-POST                       /api/store-sales/_/other-root?_dp=1
+POST                       /api/store-sales/_/other-root?depends=1
 GET, PUT, DELETE, PATCH    /api/store-sales/_/other-root/{other-root_id}
-PUT                        /api/store-sales/_/other-root/{other-root_id}?_dp=1
+PUT                        /api/store-sales/_/other-root/{other-root_id}?depends=1
 
-GET                        /api/store-sales/_/supplier?_fl=stock.region_id={region_id}
+GET                        /api/store-sales/_/supplier?filter=stock.region_id={region_id}
 POST                       /api/store-sales/_/supplier
-POST                       /api/store-sales/_/supplier?_dp=1
+POST                       /api/store-sales/_/supplier?depends=1
 GET, PUT, DELETE, PATCH    /api/store-sales/_/supplier/{supplier_id}
-PUT                        /api/store-sales/_/supplier/{supplier_id}?_dp=1
+PUT                        /api/store-sales/_/supplier/{supplier_id}?depends=1
 
-GET                        /api/store-sales/{store_id}/available_carrier?_fl=stock.region_id={region_id}
-GET                        /api/store-sales/{store_id}/available_carrier/{carrier_id}?_fl=stock.region_id={region_id}
+GET                        /api/store-sales/{store_id}/available_carrier?filter=stock.region_id={region_id}
+GET                        /api/store-sales/{store_id}/available_carrier/{carrier_id}?filter=stock.region_id={region_id}
 ```
 
 #### CRUD
@@ -112,7 +112,7 @@ GET                        /api/store-sales/{store_id}/available_carrier/{carrie
 
 #### Using of query variables
 
-- `GET /api/product?_de=1&_fl=name~tea&_so=created,2;name,1&_ps=20&_pn=1` - Read deleted products whose 'name' contains 'tea', sort descending by 'created' and then ascending by 'name', take the 1st page of 20 rows.
+- `GET /api/product?mode=1&filter=name~tea&sort=created,2;name,1&psize=20&pnum=1` - Read deleted products whose 'name' contains 'tea', sort descending by 'created' and then ascending by 'name', take the 1st page of 20 rows.
 
 #### Process dependencies (filter-by-self, filter-by-parent)
 
@@ -130,20 +130,20 @@ Client-side dependencies are implemented with javascript, while server-side ones
 
 In filter-by-self dependencies, the dependent field depends on other fields in the document. In filter-by-parent dependencies, the dependent field depends on other fields from its parent documents in the CDS.
 
-- `POST /api/product?_dp=1` - Must be sent by the client to retrieve the fields in the inserted document that depend on other fields in that document after they have been modified by the user. For example, the "product_color" field should be refreshed to the default product color when changing the "product_id" in the order item card for insert.
-- `PUT /api/product/{product_id}?_dp=1` - Same as above but for update.
+- `POST /api/product?depends=1` - Must be sent by the client to retrieve the fields in the inserted document that depend on other fields in that document after they have been modified by the user. For example, the "product_color" field should be refreshed to the default product color when changing the "product_id" in the order item card for insert.
+- `PUT /api/product/{product_id}?depends=1` - Same as above but for update.
 
 #### Filter for reference field
 
 - `GET /api/product/filter/brand_id/brand/` - Read brands to make a brand filter in the products.
 - `GET /api/product/filter/brand_id/brand/{brand_id}` - Read a specified brand for a brand filter in the products.
 - `GET /api/store-sales/filter/region_id/region/{region_id}` - Read regions to make a region filter in the stores.
-- `GET /api/store-sales/{store_id}/order/{order_id}/position/filter/carrier_id/carrier?_fl=stock.region_id={region_id}` - Read carriers to make a carrier filter in the carriers. This filter has constraints from the parent nodes on the 'store_id' and 'region_id' fields.
+- `GET /api/store-sales/{store_id}/order/{order_id}/position/filter/carrier_id/carrier?filter=stock.region_id={region_id}` - Read carriers to make a carrier filter in the carriers. This filter has constraints from the parent nodes on the 'store_id' and 'region_id' fields.
 
 #### List for reference field (filter-by-self, filter-by-parent)
 
-- `GET /api/product/cell/brand_id/brand/?_fl=product_id={product_id};depend1={depend1};depend2={depend2};...` - Read brands to make a list (to choose a brand) in the product card for insert or update. The client must send current values of other document fields on which it depends (filter-by-self) or put them in the path (filter-by-parent) as below
-- `GET /api/store-sales/{store_id}/order/{order_id}/position/cell/carrier_id/carrier?_fl=stock.region_id={region_id}` - 'store_id' will be taken from the path and 'region_id' from the filter.
+- `GET /api/product/cell/brand_id/brand/?filter=product_id={product_id};depend1={depend1};depend2={depend2};...` - Read brands to make a list (to choose a brand) in the product card for insert or update. The client must send current values of other document fields on which it depends (filter-by-self) or put them in the path (filter-by-parent) as below
+- `GET /api/store-sales/{store_id}/order/{order_id}/position/cell/carrier_id/carrier?filter=stock.region_id={region_id}` - 'store_id' will be taken from the path and 'region_id' from the filter.
 
 #### Underscore instead of Id
 

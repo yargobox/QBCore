@@ -3,6 +3,7 @@ using AutoMapper;
 using Microsoft.Extensions.DependencyInjection;
 using QBCore.Configuration;
 using QBCore.DataSource.Options;
+using QBCore.DataSource.QueryBuilder;
 using QBCore.Extensions.Threading.Tasks;
 using QBCore.ObjectFactory;
 
@@ -16,7 +17,7 @@ public abstract partial class DataSource<TKey, TDocument, TCreate, TSelect, TUpd
 	IDisposable
 {
 	public IDSInfo DSInfo { get; }
-	public object SyncRoot => _syncRoot != null ? _syncRoot : Interlocked.CompareExchange(ref _syncRoot, new object(), null)!;
+	public object SyncRoot => _syncRoot ?? Interlocked.CompareExchange(ref _syncRoot, new object(), null) ?? _syncRoot;
 
 	private readonly IServiceProvider _serviceProvider;
 	private readonly IMapper _mapper;
@@ -86,6 +87,8 @@ public abstract partial class DataSource<TKey, TDocument, TCreate, TSelect, TUpd
 			result = (TDocument)(object)document!;
 			result = await qb.InsertAsync(result, options, cancellationToken).ConfigureAwait(false);
 		}
+
+		UpdateOutputParameters(parameters, builder.Parameters);
 
 		return (TKey) getId(result!)!;
 	}
@@ -288,6 +291,8 @@ public abstract partial class DataSource<TKey, TDocument, TCreate, TSelect, TUpd
 			result = (TDocument)(object)document!;
 			await qb.UpdateAsync(id!, result, modifiedFieldNames, options, cancellationToken).ConfigureAwait(false);
 		}
+
+		UpdateOutputParameters(parameters, builder.Parameters);
 	}
 
 	public async Task DeleteAsync(
@@ -332,6 +337,8 @@ public abstract partial class DataSource<TKey, TDocument, TCreate, TSelect, TUpd
 			}
 
 			await qb.DeleteAsync(id!, document, options, cancellationToken).ConfigureAwait(false);
+
+			UpdateOutputParameters(parameters, builder.Parameters);
 		}
 		else
 		{
@@ -362,6 +369,8 @@ public abstract partial class DataSource<TKey, TDocument, TCreate, TSelect, TUpd
 			}
 
 			await qb.DeleteAsync(id!, document, options, cancellationToken).ConfigureAwait(false);
+
+			UpdateOutputParameters(parameters, builder.Parameters);
 		}
 	}
 
@@ -405,5 +414,22 @@ public abstract partial class DataSource<TKey, TDocument, TCreate, TSelect, TUpd
 		}
 
 		await qb.RestoreAsync(id!, document, options, cancellationToken).ConfigureAwait(false);
+
+		UpdateOutputParameters(parameters, builder.Parameters);
+	}
+
+	private static void UpdateOutputParameters(IDictionary<string, object?>? parameters, IReadOnlyList<QBParameter> qbParameters)
+	{
+		if (parameters != null)
+		{
+			foreach (var param in qbParameters.Where(x => x.Direction.HasFlag(ParameterDirection.Output)))
+			{
+				parameters[param.Name] = param.HasValue
+					? param.Value
+					: param.IsNullable
+						? null
+						: param.UnderlyingType.GetDefaultValue();
+			}
+		}
 	}
 }

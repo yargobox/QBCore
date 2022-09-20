@@ -38,9 +38,9 @@ public static class DataSourceDocuments
 				// a new var for each type to do not mess up with types in the lambda expression below
 				var type = selectedType;
 				if (doc == null)
-					doc = registry.TryGetOrRegisterObject(type, x => new Lazy<DSDocumentInfo>(() => dataLayer.CreateDocumentInfo(type), LazyThreadSafetyMode.ExecutionAndPublication));
+					doc = registry.GetOrRegisterObject(type, x => new Lazy<DSDocumentInfo>(() => dataLayer.CreateDocumentInfo(type), LazyThreadSafetyMode.ExecutionAndPublication));
 				else
-					registry.TryGetOrRegisterObject(type, x => new Lazy<DSDocumentInfo>(() => dataLayer.CreateDocumentInfo(type), LazyThreadSafetyMode.ExecutionAndPublication));
+					registry.GetOrRegisterObject(type, x => new Lazy<DSDocumentInfo>(() => dataLayer.CreateDocumentInfo(type), LazyThreadSafetyMode.ExecutionAndPublication));
 			}
 
 			if (doc == null)

@@ -13,12 +13,12 @@ public class DataSourceControllerFeatureProvider : IApplicationFeatureProvider<C
 {
 	public void PopulateFeature(IEnumerable<ApplicationPart> parts, ControllerFeature feature)
 	{
-		if (!AddQBCoreExtensions.IsAddQBCoreCalled)
+		if (!ExtensionsForAddQBCore.IsAddQBCoreCalled)
 		{
-			throw new InvalidOperationException(nameof(AddQBCoreExtensions.AddQBCore) + " must be called first.");
+			throw new InvalidOperationException(nameof(ExtensionsForAddQBCore.AddQBCore) + " must be called first.");
 		}
 
-		foreach (var info in StaticFactory.DataSources.Values.Where(x => x.IsAutoController == true))
+		foreach (var info in StaticFactory.DataSources.Values.Where(x => x.BuildAutoController))
 		{
 			var dataSourceControllerType = typeof(DataSourceController<,,,,,,,>).MakeGenericType(
 				info.DSTypeInfo.TKey,
