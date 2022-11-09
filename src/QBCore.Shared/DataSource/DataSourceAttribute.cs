@@ -5,7 +5,6 @@ public sealed class DataSourceAttribute : Attribute
 {
 	public string? Name { get; }
 	public Type? ServiceInterface { get; init; }
-	public Type? Listener { get; init; }
 	public DataSourceOptions? Options { get; init; }
 	public bool? IsServiceSingleton { get; init; }
 	public string? DataContextName { get; init; }

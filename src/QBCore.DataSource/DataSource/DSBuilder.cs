@@ -1,3 +1,5 @@
+using System.Collections;
+
 namespace QBCore.DataSource;
 
 internal sealed class DSBuilder : IDSBuilder
@@ -29,15 +31,9 @@ internal sealed class DSBuilder : IDSBuilder
 			_options = value;
 		}
 	}
-	public Type? Listener
+	public IList<Type> Listeners
 	{
 		get => _listener;
-		set
-		{
-			if (_listener != null)
-				throw new InvalidOperationException($"DataSource '{ConcreteType.ToPretty()}' builder option '{nameof(Listener)}' is already set.");
-			_listener = value;
-		}
 	}
 
 	public Type? ServiceInterface
@@ -172,7 +168,7 @@ internal sealed class DSBuilder : IDSBuilder
 
 	private string? _name;
 	private DataSourceOptions _options;
-	private Type? _listener;
+	private ListenerTypeList _listener;
 
 	private Type? _serviceInterface;
 	private bool? _isServiceSingleton;
@@ -193,5 +189,57 @@ internal sealed class DSBuilder : IDSBuilder
 	public DSBuilder(Type dataSourceConcreteType)
 	{
 		ConcreteType = dataSourceConcreteType;
+		_listener = new ListenerTypeList();
+	}
+
+	private sealed class ListenerTypeList : IList<Type>
+	{
+		public int Count => _list?.Count ?? 0;
+		bool ICollection<Type>.IsReadOnly => false;
+
+		private List<Type>? _list;
+
+		public Type this[int index]
+		{
+			get => _list?[index] ?? throw new IndexOutOfRangeException();
+			set => throw new InvalidOperationException($"Builder option '{nameof(IDSBuilder.Listeners)}' is already set.");
+		}
+
+		public IEnumerator<Type> GetEnumerator() => ((IEnumerable<Type>?)_list)?.GetEnumerator() ?? Enumerable.Empty<Type>().GetEnumerator();
+
+		IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
+
+		public void Add(Type listenerType)
+		{
+			if (listenerType == null) throw new ArgumentNullException(nameof(listenerType));
+			if (_list?.Contains(listenerType) == true) return;
+			if (listenerType.GetInterfaceOf(typeof(IDataSourceListener)) == null) throw new ArgumentException($"'{listenerType.ToPretty()}' is not '{typeof(IDataSourceListener).ToPretty()}'.", nameof(listenerType));
+
+			if (_list == null)
+			{
+				_list = new List<Type>(4);
+			}
+			
+			_list.Add(listenerType);
+		}
+
+		public int IndexOf(Type item) => _list?.IndexOf(item) ?? -1;
+
+		public void Insert(int index, Type item)
+		{
+			if (index != Count) throw new InvalidOperationException($"Builder option '{nameof(IDSBuilder.Listeners)}' is already set.");
+
+			Add(item);
+		}
+
+		public void RemoveAt(int index) => throw new InvalidOperationException($"Builder option '{nameof(IDSBuilder.Listeners)}' is already set.");
+
+		public void Clear() => throw new InvalidOperationException($"Builder option '{nameof(IDSBuilder.Listeners)}' is already set.");
+
+		public bool Contains(Type item) => _list?.Contains(item) ?? false;
+
+		public void CopyTo(Type[] array, int arrayIndex) => ((ICollection<Type>?)_list)?.CopyTo(array, arrayIndex);
+
+		public bool Remove(Type item) => throw new InvalidOperationException($"Builder option '{nameof(IDSBuilder.Listeners)}' is already set.");
 	}
 }

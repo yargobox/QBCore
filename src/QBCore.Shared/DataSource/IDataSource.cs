@@ -4,7 +4,10 @@ namespace QBCore.DataSource;
 
 public interface IDataSource
 {
+	DSKeyName OKeyName { get; }
 	IDSInfo DSInfo { get; }
+
+	void Init(DSKeyName? keyName = null, bool shared = true);
 }
 
 public interface IDataSource<TKey, TDocument, TCreate, TSelect, TUpdate, TDelete, TRestore> : IDataSource

@@ -25,16 +25,19 @@ public abstract partial class DataSource<TKey, TDocument, TCreate, TSelect, TUpd
 	{
 		if (disposing)
 		{
-			if (_listeners != null)
+			if (_colListeners != null)
 			{
 				AsyncHelper.RunSync(async () => await ClearListenersAsync().ConfigureAwait(false));
 			}
 
-			if (_listener != null)
+			if (_listeners != null)
 			{
-				AsyncHelper.RunSync(async () => await _listener.OnDetachAsync(this).ConfigureAwait(false));
-				DisposeObject(_listener);
-				_listener = null;
+				foreach (var listener in _listeners)
+				{
+					AsyncHelper.RunSync(async () => await listener.OnDetachAsync(this).ConfigureAwait(false));
+					DisposeObject(_colListeners);
+				}
+				_listeners = null;
 			}
 
 			//_serviceProvider = null!;
@@ -42,16 +45,19 @@ public abstract partial class DataSource<TKey, TDocument, TCreate, TSelect, TUpd
 	}
 	protected virtual async ValueTask DisposeAsyncCore()
 	{
-		if (_listeners != null)
+		if (_colListeners != null)
 		{
 			await ClearListenersAsync().ConfigureAwait(false);
 		}
 
-		if (_listener != null)
+		if (_listeners != null)
 		{
-			await _listener.OnDetachAsync(this).ConfigureAwait(false);
-			await DisposeObjectAsync(_listener).ConfigureAwait(false);
-			_listener = null;
+			foreach (var listener in _listeners)
+			{
+				await listener.OnDetachAsync(this).ConfigureAwait(false);
+				await DisposeObjectAsync(listener).ConfigureAwait(false);
+			}
+			_listeners = null;
 		}
 
 		//_serviceProvider = null!;

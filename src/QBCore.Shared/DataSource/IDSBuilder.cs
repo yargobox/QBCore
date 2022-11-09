@@ -9,7 +9,7 @@ public interface IDSBuilder
 	string? ControllerName { get; set; }
 
 	DataSourceOptions Options { get; set; }
-	Type? Listener { get; set; }
+	IList<Type> Listeners { get; }
 
 	Type? ServiceInterface { get; set; }
 	bool? IsServiceSingleton { get; set; }

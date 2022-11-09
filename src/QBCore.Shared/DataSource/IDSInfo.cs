@@ -20,7 +20,7 @@ public interface IDSInfo : IAppObjectInfo
 	string DataContextName { get; }
 
 	IQueryBuilderFactory QBFactory { get; }
-	Func<IServiceProvider, IDataSourceListener>? ListenerFactory { get; }
+	Func<IServiceProvider, IDataSourceListener>[]? Listeners { get; }
 
 	bool IsServiceSingleton { get; }
 
