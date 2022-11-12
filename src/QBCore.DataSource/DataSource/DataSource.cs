@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Data;
 using AutoMapper;
 using Microsoft.Extensions.DependencyInjection;
@@ -16,14 +17,17 @@ public abstract partial class DataSource<TKey, TDocument, TCreate, TSelect, TUpd
 	IAsyncDisposable,
 	IDisposable
 {
+	public DSKeyName OKeyName => _okeyName ?? throw new InvalidOperationException($"DataSource {DSInfo.Name} has not been initialized yet.");
 	public IDSInfo DSInfo { get; }
 	public object SyncRoot => _syncRoot ?? Interlocked.CompareExchange(ref _syncRoot, new object(), null) ?? _syncRoot;
 
 	private readonly IServiceProvider _serviceProvider;
 	private readonly IMapper _mapper;
 	private readonly IDataContext _dataContext;
-	protected DataSourceListener<TKey, TDocument, TCreate, TSelect, TUpdate, TDelete, TRestore>? _listener;
+	private DSKeyName? _okeyName;
+	protected List<DataSourceListener<TKey, TDocument, TCreate, TSelect, TUpdate, TDelete, TRestore>>? _listeners;
 	private object? _syncRoot;
+	protected ConcurrentDictionary<OKeyName, object?>? _internalObjects;
 
 	public DataSource(IServiceProvider serviceProvider, IDataContextProvider dataContextProvider)
 	{
@@ -33,11 +37,10 @@ public abstract partial class DataSource<TKey, TDocument, TCreate, TSelect, TUpd
 		_mapper = _serviceProvider.GetRequiredService<IMapper>();
 		_dataContext = dataContextProvider.GetDataContext(DSInfo.QBFactory.DataLayer.DatabaseContextInterface, DSInfo.DataContextName);
 
-		if (DSInfo.ListenerFactory != null)
-		{
-			_listener = (DataSourceListener<TKey, TDocument, TCreate, TSelect, TUpdate, TDelete, TRestore>) DSInfo.ListenerFactory(_serviceProvider);
-			AsyncHelper.RunSync(async () => await _listener.OnAttachAsync(this));
-		}
+		_listeners = DSInfo.Listeners?
+			.Select(ctor => ctor(_serviceProvider))
+			.Cast<DataSourceListener<TKey, TDocument, TCreate, TSelect, TUpdate, TDelete, TRestore>>()
+			.ToList();
 	}
 
 	public async Task<TKey> InsertAsync(

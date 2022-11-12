@@ -7,7 +7,8 @@ using QBCore.DataSource.QueryBuilder.Mongo;
 namespace Example1.BLL.Services;
 
 [DsApiController]
-[DataSource("brand", typeof(MongoDataLayer), DataSourceOptions.SoftDelete, Listener = typeof(BrandServiceListener))]
+[DsListeners(typeof(BrandServiceListener))]
+[DataSource("brand", typeof(MongoDataLayer), DataSourceOptions.SoftDelete)]
 public sealed class BrandService : DataSource<int?, Brand, BrandCreateDto, BrandSelectDto, BrandUpdateDto, SoftDelDto, SoftDelDto, BrandService>
 {
 	public BrandService(IServiceProvider serviceProvider, IDataContextProvider dataContextProvider) : base(serviceProvider, dataContextProvider) { }
@@ -21,7 +22,7 @@ public sealed class BrandService : DataSource<int?, Brand, BrandCreateDto, Brand
 		//builder.IsAutoController = true;
 		//builder.ControllerName = "[DS:guessPlural]";
 		//builder.IsServiceSingleton = false;
-		//builder.Listener = typeof(BrandServiceListener);
+		//builder.Listeners.Add(typeof(BrandServiceListener));
 		//builder.ServiceInterface = null;
 		//builder.InsertBuilder = BrandCreateDto.InsertBuilder;
 		//builder.SelectBuilder = BrandSelectDto.SelectBuilder;

@@ -29,7 +29,7 @@ internal sealed class DSInfo : IDSInfo
 	public string DataContextName { get; }
 
 	public IQueryBuilderFactory QBFactory { get; }
-	public Func<IServiceProvider, IDataSourceListener>? ListenerFactory { get; }
+	public Func<IServiceProvider, IDataSourceListener>[]? Listeners { get; }
 
 	public bool IsServiceSingleton { get; }
 
@@ -62,10 +62,20 @@ internal sealed class DSInfo : IDSInfo
 			building.Name = dataSourceAttr.Name;
 			building.Options = dataSourceAttr.Options ?? DataSourceOptions.None;
 			building.DataContextName = dataSourceAttr.DataContextName;
-			building.Listener = dataSourceAttr.Listener;
 			building.IsServiceSingleton = dataSourceAttr.IsServiceSingleton;
 			building.ServiceInterface = dataSourceAttr.ServiceInterface;
 			building.DataLayer = dataSourceAttr.DataLayer;
+		}
+
+		// Load fields from [DsListeners]
+		//
+		var listenersAttr = DSTypeInfo.Concrete.GetCustomAttribute<DsListenersAttribute>(false);
+		if (listenersAttr != null)
+		{
+			foreach (var listenerType in listenersAttr.Types)
+			{
+				building.Listeners.Add(listenerType);
+			}
 		}
 
 		// Load fields from [DsApiController]
@@ -268,9 +278,13 @@ internal sealed class DSInfo : IDSInfo
 
 		// Listener
 		//
-		if (building.Listener != null)
+		if (building.Listeners.Count > 0)
 		{
-			ListenerFactory = MakeListenerFactory(building.Listener);
+			Listeners = new Func<IServiceProvider, IDataSourceListener>[building.Listeners.Count];
+			for (int i = 0; i < building.Listeners.Count; i++)
+			{
+				Listeners[i] = MakeListenerFactoryMethod(building.Listeners[i]);
+			}
 		}
 	}
 
@@ -292,36 +306,56 @@ internal sealed class DSInfo : IDSInfo
 			.FirstOrDefault();
 	}
 
-	private Func<IServiceProvider, IDataSourceListener> MakeListenerFactory(Type listener)
+	private Func<IServiceProvider, IDataSourceListener> MakeListenerFactoryMethod(Type listenerType)
 	{
-		if (!listener.IsClass || listener.IsAbstract || listener.IsGenericType || listener.IsGenericTypeDefinition ||
-			!typeof(IDataSourceListener).IsAssignableFrom(listener) || Nullable.GetUnderlyingType(listener) != null)
+		if (!listenerType.IsClass || listenerType.IsAbstract ||
+			!typeof(IDataSourceListener).IsAssignableFrom(listenerType) || Nullable.GetUnderlyingType(listenerType) != null)
 		{
-			throw new InvalidOperationException($"Invalid datasource listener type {listener.ToPretty()}.");
+			throw new InvalidOperationException($"Invalid datasource listener type {listenerType.ToPretty()}.");
 		}
 
-		var type = listener.GetSubclassOf(typeof(DataSourceListener<,,,,,,>));
+		var type = listenerType.GetSubclassOf(typeof(DataSourceListener<,,,,,,>));
 		if (type == null)
 		{
-			throw new InvalidOperationException($"Invalid datasource listener type {listener.ToPretty()}.");
+			throw new InvalidOperationException($"Invalid datasource listener type {listenerType.ToPretty()}.");
 		}
 
 		var genericArgs = type.GetGenericArguments();
-		if (DSTypeInfo.TKey != genericArgs[0]
-			|| DSTypeInfo.TDocument != genericArgs[1]
-			|| DSTypeInfo.TCreate != genericArgs[2]
-			|| DSTypeInfo.TSelect != genericArgs[3]
-			|| DSTypeInfo.TUpdate != genericArgs[4]
-			|| DSTypeInfo.TDelete != genericArgs[5]
-			|| DSTypeInfo.TRestore != genericArgs[6])
+		if (listenerType.IsGenericTypeDefinition)
 		{
-			throw new InvalidOperationException($"Incompatible datasource listener type {listener.ToPretty()}.");
+			if (genericArgs.Length != 7)
+			{
+				throw new InvalidOperationException($"Incompatible datasource listener type {listenerType.ToPretty()}.");
+			}
+
+			listenerType = listenerType.MakeGenericType(
+				DSTypeInfo.TKey,
+				DSTypeInfo.TDocument,
+				DSTypeInfo.TCreate,
+				DSTypeInfo.TSelect,
+				DSTypeInfo.TUpdate,
+				DSTypeInfo.TDelete,
+				DSTypeInfo.TRestore
+			);
+		}
+		else
+		{
+			if (DSTypeInfo.TKey != genericArgs[0]
+				|| DSTypeInfo.TDocument != genericArgs[1]
+				|| DSTypeInfo.TCreate != genericArgs[2]
+				|| DSTypeInfo.TSelect != genericArgs[3]
+				|| DSTypeInfo.TUpdate != genericArgs[4]
+				|| DSTypeInfo.TDelete != genericArgs[5]
+				|| DSTypeInfo.TRestore != genericArgs[6])
+			{
+				throw new InvalidOperationException($"Incompatible datasource listener type {listenerType.ToPretty()}.");
+			}
 		}
 
-		var ctors = listener.GetConstructors(BindingFlags.Instance | BindingFlags.Public);
+		var ctors = listenerType.GetConstructors(BindingFlags.Instance | BindingFlags.Public);
 		if (ctors.Length != 1)
 		{
-			throw new InvalidOperationException($"DataSource listener {listener.ToPretty()} must have a single public constructor.");
+			throw new InvalidOperationException($"DataSource listener {listenerType.ToPretty()} must have a single public constructor.");
 		}
 
 		var ctor = ctors[0];

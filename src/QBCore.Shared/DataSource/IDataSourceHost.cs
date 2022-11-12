@@ -1,8 +1,14 @@
+using QBCore.ObjectFactory;
+
 namespace QBCore.DataSource;
 
 public interface IDataSourceHost<TKey, TDocument, TCreate, TSelect, TUpdate, TDelete, TRestore>
 {
 	object SyncRoot { get; }
+
+	void AttachListener<T>(T listener, bool attachTransient = false) where T : DataSourceListener<TKey, TDocument, TCreate, TSelect, TUpdate, TDelete, TRestore>;
+	void RemoveListener<T>(T listener) where T : DataSourceListener<TKey, TDocument, TCreate, TSelect, TUpdate, TDelete, TRestore>;
+	void RemoveListener<T>(OKeyName okeyName) where T : DataSourceListener<TKey, TDocument, TCreate, TSelect, TUpdate, TDelete, TRestore>;
 
 	ValueTask CreateListenerAsync<T>(bool attachTransient = false) where T : DataSourceListener<TKey, TDocument, TCreate, TSelect, TUpdate, TDelete, TRestore>;
 	ValueTask CreateListenerAsync<T>(Func<IServiceProvider, T> implementationFactory, bool attachTransient = false) where T : DataSourceListener<TKey, TDocument, TCreate, TSelect, TUpdate, TDelete, TRestore>;

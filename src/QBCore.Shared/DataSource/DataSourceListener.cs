@@ -1,9 +1,12 @@
 using QBCore.DataSource.Options;
+using QBCore.ObjectFactory;
 
 namespace QBCore.DataSource;
 
 public abstract class DataSourceListener<TKey, TDocument, TCreate, TSelect, TUpdate, TDelete, TRestore> : IDataSourceListener
 {
+	public override OKeyName KeyName { get; }
+
 	public abstract ValueTask OnAttachAsync(IDataSource dataSource);
 	public abstract ValueTask OnDetachAsync(IDataSource dataSource);
 

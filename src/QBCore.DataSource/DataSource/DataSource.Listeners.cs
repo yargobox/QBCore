@@ -1,10 +1,30 @@
+using System.Collections.Concurrent;
 using QBCore.Extensions.ComponentModel;
+using QBCore.ObjectFactory;
 
 namespace QBCore.DataSource;
 
 public abstract partial class DataSource<TKey, TDocument, TCreate, TSelect, TUpdate, TDelete, TRestore, TDataSource>
 {
-	private KeyValuePair<DataSourceListener<TKey, TDocument, TCreate, TSelect, TUpdate, TDelete, TRestore>, bool>[]? _listeners;
+	private KeyValuePair<DataSourceListener<TKey, TDocument, TCreate, TSelect, TUpdate, TDelete, TRestore>, bool>[]? _colListeners;
+
+	public void AttachListener<T>(T listener, bool attachTransient = false) where T : DataSourceListener<TKey, TDocument, TCreate, TSelect, TUpdate, TDelete, TRestore>
+	{
+		if (_internalObjects == null)
+		{
+			Interlocked.CompareExchange(ref _internalObjects, new ConcurrentDictionary<OKeyName, object?>(), null);
+		}
+
+		_internalObjects.AddOrUpdate(listener.OK, listener);
+	}
+	public void RemoveListener<T>(T listener) where T : DataSourceListener<TKey, TDocument, TCreate, TSelect, TUpdate, TDelete, TRestore>
+	{
+
+	}
+	public void RemoveListener<T>(OKeyName okeyName) where T : DataSourceListener<TKey, TDocument, TCreate, TSelect, TUpdate, TDelete, TRestore>
+	{
+
+	}
 
 	/// <summary>
 	/// Gets and adds a listener from the DI container to the datasource.
@@ -79,7 +99,7 @@ public abstract partial class DataSource<TKey, TDocument, TCreate, TSelect, TUpd
 		KeyValuePair<DataSourceListener<TKey, TDocument, TCreate, TSelect, TUpdate, TDelete, TRestore>, bool>[]? newOne, oldOne;
 		do
 		{
-			oldOne = _listeners;
+			oldOne = _colListeners;
 
 			if (oldOne == null)
 			{
@@ -93,7 +113,7 @@ public abstract partial class DataSource<TKey, TDocument, TCreate, TSelect, TUpd
 				newOne[oldOne.Length] = entry;
 			}
 		}
-		while (Interlocked.CompareExchange(ref _listeners, newOne, oldOne) != oldOne);
+		while (Interlocked.CompareExchange(ref _colListeners, newOne, oldOne) != oldOne);
 	}
 	private KeyValuePair<DataSourceListener<TKey, TDocument, TCreate, TSelect, TUpdate, TDelete, TRestore>, bool>? RemoveListenerFromArray(Type listenerType)
 	{
@@ -103,7 +123,7 @@ public abstract partial class DataSource<TKey, TDocument, TCreate, TSelect, TUpd
 		do
 		{
 			entry = null;
-			oldOne = _listeners;
+			oldOne = _colListeners;
 
 			if (oldOne != null)
 			{
@@ -131,14 +151,14 @@ public abstract partial class DataSource<TKey, TDocument, TCreate, TSelect, TUpd
 				}
 			}
 		}
-		while (entry.HasValue && Interlocked.CompareExchange(ref _listeners, newOne, oldOne) != oldOne);
+		while (entry.HasValue && Interlocked.CompareExchange(ref _colListeners, newOne, oldOne) != oldOne);
 
 		return entry;
 	}
 	private async ValueTask ClearListenersAsync()
 	{
-		var oldOne = _listeners;
-		if (oldOne != null && Interlocked.CompareExchange(ref _listeners, null, oldOne) == oldOne)
+		var oldOne = _colListeners;
+		if (oldOne != null && Interlocked.CompareExchange(ref _colListeners, null, oldOne) == oldOne)
 		{
 			KeyValuePair<DataSourceListener<TKey, TDocument, TCreate, TSelect, TUpdate, TDelete, TRestore>, bool> entry;
 			for (var i = oldOne.Length - 1; i >= 0; i--)
