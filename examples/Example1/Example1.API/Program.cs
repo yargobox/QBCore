@@ -50,7 +50,6 @@ builder.Services
 		config.AddProfile(new DataSourceMappings((source, dest) => true));
 	})
 	.Configure<MongoDbSettings>(appBuilder.Configuration.GetSection(nameof(MongoDbSettings)))
-	.Configure<SqlDbSettings>(appBuilder.Configuration.GetSection(nameof(SqlDbSettings)))
 	.AddSingleton<IDataContextProvider, DataContextProvider>()
 	.AddRouting(options =>
 	{

@@ -3,11 +3,11 @@
   <ItemGroup>
     <ProjectReference Include="..\..\..\src\QBCore.Main\QBCore.Main.csproj" />
     <ProjectReference Include="..\..\..\src\QBCore.Mongo\QBCore.Mongo.csproj" />
-    <ProjectReference Include="..\..\..\src\QBCore.Sql\QBCore.Sql.csproj" />
+    <ProjectReference Include="..\..\..\src\QBCore.EF\QBCore.EF.csproj" />
   </ItemGroup>
 
   <PropertyGroup>
-    <TargetFramework>net6.0</TargetFramework>
+    <TargetFramework>net7.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
   </PropertyGroup>

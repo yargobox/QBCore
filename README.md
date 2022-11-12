@@ -148,3 +148,54 @@ In filter-by-self dependencies, the dependent field depends on other fields in t
 #### Underscore instead of Id
 
 - `GET /api/store-sales/_/other-root` - The underscore character is used instead of an Id when the two nodes in the path are not related.
+
+
+# QBCore Develop
+QBCore.Develop is an application for developing QBCore applications. The main idea is to generate application source code (entities, their models, data sources and complex data sources, etc.) based on data taken from Develop. The QBCore.Develop application is also developed in itself.
+
+## Relational Object Model
+
+						Projects			Languages
+						/	|					\
+					Apps -- | --------------- Translations
+					/		|						|
+		FuncGroupsByApps  	|						|
+					\		|						|
+					FuncGroups						|
+					/		\						|
+		GenericObjects -- AppObjects (DS, CDS) -----|
+			|										|
+			|-- DataEntries ------------------------|
+			|
+			|-- CDSNodes ---------------------------|
+			|	|-- CDSConditions
+			|
+			|-- AOListeners
+			|
+			|-- QueryBuilders
+			|	|-- QBObjects
+			|	|-- QBColumns
+			|	|-- QBParameters
+			|	|-- QBJoinConditions
+			|	|-- QBConditions
+			|	|-- QBSortOrders
+			|	|-- QBAggregations
+			|
+			|-- Other
+
+
+# CLI & other
+#### PostgreSQL
+- `docker pull postgres`
+- `docker run -d --name pgsql -e POSTGRES_USER=user1 -e POSTGRES_PASSWORD=Pass#word1 -p 5432:5432 -v /data:/var/lib/postgresql/data postgres`
+- `docker start pgsql`
+
+#### PgAdmin 4
+- `docker pull dpage/pgadmin4`
+- `docker run -d --name pgadmin -p 82:80 -e 'PGADMIN_DEFAULT_EMAIL=user@domain.com' -e 'PGADMIN_DEFAULT_PASSWORD=Password1' dpage/pgadmin4`
+- `docker inspect pgsql -f “{{json .NetworkSettings.Networks }}”`
+- `docker start pgadmin`
+
+#### Set user-secrets
+- `dotnet user-secrets init`
+- `dotnet user-secrets set SqlDbSettings:Password Pass#word1`

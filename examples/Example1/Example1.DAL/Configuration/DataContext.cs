@@ -4,12 +4,15 @@ namespace Example1.DAL.Configuration;
 
 public sealed class DataContext : IDataContext
 {
+	public string Name { get; }
+	public Type ContextType => Context.GetType();
+	public IReadOnlyDictionary<string, object?>? Args { get; }
 	public object Context { get; }
-	public KeyValuePair<string, object?>[]? TenantArgs { get; }
 
-	public DataContext(object context, KeyValuePair<string, object?>[]? tenantArgs)
+	public DataContext(object context, string name, IReadOnlyDictionary<string, object?>? args = null)
 	{
 		Context = context;
-		TenantArgs = tenantArgs;
+		Name = name;
+		Args = args;
 	}
 }

@@ -31,7 +31,7 @@ public abstract partial class DataSource<TKey, TDocument, TCreate, TSelect, TUpd
 
 		_serviceProvider = serviceProvider;
 		_mapper = _serviceProvider.GetRequiredService<IMapper>();
-		_dataContext = dataContextProvider.GetContext(DSInfo.QBFactory.DataLayer.DatabaseContextInterface, DSInfo.DataContextName);
+		_dataContext = dataContextProvider.GetDataContext(DSInfo.QBFactory.DataLayer.DatabaseContextInterface, DSInfo.DataContextName);
 
 		if (DSInfo.ListenerFactory != null)
 		{

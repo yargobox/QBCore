@@ -1,5 +1,3 @@
-using Microsoft.Extensions.Options;
-using MongoDB.Bson.Serialization.Conventions;
 using MongoDB.Driver;
 using QBCore.Configuration;
 
@@ -7,32 +5,24 @@ namespace Example1.DAL.Configuration;
 
 public sealed class MongoDbContext : IMongoDbContext, IDisposable
 {
-	IMongoDatabase _DB;
-	public IMongoDatabase DB => _DB;
-	public MongoDbSettings MongoDbSettings { get; }
+	public IMongoDatabase DB => _db ?? throw new ObjectDisposedException(nameof(MongoDbContext));
+	
+	private IMongoDatabase? _db;
 
-	public MongoDbContext(MongoDbSettings settings)
+	public MongoDbContext(IMongoDatabase db)
 	{
-		MongoDbSettings = settings;
-		
-		var client = new MongoClient(MongoDbSettings.ToString());
-		_DB = client.GetDatabase(MongoDbSettings.Catalog);
-	}
+		if (db == null) throw new ArgumentNullException(nameof(db));
 
-	public MongoDbContext(IOptions<MongoDbSettings> settings)
-	{
-		MongoDbSettings = settings.Value;
-
-		var client = new MongoClient(MongoDbSettings.ToString());
-		_DB = client.GetDatabase(MongoDbSettings.Catalog);
+		_db = db;
 	}
 
 	public void Dispose()
 	{
-		if (_DB is IDisposable dispose)
+		var temp = _db;
+		_db = null;
+		if (temp is IDisposable disposable)
 		{
-			dispose.Dispose();
-			_DB = null!;
+			disposable.Dispose();
 		}
 	}
 }

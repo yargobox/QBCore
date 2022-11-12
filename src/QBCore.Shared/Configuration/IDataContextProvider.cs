@@ -1,9 +1,8 @@
-using QBCore.DataSource;
+using QBCore.ObjectFactory;
 
 namespace QBCore.Configuration;
 
-public interface IDataContextProvider
+public interface IDataContextProvider : ITransient<IDataContextProvider>
 {
-	IDataContext GetContext(Type databaseContextType, string dataContextName = "default");
-	IDataContext GetContext<TDatabaseContext>(string dataContextName = "default");
+	IDataContext GetDataContext(Type databaseContextType, string dataContextName = "default");
 }
