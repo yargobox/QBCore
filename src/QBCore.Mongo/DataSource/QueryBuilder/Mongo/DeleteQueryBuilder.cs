@@ -43,7 +43,7 @@ internal sealed class DeleteQueryBuilder<TDocument, TDelete> : QueryBuilder<TDoc
 			}
 		}
 
-		var collection = _mongoDbContext.DB.GetCollection<TDocument>(top.DBSideName);
+		var collection = _mongoDbContext.AsMongoDatabase().GetCollection<TDocument>(top.DBSideName);
 
 		var deleteOptions = (DeleteOptions?)options?.NativeOptions ?? new DeleteOptions();
 		var clientSessionHandle = (IClientSessionHandle?)options?.NativeClientSession;

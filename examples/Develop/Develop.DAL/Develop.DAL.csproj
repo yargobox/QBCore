@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
-    <ProjectReference Include="..\Develop.BLL\Develop.BLL.csproj" />
+	<ProjectReference Include="..\..\..\src\QBCore.Main\QBCore.Main.csproj" />
     <ProjectReference Include="..\..\..\src\QBCore.EF\QBCore.EF.csproj" />
   </ItemGroup>
 

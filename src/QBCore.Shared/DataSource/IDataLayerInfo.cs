@@ -5,7 +5,8 @@ namespace QBCore.DataSource;
 public interface IDataLayerInfo
 {
 	string Name { get; }
-	Type DatabaseContextInterface { get; }
+	Type DataContextInterfaceType { get; }
+	Type DataContextProviderInterfaceType { get; }
 	Func<Type, bool> IsDocumentType { get; set; }
 	Func<Type, string> GetDefaultDBSideContainerName { get; set; }
 

@@ -1,3 +1,4 @@
+using Develop.API.Configuration;
 using Develop.API.Middlewares;
 using Develop.DAL;
 using Develop.DAL.Configuration;
@@ -25,7 +26,7 @@ var builder = appBuilder.Services
 		});
 		
 	})
-	.AddApplicationPart(typeof(Develop.DAL.Entities.DVP.Project).Assembly)
+	.AddApplicationPart(typeof(Develop.Entities.DVP.Project).Assembly)
 	.AddQBCore(options => { })
 	.ConfigureApplicationPartManager(partManager =>
 	{
@@ -38,14 +39,11 @@ builder.Services
 		config.AddProfile(new DataSourceMappings((source, dest) => true));
 	})
 	.Configure<SqlDbSettings>(appBuilder.Configuration.GetRequiredSection(nameof(SqlDbSettings)))
-	.AddSingleton<OptionsMonitor<SqlDbSettings>>()
-	.AddTransient<ITransient<IDataContextProvider>, DataContextProvider>()
-	.AddScoped<IDataContextProvider, DataContextProvider>()
-	.AddScoped<DbDevelopContext>(sp => sp
-		.GetRequiredService<IDataContextProvider>()
-		.GetDataContext<DbDevelopContext>()
-		.AsContext<DbDevelopContext>()
-	)
+	.AddSingleton<OptionsListener<SqlDbSettings>>()
+	.AddTransient<ITransient<IEfDataContextProvider>, EfDataContextProvider>()
+	.AddScoped<IEfDataContextProvider, EfDataContextProvider>()
+	.AddScoped<DbDevelopContext>(sp => sp.GetRequiredService<IEfDataContextProvider>().GetDataContext().AsDbContext<DbDevelopContext>())
+	.AddTransient<IStartupFilter, DatabaseMigrateStartupFilter<DbDevelopContext>>()
 	.AddRouting(options =>
 	{
 		options.LowercaseUrls = true;
@@ -64,10 +62,7 @@ app.UseMiddleware<ExceptionHandlingMiddleware>();
 app.UseHttpsRedirection();
 app.UseRouting();
 app.UseAuthorization();
-app.UseEndpoints(endpoints =>
-{
-	endpoints.MapControllers();
-	endpoints.MapDataSourceControllers();
-});
+app.MapControllers();
+app.MapDataSourceControllers();
 
 app.Run();

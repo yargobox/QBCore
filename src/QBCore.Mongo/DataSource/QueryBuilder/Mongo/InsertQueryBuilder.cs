@@ -34,7 +34,7 @@ internal sealed class InsertQueryBuilder<TDocument, TCreate> : QueryBuilder<TDoc
 			}
 		}
 
-		var collection = _mongoDbContext.DB.GetCollection<TDocument>(top.DBSideName);
+		var collection = _mongoDbContext.AsMongoDatabase().GetCollection<TDocument>(top.DBSideName);
 
 		var insertOneOptions = (InsertOneOptions?)options?.NativeOptions;
 		var clientSessionHandle = (IClientSessionHandle?)options?.NativeClientSession;

@@ -7,20 +7,23 @@ public static class DataSourceDocuments
 {
 	public static IFactoryObjectDictionary<Type, Lazy<DSDocumentInfo>> Collection => StaticFactory.Documents;
 
-	private static Func<Type, bool> _documentExclusionSelector = _ => false;
+	static class Singleton
+	{
+		public static Func<Type, bool> _documentExclusionSelector = _ => false;
+		public static List<Type> _dataContextProviders = new List<Type>();
+
+		static Singleton() { }
+	}
 
 	public static Func<Type, bool> DocumentExclusionSelector
 	{
-		get => _documentExclusionSelector;
-		set
-		{
-			if (value == null)
-			{
-				throw new ArgumentNullException(nameof(value));
-			}
+		get => Singleton._documentExclusionSelector;
+		set => Interlocked.Exchange(ref Singleton._documentExclusionSelector, value ?? throw new ArgumentNullException(nameof(value)));
+	}
 
-			Interlocked.Exchange(ref _documentExclusionSelector, value);
-		}
+	public static IReadOnlyList<Type> DataContextProviders
+	{
+		get => Singleton._dataContextProviders;
 	}
 
 	public static Lazy<DSDocumentInfo> GetOrRegister(Type documentType, IDataLayerInfo dataLayer)

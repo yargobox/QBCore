@@ -57,7 +57,7 @@ public abstract partial class DataSource<TKey, TDocument, TCreate, TSelect, TUpd
 			var node = cdsInfo.Nodes[keyName.DSOrNodeName];
 			if (node.Parent != null && node.Parent.Conditions.Any())
 			{
-				var listener = new CDSChildNodeDSListener<TKey, TDocument, TCreate, TSelect, TUpdate, TDelete, TRestore>(node.Parent.Conditions);
+				var listener = new CDSChildNodeDSListener<TKey, TDocument, TCreate, TSelect, TUpdate, TDelete, TRestore>(node.Parent.Conditions, keyName);
 				AttachListener(listener, true);
 			}
 		}

@@ -10,7 +10,7 @@ namespace Example1.BLL.Services;
 [DataSource("product", typeof(MongoDataLayer), DataSourceOptions.SoftDelete)]
 public sealed class ProductService : DataSource<int?, Product, ProductCreateDto, ProductSelectDto, ProductUpdateDto, SoftDelDto, SoftDelDto, OrderService>
 {
-	public ProductService(IServiceProvider serviceProvider, IDataContextProvider dataContextProvider) : base(serviceProvider, dataContextProvider) { }
+	public ProductService(IServiceProvider serviceProvider) : base(serviceProvider) { }
 
 	static void SoftDelBuilder(IQBMongoSoftDelBuilder<Product, SoftDelDto> qb)
 	{

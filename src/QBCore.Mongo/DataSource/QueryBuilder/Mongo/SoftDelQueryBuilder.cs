@@ -43,7 +43,7 @@ internal sealed class SoftDelQueryBuilder<TDocument, TDelete> : QueryBuilder<TDo
 			}
 		}
 
-		var collection = _mongoDbContext.DB.GetCollection<TDocument>(top.DBSideName);
+		var collection = _mongoDbContext.AsMongoDatabase().GetCollection<TDocument>(top.DBSideName);
 
 		var updateOptions = (UpdateOptions?)options?.NativeOptions ?? new UpdateOptions();
 		var clientSessionHandle = (IClientSessionHandle?)options?.NativeClientSession;

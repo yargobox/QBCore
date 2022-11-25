@@ -26,6 +26,9 @@ public class DataSourceSelectOptions : DataSourceOperationOptions
 	public bool ObtainLastPageMarker;
 	public Action<object>? NativeSelectQueryCallback;
 }
-public class DataSourceUpdateOptions : DataSourceOperationOptions { }
+public class DataSourceUpdateOptions : DataSourceOperationOptions
+{
+	public bool FetchResultDocument;
+}
 public class DataSourceDeleteOptions : DataSourceOperationOptions { }
 public class DataSourceRestoreOptions : DataSourceOperationOptions { }

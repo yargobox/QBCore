@@ -4,7 +4,7 @@ namespace QBCore.DataSource;
 
 public interface IDataSourceListener
 {
-	abstract OKeyName KeyName { get; }
-	abstract ValueTask OnAttachAsync(IDataSource dataSource);
-	abstract ValueTask OnDetachAsync(IDataSource dataSource);
+	OKeyName KeyName { get; }
+	ValueTask OnAttachAsync(IDataSource dataSource);
+	ValueTask OnDetachAsync(IDataSource dataSource);
 }

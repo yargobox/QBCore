@@ -10,7 +10,7 @@ namespace Example1.BLL.Services;
 [DataSource("order", typeof(MongoDataLayer), DataSourceOptions.SoftDelete)]
 public sealed class OrderService : DataSource<int?, Order, OrderCreateDto, OrderSelectDto, OrderUpdateDto, SoftDelDto, SoftDelDto, OrderService>
 {
-	public OrderService(IServiceProvider serviceProvider, IDataContextProvider dataContextProvider) : base(serviceProvider, dataContextProvider) { }
+	public OrderService(IServiceProvider serviceProvider) : base(serviceProvider) { }
 
 	static void DefinitionBuilder(IDSBuilder builder)
 	{

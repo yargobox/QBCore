@@ -12,8 +12,8 @@ public abstract class OKeyName : IEquatable<OKeyName?>, IEquatable<string?>, ICo
 	public override string ToString() => Key;
 	public override int GetHashCode() => Key.GetHashCode();
 
-	public bool Equals(OKeyName? other) => other != null ? Key == other.Key : false;
-	public bool Equals(string? other) => other != null ? Key == other : false;
+	public bool Equals(OKeyName? other) => Key == other?.Key;
+	public bool Equals(string? other) => Key == other;
 	public override bool Equals(object? obj)
 	{
 		if (obj is OKeyName modelName)

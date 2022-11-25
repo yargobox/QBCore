@@ -17,11 +17,11 @@ internal abstract class QueryBuilder<TDocument, TProjection> : IQueryBuilder<TDo
 	public DSDocumentInfo DocumentInfo => Builder.DocumentInfo;
 	public Type ProjectionType => typeof(TProjection);
 	public DSDocumentInfo? ProjectionInfo => Builder.ProjectionInfo;
-	public Type DatabaseContextInterfaceType => typeof(IMongoDbContext);
+	public Type DataContextInterfaceType => typeof(IMongoDataContext);
 	public IDataContext DataContext { get; }
 	public QBBuilder<TDocument, TProjection> Builder { get; }
 
-	protected IMongoDbContext _mongoDbContext;
+	protected IMongoDataContext _mongoDbContext;
 
 
 	#region Static ReadOnly & Const Properties
@@ -63,14 +63,14 @@ internal abstract class QueryBuilder<TDocument, TProjection> : IQueryBuilder<TDo
 		{
 			throw new ArgumentNullException(nameof(dataContext));
 		}
-		if (dataContext.Context is not IMongoDbContext)
+		if (dataContext is not IMongoDataContext mongoDbContext)
 		{
 			throw new ArgumentException(nameof(dataContext));
 		}
 
 		Builder = builder;
 		DataContext = dataContext;
-		_mongoDbContext = (IMongoDbContext)dataContext.Context;
+		_mongoDbContext = mongoDbContext;
 	}
 
 	/// <summary>
@@ -1002,5 +1002,108 @@ internal abstract class QueryBuilder<TDocument, TProjection> : IQueryBuilder<TDo
 			return true;
 		}
 		return false;
+	}
+
+	public static object CreateEntityInstance(BsonClassMap classMap, IReadOnlyDictionary<string, object?> dataEntryValues)
+	{
+		if (classMap.CreatorMaps.Any())
+		{
+			var creatorMap = FindMostSpecEntityCreatorMap(classMap, dataEntryValues)
+				?? throw new InvalidOperationException($"Failed to create entity instance '{classMap.ClassType.FullName}'. There is no matching creator according to the specified argument values.");
+
+			var invokeArgs = new object?[creatorMap.Arguments.Count()];
+			var i = 0;
+			object? value;
+
+			foreach (var argName in creatorMap.Arguments.Select(memberInfo => memberInfo.Name))
+			{
+				if (dataEntryValues.TryGetValue(argName, out value) && value is not null)
+				{
+					invokeArgs[i++] = value;
+				}
+				else if (creatorMap.HasDefaultValue(argName))
+				{
+					i++;
+				}
+				else
+				{
+					throw new InvalidOperationException($"Failed to create entity instance '{creatorMap.ClassMap.ClassType.FullName}' by provided creator with the arguments ({string.Join(", ", creatorMap.Arguments.Select(memberInfo => memberInfo.Name))}). There is no value provided for the argument '{argName}'.");
+				}
+			}
+
+			return creatorMap.Delegate.DynamicInvoke(invokeArgs)
+				?? throw new InvalidOperationException($"Failed to create entity instance '{creatorMap.ClassMap.ClassType.FullName}' by provided creator with the arguments ({string.Join(", ", creatorMap.Arguments.Select(memberInfo => memberInfo.Name))}).");
+		}
+		else
+		{
+			return classMap.CreateInstance();
+		}
+	}
+
+	private static BsonCreatorMap? FindMostSpecEntityCreatorMap(BsonClassMap classMap, IReadOnlyDictionary<string, object?> dataEntryValues)
+	{
+		int matchedArgCount, totalArgCount;
+		BsonCreatorMap creatorMap;
+
+		var creators = classMap
+			.CreatorMaps
+			.Select(x => (CreatorMap: x, TotalArgCount: x.Arguments.Count(), MatchedArgCount: -1))
+			.OrderByDescending(x => x.TotalArgCount)
+			.ToArray();
+
+		// Consider only non-null arguments first
+		for (int i = 0; i < creators.Length; i++)
+		{
+			creatorMap = creators[i].CreatorMap;
+			totalArgCount = creators[i].TotalArgCount;
+
+			if (i > 0 && creators[i - 1].TotalArgCount > totalArgCount && creators.Take(i).Any(x => x.MatchedArgCount >= 0))
+			{
+				break;
+			}
+
+			matchedArgCount = creatorMap.Arguments.Count(memberInfo => dataEntryValues.GetValueOrDefault(memberInfo.Name) is not null);
+
+			if (totalArgCount == matchedArgCount)
+			{
+				// MatchedArgCount - the number of non-null matched arguments
+				creators[i].MatchedArgCount = matchedArgCount;
+			}
+		}
+
+		// Matches found? Return the most specific (in this case they will be the same, so return the first one).
+		if (creators.Where(x => x.MatchedArgCount >= 0).Any())
+		{
+			return creators.First(x => x.MatchedArgCount >= 0).CreatorMap;
+		}
+
+		// Consider non-null arguments along with default values
+		for (int i = 0; i < creators.Length; i++)
+		{
+			creatorMap = creators[i].CreatorMap;
+			totalArgCount = creators[i].TotalArgCount;
+
+			if (i > 0 && creators[i - 1].TotalArgCount > totalArgCount && creators.Take(i).Any(x => x.MatchedArgCount >= 0))
+			{
+				break;
+			}
+
+			matchedArgCount = creatorMap.Arguments.Count(memberInfo => dataEntryValues.GetValueOrDefault(memberInfo.Name) is not null
+				|| creatorMap.HasDefaultValue(memberInfo.Name));
+
+			if (totalArgCount == matchedArgCount)
+			{
+				// Still MatchedArgCount is the number of matching non-NULL arguments, but in this case it will vary depending on the particular creator.
+				creators[i].MatchedArgCount = creatorMap.Arguments.Count(memberInfo => dataEntryValues.GetValueOrDefault(memberInfo.Name) is not null);
+			}
+		}
+
+		// Matches found? Return the most specific.
+		if (creators.Where(x => x.MatchedArgCount >= 0).Any())
+		{
+			return creators.Where(x => x.MatchedArgCount >= 0).MaxBy(x => x.MatchedArgCount).CreatorMap;
+		}
+
+		return null;
 	}
 }

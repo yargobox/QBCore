@@ -2,7 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Develop.DAL.PostgreSQL;
 
-namespace Develop.DAL.Entities.DVP;
+namespace Develop.Entities.DVP;
 
 public class QBSortOrder
 {

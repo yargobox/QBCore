@@ -1,17 +1,18 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Develop.DAL.PostgreSQL;
+using QBCore.DataSource;
 
-namespace Develop.DAL.Entities.DVP;
+namespace Develop.Entities.DVP;
 
 public class Project
 {
-	public int ProjectId { get; set; }
-	public string Name { get; set; } = string.Empty;
+	[DeId] public int ProjectId { get; set; }
+	[DeViewName] public string Name { get; set; } = string.Empty;
 	public string Desc { get; set; } = string.Empty;
-	public DateTime Inserted { get; set; }
-	public DateTime? Updated { get; set; }
-	public DateTime? Deleted { get; set; }
+	[DeCreated] public DateTime Inserted { get; set; }
+	[DeUpdated] public DateTime? Updated { get; set; }
+	[DeDeleted] public DateTime? Deleted { get; set; }
 
 	public virtual ICollection<App> Apps { get; set; } = null!;
 	public virtual ICollection<FuncGroup> FuncGroups { get; set; } = null!;

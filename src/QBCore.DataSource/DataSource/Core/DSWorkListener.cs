@@ -1,10 +1,18 @@
 using QBCore.DataSource.Options;
+using QBCore.ObjectFactory;
 
 namespace QBCore.DataSource.Core;
 
 public sealed class DSWorkListener<TKey, TDocument, TCreate, TSelect, TUpdate, TDelete, TRestore> : DataSourceListener<TKey, TDocument, TCreate, TSelect, TUpdate, TDelete, TRestore>
 {
 	IDataSource<TKey, TDocument, TCreate, TSelect, TUpdate, TDelete, TRestore> _dataSource = null!;
+
+	public DSWorkListener(OKeyName keyName)
+	{
+		KeyName = keyName;
+	}
+
+	public override OKeyName KeyName { get; }
 
 	public override async ValueTask OnAttachAsync(IDataSource dataSource)
 	{

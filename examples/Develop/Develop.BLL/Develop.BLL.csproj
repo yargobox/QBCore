@@ -3,6 +3,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\..\src\QBCore.DataSource\QBCore.DataSource.csproj" />
     <ProjectReference Include="..\..\..\src\QBCore.EF\QBCore.EF.csproj" />
+	<ProjectReference Include="..\Develop.DAL\Develop.DAL.csproj" />
   </ItemGroup>
 
   <PropertyGroup>

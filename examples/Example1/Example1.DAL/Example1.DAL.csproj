@@ -3,7 +3,6 @@
   <ItemGroup>
     <ProjectReference Include="..\..\..\src\QBCore.Main\QBCore.Main.csproj" />
     <ProjectReference Include="..\..\..\src\QBCore.Mongo\QBCore.Mongo.csproj" />
-    <ProjectReference Include="..\..\..\src\QBCore.EF\QBCore.EF.csproj" />
   </ItemGroup>
 
   <PropertyGroup>

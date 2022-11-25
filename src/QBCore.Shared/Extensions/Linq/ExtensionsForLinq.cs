@@ -12,9 +12,9 @@ public static class ExtensionsForLinq
 		return list;
 	}
 
-	public static IEnumerable<T> Next<T, T1>(this IEnumerable<T> @this, IEnumerable<T1>? next) where T1 : T
+	public static int CountTryGetNonEnumerated<T>(this IEnumerable<T> @this)
 	{
-		if (next != null) using (var p = next.GetEnumerator()) while (p.MoveNext()) yield return p.Current;
+		return (@this as ICollection<T>)?.Count ?? @this.Count();
 	}
 
 	public static bool IsNullEmpty<T>([NotNullWhen(false)] this IEnumerable<T>? @this)

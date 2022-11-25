@@ -3,7 +3,7 @@ using System.Globalization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
-namespace Develop.DAL;
+namespace Develop.Entities;
 
 internal abstract class PluralNamingConfiguration<TEntity> : IEntityTypeConfiguration<TEntity> where TEntity : class
 {

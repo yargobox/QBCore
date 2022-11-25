@@ -10,7 +10,7 @@ namespace Example1.BLL.Services;
 [DataSource("position", typeof(MongoDataLayer), DataSourceOptions.SoftDelete)]
 public sealed class OrderPositionService : DataSource<int?, OrderPosition, OrderPositionCreateDto, OrderPositionSelectDto, OrderPositionUpdateDto, SoftDelDto, SoftDelDto, OrderPositionService>
 {
-	public OrderPositionService(IServiceProvider serviceProvider, IDataContextProvider dataContextProvider) : base(serviceProvider, dataContextProvider) { }
+	public OrderPositionService(IServiceProvider serviceProvider) : base(serviceProvider) { }
 
 	static void SoftDelBuilder(IQBMongoSoftDelBuilder<OrderPosition, SoftDelDto> qb)
 	{

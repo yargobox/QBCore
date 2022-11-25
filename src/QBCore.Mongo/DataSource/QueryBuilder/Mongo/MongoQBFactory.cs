@@ -165,42 +165,42 @@ internal class MongoQBFactory : IQueryBuilderFactory
 		}
 	}
 
-	public IInsertQueryBuilder<TDocument, TCreate> CreateQBInsert<TDocument, TCreate>(IDataContext dataContext)
+	public IInsertQueryBuilder<TDocument, TCreate> CreateQBInsert<TDocument, TCreate>(IDataContext dataContext) where TDocument : class
 	{
 		var setup = (QBInsertBuilder<TDocument, TCreate>?)GetInsertBuilder()
 			?? throw new NotSupportedException($"DataSource '{_dsTypeInfo.Concrete.ToPretty()}' does not support the insert operation.");
 
 		return new InsertQueryBuilder<TDocument, TCreate>(new QBInsertBuilder<TDocument, TCreate>(setup), dataContext);
 	}
-	public ISelectQueryBuilder<TDocument, TSelect> CreateQBSelect<TDocument, TSelect>(IDataContext dataContext)
+	public ISelectQueryBuilder<TDocument, TSelect> CreateQBSelect<TDocument, TSelect>(IDataContext dataContext) where TDocument : class
 	{
 		var setup = (QBSelectBuilder<TDocument, TSelect>?)GetSelectBuilder()
 			?? throw new NotSupportedException($"DataSource '{_dsTypeInfo.Concrete.ToPretty()}' does not support the select operation.");
 
 		return new SelectQueryBuilder<TDocument, TSelect>(new QBSelectBuilder<TDocument, TSelect>(setup), dataContext);
 	}
-	public IUpdateQueryBuilder<TDocument, TUpdate> CreateQBUpdate<TDocument, TUpdate>(IDataContext dataContext)
+	public IUpdateQueryBuilder<TDocument, TUpdate> CreateQBUpdate<TDocument, TUpdate>(IDataContext dataContext) where TDocument : class
 	{
 		var setup = (QBUpdateBuilder<TDocument, TUpdate>?)GetUpdateBuilder()
 			?? throw new NotSupportedException($"DataSource '{_dsTypeInfo.Concrete.ToPretty()}' does not support the update operation.");
 
 		return new UpdateQueryBuilder<TDocument, TUpdate>(new QBUpdateBuilder<TDocument, TUpdate>(setup), dataContext);
 	}
-	public IDeleteQueryBuilder<TDocument, TDelete> CreateQBDelete<TDocument, TDelete>(IDataContext dataContext)
+	public IDeleteQueryBuilder<TDocument, TDelete> CreateQBDelete<TDocument, TDelete>(IDataContext dataContext) where TDocument : class
 	{
 		var setup = (QBDeleteBuilder<TDocument, TDelete>?)GetDeleteBuilder()
 			?? throw new NotSupportedException($"DataSource '{_dsTypeInfo.Concrete.ToPretty()}' does not support the delete operation.");
 
 		return new DeleteQueryBuilder<TDocument, TDelete>(new QBDeleteBuilder<TDocument, TDelete>(setup), dataContext);
 	}
-	public IDeleteQueryBuilder<TDocument, TDelete> CreateQBSoftDel<TDocument, TDelete>(IDataContext dataContext)
+	public IDeleteQueryBuilder<TDocument, TDelete> CreateQBSoftDel<TDocument, TDelete>(IDataContext dataContext) where TDocument : class
 	{
 		var setup = (QBSoftDelBuilder<TDocument, TDelete>?)GetSoftDelBuilder()
 			?? throw new NotSupportedException($"DataSource '{_dsTypeInfo.Concrete.ToPretty()}' does not support the soft delete operation.");
 
 		return new SoftDelQueryBuilder<TDocument, TDelete>(new QBSoftDelBuilder<TDocument, TDelete>(setup), dataContext);
 	}
-	public IRestoreQueryBuilder<TDocument, TRestore> CreateQBRestore<TDocument, TRestore>(IDataContext dataContext)
+	public IRestoreQueryBuilder<TDocument, TRestore> CreateQBRestore<TDocument, TRestore>(IDataContext dataContext) where TDocument : class
 	{
 		var setup = (QBRestoreBuilder<TDocument, TRestore>?)GetRestoreBuilder()
 			?? throw new NotSupportedException($"DataSource '{_dsTypeInfo.Concrete.ToPretty()}' does not support the restore operation.");

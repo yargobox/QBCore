@@ -16,6 +16,7 @@ public abstract partial class DataSource<TKey, TDocument, TCreate, TSelect, TUpd
 	ITransient<TDataSource>,
 	IAsyncDisposable,
 	IDisposable
+	where TDocument : class
 {
 	public DSKeyName OKeyName => _okeyName ?? throw new InvalidOperationException($"DataSource {DSInfo.Name} has not been initialized yet.");
 	public IDSInfo DSInfo { get; }
@@ -29,13 +30,14 @@ public abstract partial class DataSource<TKey, TDocument, TCreate, TSelect, TUpd
 	private object? _syncRoot;
 	protected ConcurrentDictionary<OKeyName, object?>? _internalObjects;
 
-	public DataSource(IServiceProvider serviceProvider, IDataContextProvider dataContextProvider)
+	public DataSource(IServiceProvider serviceProvider)
 	{
 		DSInfo = StaticFactory.DataSources[typeof(TDataSource)];
 
 		_serviceProvider = serviceProvider;
 		_mapper = _serviceProvider.GetRequiredService<IMapper>();
-		_dataContext = dataContextProvider.GetDataContext(DSInfo.QBFactory.DataLayer.DatabaseContextInterface, DSInfo.DataContextName);
+		var dataContextProvider = (IDataContextProvider) _serviceProvider.GetRequiredService(DSInfo.QBFactory.DataLayer.DataContextProviderInterfaceType);
+		_dataContext = dataContextProvider.GetDataContext(DSInfo.DataContextName);
 
 		_listeners = DSInfo.Listeners?
 			.Select(ctor => ctor(_serviceProvider))
@@ -244,7 +246,7 @@ public abstract partial class DataSource<TKey, TDocument, TCreate, TSelect, TUpd
 	public async Task UpdateAsync(
 		TKey id,
 		TUpdate document,
-		IReadOnlySet<string>? modifiedFieldNames = null,
+		IReadOnlySet<string>? validFieldNames = null,
 		IDictionary<string, object?>? parameters = null,
 		DataSourceUpdateOptions? options = null,
 		CancellationToken cancellationToken = default(CancellationToken)
@@ -281,20 +283,8 @@ public abstract partial class DataSource<TKey, TDocument, TCreate, TSelect, TUpd
 			}
 		}
 
-		TDocument result;
-		if (typeof(TDocument) != typeof(TUpdate))
-		{
-			modifiedFieldNames ??= builder.ProjectionInfo!.DataEntries.Keys.ToHashSet();
-
-			result = _mapper.Map<TDocument>(document);
-			await qb.UpdateAsync(id!, result, modifiedFieldNames, options, cancellationToken).ConfigureAwait(false);
-		}
-		else
-		{
-			result = (TDocument)(object)document!;
-			await qb.UpdateAsync(id!, result, modifiedFieldNames, options, cancellationToken).ConfigureAwait(false);
-		}
-
+		await qb.UpdateAsync(id!, document, validFieldNames, options, cancellationToken).ConfigureAwait(false);
+	
 		UpdateOutputParameters(parameters, builder.Parameters);
 	}
 

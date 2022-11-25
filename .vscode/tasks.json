@@ -2,7 +2,7 @@
 	"version": "2.0.0",
 	"tasks": [
 		{
-			"label": "build",
+			"label": "build - Develop",
 			"command": "dotnet",
 			"type": "process",
 			"args": [
@@ -14,7 +14,19 @@
 			"problemMatcher": "$msCompile"
 		},
 		{
-			"label": "publish",
+			"label": "build - Example1",
+			"command": "dotnet",
+			"type": "process",
+			"args": [
+				"build",
+				"${workspaceFolder}/examples/Example1/Example1.API/Example1.API.csproj",
+				"/property:GenerateFullPaths=true",
+				"/consoleloggerparameters:NoSummary"
+			],
+			"problemMatcher": "$msCompile"
+		},
+		{
+			"label": "publish - Develop",
 			"command": "dotnet",
 			"type": "process",
 			"args": [
@@ -26,7 +38,19 @@
 			"problemMatcher": "$msCompile"
 		},
 		{
-			"label": "watch",
+			"label": "publish - Example1",
+			"command": "dotnet",
+			"type": "process",
+			"args": [
+				"publish",
+				"${workspaceFolder}/examples/Example1/Example1.API/Example1.API.csproj",
+				"/property:GenerateFullPaths=true",
+				"/consoleloggerparameters:NoSummary"
+			],
+			"problemMatcher": "$msCompile"
+		},
+		{
+			"label": "watch - Develop",
 			"command": "dotnet",
 			"type": "process",
 			"args": [
@@ -34,6 +58,18 @@
 				"run",
 				"--project",
 				"${workspaceFolder}/examples/Develop/Develop.API/Develop.API.csproj"
+			],
+			"problemMatcher": "$msCompile"
+		},
+		{
+			"label": "watch - Example1",
+			"command": "dotnet",
+			"type": "process",
+			"args": [
+				"watch",
+				"run",
+				"--project",
+				"${workspaceFolder}/examples/Example1/Example1.API/Example1.API.csproj"
 			],
 			"problemMatcher": "$msCompile"
 		}

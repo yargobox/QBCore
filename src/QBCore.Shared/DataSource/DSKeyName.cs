@@ -7,14 +7,14 @@ namespace QBCore.DataSource;
 /// </summary>
 /// <remarks>
 /// Examples of full datasource names:<para />
-/// "Order"<para />
-/// "FLT:Order:BrandId:Brand"<para />
-/// "CLL:Order:BrandId:Brand"<para />
-/// "Sales:positions"<para />
-/// "FLT:Sales:positions:ProductId:Product"<para />
-/// "CLL:Sales:positions:ProductId:Product"<para />
+/// "Order@DS"<para />
+/// "FLT:Order:BrandId:Brand@DS"<para />
+/// "CLL:Order:BrandId:Brand@DS"<para />
+/// "Sales:positions@DS"<para />
+/// "FLT:Sales:positions:ProductId:Product@DS"<para />
+/// "CLL:Sales:positions:ProductId:Product@DS"<para />
 /// </remarks>
-public sealed class DSKeyName : OKeyName, IEquatable<DSKeyName>, IEquatable<string>
+public sealed class DSKeyName : OKeyName/* , IEquatable<DSKeyName>, IEquatable<string> */
 {
 	public override ReadOnlySpan<char> Tech => "DS";
 	public override string Key => _key;
@@ -97,16 +97,7 @@ public sealed class DSKeyName : OKeyName, IEquatable<DSKeyName>, IEquatable<stri
 		_key = okeyName;
 	}
 
-	public override int GetHashCode()
-	{
-		return _isForFilterOrForCard.GetHashCode()
-			^ (CDSName?.GetHashCode() ?? 0)
-			^ (ForDSOrNodeName?.GetHashCode() ?? 0)
-			^ (ForField?.GetHashCode() ?? 0)
-			^ DSOrNodeName.GetHashCode();
-	}
-
-	public override bool Equals(object? obj)
+/* 	public override bool Equals(object? obj)
 	{
 		if (obj is DSKeyName modelName)
 		{
@@ -133,7 +124,7 @@ public sealed class DSKeyName : OKeyName, IEquatable<DSKeyName>, IEquatable<stri
 			&& ForDSOrNodeName == other.ForDSOrNodeName
 			&& ForField == other.ForField
 			&& DSOrNodeName == other.DSOrNodeName;
-	}
+	} */
 
 /* 	public bool Equals(string? other)
 	{
@@ -245,7 +236,7 @@ public sealed class DSKeyName : OKeyName, IEquatable<DSKeyName>, IEquatable<stri
 		}
 	} */
 
-	public static implicit operator string?(DSKeyName? okeyName)
+/* 	public static implicit operator string?(DSKeyName? okeyName)
 	{
 		return okeyName?.Key;
 	}
@@ -271,7 +262,7 @@ public sealed class DSKeyName : OKeyName, IEquatable<DSKeyName>, IEquatable<stri
 	{
 		return !(a == b);
 	}
-
+ */
 	private static string MakeKey(DSKeyName p)
 	{
 		if (p.ForField != null)

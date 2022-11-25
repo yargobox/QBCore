@@ -10,10 +10,12 @@ using MongoDB.Bson;
 using MongoDB.Bson.Serialization;
 using MongoDB.Bson.Serialization.Conventions;
 using MongoDB.Bson.Serialization.Serializers;
+using MongoDB.Driver;
 using QBCore.Configuration;
 using QBCore.Controllers;
 using QBCore.Extensions;
 using QBCore.Extensions.Runtime;
+using QBCore.ObjectFactory;
 
 EagerLoading.Initialize();
 
@@ -49,8 +51,11 @@ builder.Services
 	{
 		config.AddProfile(new DataSourceMappings((source, dest) => true));
 	})
-	.Configure<MongoDbSettings>(appBuilder.Configuration.GetSection(nameof(MongoDbSettings)))
-	.AddSingleton<IDataContextProvider, DataContextProvider>()
+	.Configure<MongoDbSettings>(appBuilder.Configuration.GetRequiredSection(nameof(MongoDbSettings)))
+	.AddSingleton<OptionsListener<MongoDbSettings>>()
+	.AddTransient<ITransient<IMongoDataContextProvider>, MongoDataContextProvider>()
+	.AddSingleton<IMongoDataContextProvider, MongoDataContextProvider>()
+	.AddSingleton<IMongoDatabase>(sp => sp.GetRequiredService<IMongoDataContextProvider>().GetDataContext().AsMongoDatabase())
 	.AddRouting(options =>
 	{
 		options.LowercaseUrls = true;
@@ -69,10 +74,7 @@ app.UseMiddleware<ExceptionHandlingMiddleware>();
 app.UseHttpsRedirection();
 app.UseRouting();
 app.UseAuthorization();
-app.UseEndpoints(endpoints =>
-{
-	endpoints.MapControllers();
-	endpoints.MapDataSourceControllers();
-});
+app.MapControllers();
+app.MapDataSourceControllers();
 
 app.Run();

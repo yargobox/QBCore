@@ -1,4 +1,5 @@
 using QBCore.DataSource.Options;
+using QBCore.ObjectFactory;
 
 namespace QBCore.DataSource.Core;
 
@@ -6,12 +7,15 @@ public sealed class CDSChildNodeDSListener<TKey, TDocument, TCreate, TSelect, TU
 {
 	IDataSource<TKey, TDocument, TCreate, TSelect, TUpdate, TDelete, TRestore> _dataSource = null!;
 	IEnumerable<ICDSCondition> _parentNodeConds;
+	
+	public override OKeyName KeyName { get; }
 
-	public CDSChildNodeDSListener(IEnumerable<ICDSCondition> parentNodeConds)
+	public CDSChildNodeDSListener(IEnumerable<ICDSCondition> parentNodeConds, OKeyName keyName)
 	{
 		if (parentNodeConds == null) throw new ArgumentNullException(nameof(parentNodeConds));
 
 		_parentNodeConds = parentNodeConds;
+		KeyName = keyName;
 	}
 
 	public override async ValueTask OnAttachAsync(IDataSource dataSource)

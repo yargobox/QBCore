@@ -26,6 +26,8 @@ public record AddQBCoreOptions
 	public Func<Assembly, bool> AssemblySelector { get; set; } = _ => true;
 	public Func<Type, bool> TypeSelector { get; set; } = _ => true;
 	public Func<Type, bool> DocumentExclusionSelector { get; set; } = _ => false;
+	public Func<Type, bool> DataContextProviderSelector { get; set; } = type
+		=> type.IsClass && !type.IsAbstract && !type.IsGenericType && !type.IsGenericTypeDefinition && type.GetInterfaceOf(typeof(IDataContextProvider)) != null;
 	public Func<Type, bool> DataSourceSelector { get; set; } = type
 		=> type.IsClass && !type.IsAbstract && !type.IsGenericType && !type.IsGenericTypeDefinition && type.GetSubclassOf(typeof(DataSource<,,,,,,,>)) != null;
 	public Func<Type, bool> ComplexDataSourceSelector { get; set; } = type
@@ -123,6 +125,8 @@ public static class ExtensionsForAddQBCore
 
 		DataSourceDocuments.DocumentExclusionSelector = options.DocumentExclusionSelector;
 
+		((List<Type>)DataSourceDocuments.DataContextProviders).AddRange(atypes.Where(x => options.DataContextProviderSelector(x)));
+
 		IDSInfo pDSInfo;
 		foreach (var type in atypes.Where(x => options.DataSourceSelector(x)))
 		{
@@ -167,7 +171,7 @@ public static class ExtensionsForAddQBCore
 		foreach (var definition in StaticFactory.DataSources)
 		{
 			var dataSourceType = definition.Value.ConcreteType;
-			implementationFactory = sp => ActivatorUtilities.CreateInstance(sp, dataSourceType, sp, sp.GetRequiredService<IDataContextProvider>());
+			implementationFactory = sp => ActivatorUtilities.CreateInstance(sp, dataSourceType, sp);
 
 			if (definition.Value.DataSourceServiceType == dataSourceType)
 			{

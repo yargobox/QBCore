@@ -11,7 +11,7 @@ namespace Example1.BLL.Services;
 [DataSource("brand", typeof(MongoDataLayer), DataSourceOptions.SoftDelete)]
 public sealed class BrandService : DataSource<int?, Brand, BrandCreateDto, BrandSelectDto, BrandUpdateDto, SoftDelDto, SoftDelDto, BrandService>
 {
-	public BrandService(IServiceProvider serviceProvider, IDataContextProvider dataContextProvider) : base(serviceProvider, dataContextProvider) { }
+	public BrandService(IServiceProvider serviceProvider) : base(serviceProvider) { }
 
 	static void DefinitionBuilder(IDSBuilder builder)
 	{

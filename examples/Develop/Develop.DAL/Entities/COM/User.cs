@@ -2,7 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Develop.DAL.PostgreSQL;
 
-namespace Develop.DAL.Entities.COM;
+namespace Develop.Entities.COM;
 
 public class User
 {

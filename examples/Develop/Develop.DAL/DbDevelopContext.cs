@@ -1,17 +1,27 @@
-using Develop.DAL.Entities.COM;
-using Develop.DAL.Entities.DVP;
+using Develop.Entities.COM;
+using Develop.Entities.DVP;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
+using QBCore.Configuration;
 
 namespace Develop.DAL;
 
-public class DbDevelopContext : DbContext
+public class DbDevelopContext : DbContext, IEfDbContextLogger
 {
+	private volatile List<Action<string>>? _queryStringCallbacks;
+
+	/// <summary>
+    /// A callback delegate for logging a query string. Adding and removing the delegate here is not thread-safe for performance reasons.
+    /// </summary>
+	public event Action<string>? QueryStringCallback
+	{
+		add => (_queryStringCallbacks ??= new List<Action<string>>(2)).Add(value ?? throw new ArgumentNullException(nameof(value)));
+		remove => _queryStringCallbacks?.Remove(value!);
+	}
+
 	public DbDevelopContext(DbContextOptions<DbDevelopContext> options)
         : base(options)
 	{
-		//Database.EnsureDeleted();
-		//Database.EnsureCreated();
-		//Database.Migrate();
 	}
 
 	public virtual DbSet<User> Users { get; set; } = null!;
@@ -43,6 +53,25 @@ public class DbDevelopContext : DbContext
 	protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
 	{
 		configurationBuilder.Properties<string>().UseCollation("uk-UA-x-icu");
+
+		base.ConfigureConventions(configurationBuilder);
+	}
+
+	protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
+	{
+		optionsBuilder.LogTo(
+			OnQueryStringCallback,
+			//new string[] { DbLoggerCategory.Query.Name, DbLoggerCategory.Database.Command.Name, DbLoggerCategory.Database.Transaction.Name },
+			new EventId[] { Microsoft.EntityFrameworkCore.Diagnostics.RelationalEventId.CommandExecuted.Id },
+			LogLevel.Trace)
+			.EnableSensitiveDataLogging();
+
+		base.OnConfiguring(optionsBuilder);
+	}
+
+	private void OnQueryStringCallback(string queryString)
+	{
+		_queryStringCallbacks?.ForEach(x => x(queryString));
 	}
 
 	protected override void OnModelCreating(ModelBuilder modelBuilder)

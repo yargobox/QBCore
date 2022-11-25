@@ -8,5 +8,7 @@ public sealed record SqlDbSettings
 	public string Password { get; set; } = null!;
 	public string Catalog { get; set; } = null!;
 
-	public override string ToString() => $"Host={Host};Port={Port};Database={Catalog};Username={User};Password={Password}";
+	public string ConnectionString() => $"Host={Host};Port={Port};Database={Catalog};Username={User};Password={Password}";
+
+	public override string ToString() => $"{User}@{Host}:{Port}/{Catalog}";
 }

@@ -24,7 +24,7 @@ internal sealed partial class SelectQueryBuilder<TDocument, TSelect> : QueryBuil
 				var top = Builder.Containers.FirstOrDefault(x => x.ContainerOperation == ContainerOperations.Select);
 				if (top?.ContainerType == ContainerTypes.Table || top?.ContainerType == ContainerTypes.View)
 				{
-					_collection = _mongoDbContext.DB.GetCollection<TDocument>(top!.DBSideName);
+					_collection = _mongoDbContext.AsMongoDatabase().GetCollection<TDocument>(top!.DBSideName);
 				}
 				else
 				{

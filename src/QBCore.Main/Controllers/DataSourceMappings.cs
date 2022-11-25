@@ -18,6 +18,10 @@ public class DataSourceMappings : Profile
 			{
 				CreateMap(info.DSTypeInfo.TUpdate, info.DSTypeInfo.TDocument);
 			}
+			if (info.DSTypeInfo.TSelect != info.DSTypeInfo.TSelect && info.DSTypeInfo.TSelect != typeof(NotSupported) && info.Options.HasFlag(DataSourceOptions.CanSelect))
+			{
+				CreateMap(info.DSTypeInfo.TDocument, info.DSTypeInfo.TSelect);
+			}
 		}
 	}
 
@@ -39,9 +43,16 @@ public class DataSourceMappings : Profile
 			}
 			if (info.DSTypeInfo.TUpdate != info.DSTypeInfo.TDocument && info.DSTypeInfo.TUpdate != typeof(NotSupported) && info.Options.HasFlag(DataSourceOptions.CanUpdate))
 			{
-				if (createDefaultMap(info.DSTypeInfo.TCreate, info.DSTypeInfo.TDocument))
+				if (createDefaultMap(info.DSTypeInfo.TUpdate, info.DSTypeInfo.TDocument))
 				{
 					CreateMap(info.DSTypeInfo.TUpdate, info.DSTypeInfo.TDocument);
+				}
+			}
+			if (info.DSTypeInfo.TSelect != info.DSTypeInfo.TDocument && info.DSTypeInfo.TSelect != typeof(NotSupported) && info.Options.HasFlag(DataSourceOptions.CanSelect))
+			{
+				if (createDefaultMap(info.DSTypeInfo.TDocument, info.DSTypeInfo.TSelect))
+				{
+					CreateMap(info.DSTypeInfo.TDocument, info.DSTypeInfo.TSelect);
 				}
 			}
 		}

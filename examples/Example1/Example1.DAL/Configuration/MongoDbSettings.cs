@@ -8,5 +8,7 @@ public sealed record MongoDbSettings
 	public string Password { get; set; } = null!;
 	public string Catalog { get; set; } = null!;
 
-	public override string ToString() => $"mongodb://{User}:{Password}@{Host}:{Port}";
+	public string ConnectionString => $"mongodb://{User}:{Password}@{Host}:{Port}";
+
+	public override string ToString() => $"{User}@{Host}:{Port}/{Catalog}";
 }

@@ -15,7 +15,7 @@ public abstract partial class DataSource<TKey, TDocument, TCreate, TSelect, TUpd
 			Interlocked.CompareExchange(ref _internalObjects, new ConcurrentDictionary<OKeyName, object?>(), null);
 		}
 
-		_internalObjects.AddOrUpdate(listener.OK, listener);
+		_internalObjects[listener.KeyName] = listener;
 	}
 	public void RemoveListener<T>(T listener) where T : DataSourceListener<TKey, TDocument, TCreate, TSelect, TUpdate, TDelete, TRestore>
 	{

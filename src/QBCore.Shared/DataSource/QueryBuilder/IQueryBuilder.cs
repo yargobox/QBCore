@@ -10,7 +10,7 @@ public interface IQueryBuilder
 	DSDocumentInfo DocumentInfo { get; }
 	Type ProjectionType { get; }
 	DSDocumentInfo? ProjectionInfo { get; }
-	Type DatabaseContextInterfaceType { get; }
+	Type DataContextInterfaceType { get; }
 	IDataContext DataContext { get; }
 }
 
@@ -33,7 +33,7 @@ public interface ISelectQueryBuilder<TDocument, TSelect> : IQueryBuilder<TDocume
 
 public interface IUpdateQueryBuilder<TDocument, TUpdate> : IQueryBuilder<TDocument, TUpdate>
 {
-	Task<TDocument> UpdateAsync(object id, TDocument document, IReadOnlySet<string>? modifiedFieldNames = null, DataSourceUpdateOptions? options = null, CancellationToken cancellationToken = default(CancellationToken));
+	Task<TDocument?> UpdateAsync(object id, TUpdate document, IReadOnlySet<string>? validFieldNames = null, DataSourceUpdateOptions? options = null, CancellationToken cancellationToken = default(CancellationToken));
 }
 
 public interface IDeleteQueryBuilder<TDocument, TDelete> : IQueryBuilder<TDocument, TDelete>
