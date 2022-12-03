@@ -55,13 +55,13 @@ internal sealed class DeleteQueryBuilder<TDocument, TDelete> : QueryBuilder<TDoc
 
 		if (options != null)
 		{
-			if (options.QueryStringAsyncCallback != null)
+			if (options.QueryStringCallbackAsync != null)
 			{
 				var queryString = string.Concat(
 					"db.", top.DBSideName, ".deleteOne(",
 					filter.Render(BsonSerializer.SerializerRegistry.GetSerializer<TDocument>(), BsonSerializer.SerializerRegistry).ToString(), ");"
 				);
-				await options.QueryStringAsyncCallback(queryString).ConfigureAwait(false);
+				await options.QueryStringCallbackAsync(queryString).ConfigureAwait(false);
 			}
 			else if (options.QueryStringCallback != null)
 			{

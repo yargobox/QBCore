@@ -79,7 +79,7 @@ internal sealed class RestoreQueryBuilder<TDocument, TRestore> : QueryBuilder<TD
 
 		if (options != null)
 		{
-			if (options.QueryStringAsyncCallback != null)
+			if (options.QueryStringCallbackAsync != null)
 			{
 				var queryString = string.Concat(
 					"db.", top.DBSideName, ".updateOne(", Environment.NewLine,
@@ -88,7 +88,7 @@ internal sealed class RestoreQueryBuilder<TDocument, TRestore> : QueryBuilder<TD
 					  "\t{\"upsert\": false}", Environment.NewLine,
 					");"
 				);
-				await options.QueryStringAsyncCallback(queryString).ConfigureAwait(false);
+				await options.QueryStringCallbackAsync(queryString).ConfigureAwait(false);
 			}
 			else if (options.QueryStringCallback != null)
 			{

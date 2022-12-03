@@ -76,7 +76,7 @@ internal sealed class SoftDelQueryBuilder<TDocument, TDelete> : QueryBuilder<TDo
 
 		if (options != null)
 		{
-			if (options.QueryStringAsyncCallback != null)
+			if (options.QueryStringCallbackAsync != null)
 			{
 				var queryString = string.Concat(
 					"db.", top.DBSideName, ".updateOne(", Environment.NewLine,
@@ -85,7 +85,7 @@ internal sealed class SoftDelQueryBuilder<TDocument, TDelete> : QueryBuilder<TDo
 					  "\t{\"upsert\": false}", Environment.NewLine,
 					");"
 				);
-				await options.QueryStringAsyncCallback(queryString).ConfigureAwait(false);
+				await options.QueryStringCallbackAsync(queryString).ConfigureAwait(false);
 			}
 			else if (options.QueryStringCallback != null)
 			{

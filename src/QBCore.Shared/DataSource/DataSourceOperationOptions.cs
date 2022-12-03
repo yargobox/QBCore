@@ -5,7 +5,7 @@ public class DataSourceOperationOptions
 	public object? NativeOptions;
 	public object? NativeClientSession;
 	public Action<string>? QueryStringCallback;
-	public Func<string, Task>? QueryStringAsyncCallback;
+	public Func<string, Task>? QueryStringCallbackAsync;
 }
 
 public class DataSourceIdGeneratorOptions : DataSourceOperationOptions { }

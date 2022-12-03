@@ -14,10 +14,7 @@ public sealed class DSTypeInfo
 
 	public DSTypeInfo(Type dataSourceConcreteType)
 	{
-		if (dataSourceConcreteType == null)
-		{
-			throw new ArgumentNullException(nameof(dataSourceConcreteType));
-		}
+		if (dataSourceConcreteType == null) throw new ArgumentNullException(nameof(dataSourceConcreteType));
 
 		Concrete = dataSourceConcreteType;
 		Interface = dataSourceConcreteType.GetInterfaceOf(typeof(IDataSource<,,,,,,>)) ??
@@ -31,5 +28,18 @@ public sealed class DSTypeInfo
 		TUpdate = genericArgs[4];
 		TDelete = genericArgs[5];
 		TRestore = genericArgs[6];
+	}
+
+	public DSTypeInfo(Type Concrete, Type Interface, Type TKey, Type TDocument, Type TCreate, Type TSelect, Type TUpdate, Type TDelete, Type TRestore)
+	{
+		this.Concrete = Concrete;
+		this.Interface = Interface;
+		this.TKey = TKey;
+		this.TDocument = TDocument;
+		this.TCreate = TCreate;
+		this.TSelect = TSelect;
+		this.TUpdate = TUpdate;
+		this.TDelete = TDelete;
+		this.TRestore = TRestore;
 	}
 }

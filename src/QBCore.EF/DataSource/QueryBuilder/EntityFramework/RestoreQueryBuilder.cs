@@ -80,9 +80,9 @@ internal sealed class RestoreQueryBuilder<TDocument, TRestore> : QueryBuilder<TD
 
 				logger.QueryStringCallback += options.QueryStringCallback;
 			}
-			else if (options.QueryStringAsyncCallback != null)
+			else if (options.QueryStringCallbackAsync != null)
 			{
-				throw new NotSupportedException($"{nameof(DataSourceRestoreOptions)}.{nameof(DataSourceRestoreOptions.QueryStringAsyncCallback)} is not supported.");
+				throw new NotSupportedException($"{nameof(DataSourceRestoreOptions)}.{nameof(DataSourceRestoreOptions.QueryStringCallbackAsync)} is not supported.");
 			}
 		}
 

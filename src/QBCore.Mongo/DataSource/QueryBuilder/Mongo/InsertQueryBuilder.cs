@@ -53,7 +53,7 @@ internal sealed class InsertQueryBuilder<TDocument, TCreate> : QueryBuilder<TDoc
 			generatorOptions = options.GeneratorOptions ?? new DataSourceIdGeneratorOptions();
 			generatorOptions.NativeClientSession ??= options.NativeClientSession;
 			generatorOptions.QueryStringCallback ??= options.QueryStringCallback;
-			generatorOptions.QueryStringAsyncCallback ??= options.QueryStringAsyncCallback;
+			generatorOptions.QueryStringCallbackAsync ??= options.QueryStringCallbackAsync;
 		}
 
 		for (int i = 0; ; )
@@ -94,10 +94,10 @@ internal sealed class InsertQueryBuilder<TDocument, TCreate> : QueryBuilder<TDoc
 
 			if (options != null)
 			{
-				if (options.QueryStringAsyncCallback != null)
+				if (options.QueryStringCallbackAsync != null)
 				{
 					var queryString = string.Concat("db.", top.DBSideName, ".insertOne(", document.ToBsonDocument().ToString(), ");");
-					await options.QueryStringAsyncCallback(queryString).ConfigureAwait(false);
+					await options.QueryStringCallbackAsync(queryString).ConfigureAwait(false);
 				}
 				else if (options.QueryStringCallback != null)
 				{

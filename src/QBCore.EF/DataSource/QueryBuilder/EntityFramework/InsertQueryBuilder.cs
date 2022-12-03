@@ -76,9 +76,9 @@ internal sealed class InsertQueryBuilder<TDocument, TCreate> : QueryBuilder<TDoc
 
 			logger.QueryStringCallback += options.QueryStringCallback;
 		}
-		else if (options?.QueryStringAsyncCallback != null)
+		else if (options?.QueryStringCallbackAsync != null)
 		{
-			throw new NotSupportedException($"{nameof(DataSourceOperationOptions)}.{nameof(DataSourceOperationOptions.QueryStringAsyncCallback)} is not supported.");
+			throw new NotSupportedException($"{nameof(DataSourceOperationOptions)}.{nameof(DataSourceOperationOptions.QueryStringCallbackAsync)} is not supported.");
 		}
 	}
 

@@ -223,10 +223,10 @@ internal sealed partial class SelectQueryBuilder<TDocument, TSelect> : QueryBuil
 
 		if (options != null)
 		{
-			if (options.QueryStringAsyncCallback != null)
+			if (options.QueryStringCallbackAsync != null)
 			{
 				var queryString = string.Concat("db.", Builder.Containers.First().DBSideName, ".aggregate(", new BsonArray(query).ToString(), ");");
-				await options.QueryStringAsyncCallback(queryString).ConfigureAwait(false);
+				await options.QueryStringCallbackAsync(queryString).ConfigureAwait(false);
 			}
 			else if (options.QueryStringCallback != null)
 			{
@@ -284,10 +284,10 @@ internal sealed partial class SelectQueryBuilder<TDocument, TSelect> : QueryBuil
 			{
 				options.NativeSelectQueryCallback(query);
 			}
-			if (options.QueryStringAsyncCallback != null)
+			if (options.QueryStringCallbackAsync != null)
 			{
 				var queryString = string.Concat("db.", Builder.Containers.First().DBSideName, ".aggregate(", new BsonArray(query).ToString(), ");");
-				await options.QueryStringAsyncCallback(queryString).ConfigureAwait(false);
+				await options.QueryStringCallbackAsync(queryString).ConfigureAwait(false);
 			}
 			else if (options.QueryStringCallback != null)
 			{

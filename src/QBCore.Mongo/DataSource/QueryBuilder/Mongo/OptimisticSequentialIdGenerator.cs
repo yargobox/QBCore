@@ -171,13 +171,13 @@ public class OptimisticSequentialIdGenerator<TDocument, TIdNamespace> : IDSIdGen
 			var clientSessionHandle = (IClientSessionHandle?)options?.NativeClientSession;
 			var query = Step > 0 ? SequentialIdGeneratorBase.MaxIDQuery : SequentialIdGeneratorBase.MinIDQuery;
 
-			if (options?.QueryStringAsyncCallback != null)
+			if (options?.QueryStringCallbackAsync != null)
 			{
 				var queryString = string.Concat(
 					"db.", collection.CollectionNamespace.CollectionName, ".aggregate(",
 						Step > 0 ? SequentialIdGeneratorBase.MaxIDQueryString : SequentialIdGeneratorBase.MinIDQueryString,
 					");");
-				await options.QueryStringAsyncCallback(queryString).ConfigureAwait(false);
+				await options.QueryStringCallbackAsync(queryString).ConfigureAwait(false);
 			}
 			else if (options?.QueryStringCallback != null)
 			{

@@ -171,7 +171,7 @@ internal sealed class UpdateQueryBuilder<TDocument, TUpdate> : QueryBuilder<TDoc
 
 	private async ValueTask CallQueryStringCallback(DataSourceOperationOptions? options, IMongoCollection<TDocument> collection, string funcName, FilterDefinition<TDocument> filter, UpdateDefinition<TDocument> update)
 	{
-		if (options?.QueryStringAsyncCallback != null)
+		if (options?.QueryStringCallbackAsync != null)
 		{
 			var queryString = string.Concat(
 				"db.", collection.CollectionNamespace.FullName, ".", funcName, "(", Environment.NewLine,
@@ -180,7 +180,7 @@ internal sealed class UpdateQueryBuilder<TDocument, TUpdate> : QueryBuilder<TDoc
 					"\t{\"upsert\": false}", Environment.NewLine,
 				");"
 			);
-			await options.QueryStringAsyncCallback(queryString).ConfigureAwait(false);
+			await options.QueryStringCallbackAsync(queryString).ConfigureAwait(false);
 		}
 		else if (options?.QueryStringCallback != null)
 		{
@@ -197,14 +197,14 @@ internal sealed class UpdateQueryBuilder<TDocument, TUpdate> : QueryBuilder<TDoc
 
 	private async ValueTask CallQueryStringCallback(DataSourceOperationOptions? options, IMongoCollection<TDocument> collection, string funcName, FilterDefinition<TDocument> filter)
 	{
-		if (options?.QueryStringAsyncCallback != null)
+		if (options?.QueryStringCallbackAsync != null)
 		{
 			var queryString = string.Concat(
 				"db.", collection.CollectionNamespace.FullName, ".", funcName, "(", Environment.NewLine,
 					"\t", filter.ToString(), ",", Environment.NewLine,
 				");"
 			);
-			await options.QueryStringAsyncCallback(queryString).ConfigureAwait(false);
+			await options.QueryStringCallbackAsync(queryString).ConfigureAwait(false);
 		}
 		else if (options?.QueryStringCallback != null)
 		{

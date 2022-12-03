@@ -49,9 +49,9 @@ internal sealed partial class SelectQueryBuilder<TDocument, TSelect> : QueryBuil
 
 				logger.QueryStringCallback += options.QueryStringCallback;
 			}
-			else if (options.QueryStringAsyncCallback != null)
+			else if (options.QueryStringCallbackAsync != null)
 			{
-				throw new NotSupportedException($"{nameof(DataSourceCountOptions)}.{nameof(DataSourceCountOptions.QueryStringAsyncCallback)} is not supported.");
+				throw new NotSupportedException($"{nameof(DataSourceCountOptions)}.{nameof(DataSourceCountOptions.QueryStringCallbackAsync)} is not supported.");
 			}
 		}
 
@@ -128,9 +128,9 @@ internal sealed partial class SelectQueryBuilder<TDocument, TSelect> : QueryBuil
 
 				logger.QueryStringCallback += options.QueryStringCallback;
 			}
-			else if (options.QueryStringAsyncCallback != null)
+			else if (options.QueryStringCallbackAsync != null)
 			{
-				throw new NotSupportedException($"{nameof(DataSourceCountOptions)}.{nameof(DataSourceCountOptions.QueryStringAsyncCallback)} is not supported.");
+				throw new NotSupportedException($"{nameof(DataSourceCountOptions)}.{nameof(DataSourceCountOptions.QueryStringCallbackAsync)} is not supported.");
 			}
 		}
 

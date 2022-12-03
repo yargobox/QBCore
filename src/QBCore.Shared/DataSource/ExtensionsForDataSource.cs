@@ -21,6 +21,9 @@ public static class ExtensionsForDataSource
 		=> dataSourceType.GetDataSourceInterface().GetGenericArguments()[5];
 	public static Type GetDataSourceTRestore(this Type dataSourceType)
 		=> dataSourceType.GetDataSourceInterface().GetGenericArguments()[6];
+	
+	public static DSTypeInfo ToDSTypeInfo(this Type dataSourceType)
+		=> new DSTypeInfo(dataSourceType);
 
 	public static T AsInfo<T>(this IAppObjectInfo appObject)
 	{
