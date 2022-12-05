@@ -17,12 +17,12 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using QBCore.Configuration;
 using QBCore.DataSource;
 using QBCore.ObjectFactory;
+using QBCore.ObjectFactory.Internals;
 
 namespace QBCore.Controllers;
 
 public record AddQBCoreOptions
 {
-	public Func<AssemblyPart, bool> AssemblyPartSelector { get; set; } = _ => true;
 	public Func<Assembly, bool> AssemblySelector { get; set; } = _ => true;
 	public Func<Type, bool> TypeSelector { get; set; } = _ => true;
 	public Func<Type, bool> DocumentExclusionSelector { get; set; } = _ => false;
@@ -64,7 +64,7 @@ public static class ExtensionsForAddQBCore
 			setupOptions(options);
 		}
 
-		AddQBCoreRegisters(builder.Services, options, builder.PartManager);
+		AddQBCoreRegisters(builder.Services, options, builder.PartManager.ApplicationParts.OfType<AssemblyPart>().Select(x => x.Assembly).ToArray());
 		return builder;
 	}
 	public static IMvcCoreBuilder AddQBCore(this IMvcCoreBuilder builder, Action<AddQBCoreOptions>? setupOptions = null)
@@ -75,7 +75,7 @@ public static class ExtensionsForAddQBCore
 			setupOptions(options);
 		}
 
-		AddQBCoreRegisters(builder.Services, options, builder.PartManager);
+		AddQBCoreRegisters(builder.Services, options, builder.PartManager.ApplicationParts.OfType<AssemblyPart>().Select(x => x.Assembly).ToArray());
 		return builder;
 	}
 	public static IServiceCollection AddQBCore(this IServiceCollection services, Action<AddQBCoreOptions>? setupOptions = null, params Assembly[] assemblies)
@@ -101,18 +101,6 @@ public static class ExtensionsForAddQBCore
 
 		return services.AddQBCoreRegisters(options, types);
 	}
-	private static IServiceCollection AddQBCoreRegisters(this IServiceCollection services, AddQBCoreOptions options, ApplicationPartManager partManager)
-	{
-		var types = partManager
-			.ApplicationParts
-			.Where(x => x is AssemblyPart)
-			.Cast<AssemblyPart>()
-			.Where(x => options.AssemblyPartSelector(x) && options.AssemblySelector(x.Assembly))
-			.SelectMany(x => x.Types.Where(x => options.TypeSelector(x)))
-			.Distinct();
-
-		return services.AddQBCoreRegisters(options, types);
-	}
 	private static IServiceCollection AddQBCoreRegisters(this IServiceCollection services, AddQBCoreOptions options, IEnumerable<Type> types)
 	{
 		if (IsAddQBCoreCalled)
@@ -124,58 +112,31 @@ public static class ExtensionsForAddQBCore
 		var atypes = (types as Type[]) ?? types.ToArray();
 
 		DataSourceDocuments.DocumentExclusionSelector = options.DocumentExclusionSelector;
-
 		((List<Type>)DataSourceDocuments.DataContextProviders).AddRange(atypes.Where(x => options.DataContextProviderSelector(x)));
 
-		IDSInfo pDSInfo;
-		foreach (var type in atypes.Where(x => options.DataSourceSelector(x)))
-		{
-			pDSInfo = StaticFactory.DataSources.GetOrRegisterObject(type);
-			StaticFactory.AppObjects.RegisterObject(pDSInfo);
-		}
-
-		ICDSInfo pCDSInfo;
-		foreach (var type in atypes.Where(x => options.ComplexDataSourceSelector(x)))
-		{
-			pCDSInfo = StaticFactory.ComplexDataSources.GetOrRegisterObject(type);
-			StaticFactory.AppObjects.RegisterObject(pCDSInfo);
-		}
-
-		AddBusinessObjects();
+		var registeredDataSources = StaticFactory.RegisterRange(StaticFactory.DataSources.DSInfoFactoryMethod, atypes.Where(x => options.DataSourceSelector(x)));
+		StaticFactory.RegisterRange(StaticFactory.ComplexDataSources.CDSInfoFactoryMethod, atypes.Where(x => options.ComplexDataSourceSelector(x)));
 
 		services.TryAddSingleton<DataSourceRouteValueTransformer>();
 		services.TryAddScoped<IDSRequestContext>(_ => new DSRequestContext());
-		AddDataSourcesAsServices(services);
+		AddDataSourcesAsServices(services, registeredDataSources);
 
 		return services;
 	}
-
-	private static void AddBusinessObjects()
-	{
-		var registry = (IFactoryObjectRegistry<string, BusinessObject>)StaticFactory.BusinessObjects;
-		BusinessObject bo;
-		
-		foreach (var definition in StaticFactory.DataSources)
-		{
-			bo = new BusinessObject("DS", string.Intern(definition.Value.Name), definition.Value.ConcreteType);
-			
-			registry.TryRegisterObject(bo.Key, bo);
-		}
-	}
 	
-	private static void AddDataSourcesAsServices(IServiceCollection services)
+	private static void AddDataSourcesAsServices(IServiceCollection services, List<IDSInfo> dataSources)
 	{
 		Type transientInterface, transientType = typeof(ITransient<>);
 		Func<IServiceProvider, object> implementationFactory;
 
-		foreach (var definition in StaticFactory.DataSources)
+		foreach (var info in dataSources)
 		{
-			var dataSourceType = definition.Value.ConcreteType;
+			var dataSourceType = info.ConcreteType;
 			implementationFactory = sp => ActivatorUtilities.CreateInstance(sp, dataSourceType, sp);
 
-			if (definition.Value.DataSourceServiceType == dataSourceType)
+			if (info.DataSourceServiceType == dataSourceType)
 			{
-				if (definition.Value.IsServiceSingleton)
+				if (info.IsServiceSingleton)
 				{
 					services.TryAddSingleton(dataSourceType, implementationFactory);
 				}
@@ -192,16 +153,16 @@ public static class ExtensionsForAddQBCore
 			}
 			else
 			{
-				if (definition.Value.IsServiceSingleton)
+				if (info.IsServiceSingleton)
 				{
-					services.TryAddSingleton(definition.Value.DataSourceServiceType, implementationFactory);
+					services.TryAddSingleton(info.DataSourceServiceType, implementationFactory);
 				}
 				else
 				{
-					services.TryAddScoped(definition.Value.DataSourceServiceType, implementationFactory);
+					services.TryAddScoped(info.DataSourceServiceType, implementationFactory);
 				}
 
-				transientInterface = transientType.MakeGenericType(definition.Value.DataSourceServiceType);
+				transientInterface = transientType.MakeGenericType(info.DataSourceServiceType);
 				if (transientInterface.IsAssignableFrom(dataSourceType))
 				{
 					services.TryAddTransient(transientInterface, implementationFactory);

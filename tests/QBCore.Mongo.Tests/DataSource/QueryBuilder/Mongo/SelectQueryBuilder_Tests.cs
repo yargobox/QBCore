@@ -1,36 +1,22 @@
 using FluentAssertions;
-using Microsoft.Extensions.DependencyInjection;
-using MongoDB.Bson;
-using MongoDB.Bson.Serialization;
-using MongoDB.Bson.Serialization.Conventions;
-using MongoDB.Bson.Serialization.Serializers;
 using MongoDB.Driver;
 using QBCore.Configuration;
-using QBCore.Controllers;
+using QBCore.Controllers.Tests;
 using QBCore.DataSource.Options;
 
 namespace QBCore.DataSource.QueryBuilder.Mongo.Tests;
 
-public class SelectQueryBuilder_Tests : IDisposable
+[Collection(nameof(GlobalTestFixture))]
+public class SelectQueryBuilder_Tests
 {
-	private static IServiceProvider _serviceProvider;
-
-	static SelectQueryBuilder_Tests()
+	public SelectQueryBuilder_Tests(GlobalTestFixture fixture)
 	{
-		BsonSerializer.RegisterSerializer(new GuidSerializer(BsonType.String));
-		BsonSerializer.RegisterSerializer(new DateTimeOffsetSerializer(BsonType.String));
-		BsonSerializer.RegisterSerializer(new DecimalSerializer(BsonType.String));
-		ConventionRegistry.Register("camelCase", new ConventionPack { new CamelCaseElementNameConvention() }, _ => true);
-
-		var scopeFactory = new DefaultServiceProviderFactory(new ServiceProviderOptions { ValidateScopes = true });
-		var services =
-			scopeFactory.CreateBuilder(new ServiceCollection())
-			.AddQBCore(null, typeof(Document).Assembly);
-
-		_serviceProvider = scopeFactory.CreateServiceProvider(services);
 	}
 
-	private sealed class AggregateAsyncStub
+	/// <summary>
+    /// Mocks IDataContext that mocks IMongoDatabase.GetCollection().AggregateAsync() to intercept its arguments during the query builder invocation.
+    /// </summary>
+	sealed class MongoCollectionAggregateAsyncStub
 	{
 		public readonly IDataContext DataContext;
 
@@ -39,7 +25,7 @@ public class SelectQueryBuilder_Tests : IDisposable
 		public AggregateOptions? AggregateOptionsArg;
 		public CancellationToken AggregateCancellationTokenArg;
 
-		public AggregateAsyncStub()
+		public MongoCollectionAggregateAsyncStub()
 		{
 			var fnAggregateAsync = void (PipelineDefinition<Document, DocumentSelectDto> pipeline, AggregateOptions options, CancellationToken cancellationToken) =>
 			{
@@ -81,7 +67,7 @@ public class SelectQueryBuilder_Tests : IDisposable
 	public async Task SelectAsync_WithSelectBuilder_1_PerformsExpectedQuery()
 	{
 		var qbFactory = CreateQBFactory<int, Document, DocumentSelectDto>(DocumentSelectDto.SelectBuilder_1);
-		var stub = new AggregateAsyncStub();
+		var stub = new MongoCollectionAggregateAsyncStub();
 		var qbSelect = qbFactory.CreateQBSelect<Document, DocumentSelectDto>(stub.DataContext);
 
 		using var cursor = await qbSelect.SelectAsync();
@@ -96,7 +82,7 @@ public class SelectQueryBuilder_Tests : IDisposable
 	public async Task SelectAsync_WithSelectBuilder_2_WithSkipAndTakeAndQueryStringCallback_PerformsExpectedQuery()
 	{
 		var qbFactory = CreateQBFactory<int, Document, DocumentSelectDto>(DocumentSelectDto.SelectBuilder_2);
-		var stub = new AggregateAsyncStub();
+		var stub = new MongoCollectionAggregateAsyncStub();
 		var qbSelect = qbFactory.CreateQBSelect<Document, DocumentSelectDto>(stub.DataContext);
 
 		string? queryString = null;
@@ -118,7 +104,7 @@ public class SelectQueryBuilder_Tests : IDisposable
 	public async Task SelectAsync_WithSelectBuilder_3_WithOptionsAndQueryStringCallbackAsync_PerformsExpectedQuery()
 	{
 		var qbFactory = CreateQBFactory<int, Document, DocumentSelectDto>(DocumentSelectDto.SelectBuilder_3);
-		var stub = new AggregateAsyncStub();
+		var stub = new MongoCollectionAggregateAsyncStub();
 		var qbSelect = qbFactory.CreateQBSelect<Document, DocumentSelectDto>(stub.DataContext);
 
 		string? queryString = null;
@@ -147,7 +133,7 @@ public class SelectQueryBuilder_Tests : IDisposable
 	public async Task SelectAsync_WithSelectBuilder_4_PerformsExpectedQuery()
 	{
 		var qbFactory = CreateQBFactory<int, Document, DocumentSelectDto>(DocumentSelectDto.SelectBuilder_4);
-		var stub = new AggregateAsyncStub();
+		var stub = new MongoCollectionAggregateAsyncStub();
 		var qbSelect = qbFactory.CreateQBSelect<Document, DocumentSelectDto>(stub.DataContext);
 
 		using var cursor = await qbSelect.SelectAsync();
@@ -159,7 +145,7 @@ public class SelectQueryBuilder_Tests : IDisposable
 	public async Task SelectAsync_WithSelectBuilder_5_PerformsExpectedQuery()
 	{
 		var qbFactory = CreateQBFactory<int, Document, DocumentSelectDto>(DocumentSelectDto.SelectBuilder_5);
-		var stub = new AggregateAsyncStub();
+		var stub = new MongoCollectionAggregateAsyncStub();
 		var qbSelect = qbFactory.CreateQBSelect<Document, DocumentSelectDto>(stub.DataContext);
 
 		using var cursor = await qbSelect.SelectAsync();
@@ -171,7 +157,7 @@ public class SelectQueryBuilder_Tests : IDisposable
 	public async Task SelectAsync_WithSelectBuilder_6_PerformsExpectedQuery()
 	{
 		var qbFactory = CreateQBFactory<int, Document, DocumentSelectDto>(DocumentSelectDto.SelectBuilder_6);
-		var stub = new AggregateAsyncStub();
+		var stub = new MongoCollectionAggregateAsyncStub();
 		var qbSelect = qbFactory.CreateQBSelect<Document, DocumentSelectDto>(stub.DataContext);
 
 		using var cursor = await qbSelect.SelectAsync();
@@ -183,7 +169,7 @@ public class SelectQueryBuilder_Tests : IDisposable
 	public async Task SelectAsync_WithSelectBuilder_7_PerformsExpectedQuery()
 	{
 		var qbFactory = CreateQBFactory<int, Document, DocumentSelectDto>(DocumentSelectDto.SelectBuilder_7);
-		var stub = new AggregateAsyncStub();
+		var stub = new MongoCollectionAggregateAsyncStub();
 		var qbSelect = qbFactory.CreateQBSelect<Document, DocumentSelectDto>(stub.DataContext);
 
 		using var cursor = await qbSelect.SelectAsync();
@@ -195,7 +181,7 @@ public class SelectQueryBuilder_Tests : IDisposable
 	public async Task SelectAsync_WithSelectBuilder_8_PerformsExpectedQuery()
 	{
 		var qbFactory = CreateQBFactory<int, Document, DocumentSelectDto>(DocumentSelectDto.SelectBuilder_8);
-		var stub = new AggregateAsyncStub();
+		var stub = new MongoCollectionAggregateAsyncStub();
 		var qbSelect = qbFactory.CreateQBSelect<Document, DocumentSelectDto>(stub.DataContext);
 
 		using var cursor = await qbSelect.SelectAsync();
@@ -207,7 +193,7 @@ public class SelectQueryBuilder_Tests : IDisposable
 	public async Task SelectAsync_WithSelectBuilder_9_PerformsExpectedQuery()
 	{
 		var qbFactory = CreateQBFactory<int, Document, DocumentSelectDto>(DocumentSelectDto.SelectBuilder_9);
-		var stub = new AggregateAsyncStub();
+		var stub = new MongoCollectionAggregateAsyncStub();
 		var qbSelect = qbFactory.CreateQBSelect<Document, DocumentSelectDto>(stub.DataContext);
 
 		using var cursor = await qbSelect.SelectAsync();
@@ -219,7 +205,7 @@ public class SelectQueryBuilder_Tests : IDisposable
 	public async Task SelectAsync_WithSelectBuilder_10_PerformsExpectedQuery()
 	{
 		var qbFactory = CreateQBFactory<int, Document, DocumentSelectDto>(DocumentSelectDto.SelectBuilder_10);
-		var stub = new AggregateAsyncStub();
+		var stub = new MongoCollectionAggregateAsyncStub();
 		var qbSelect = qbFactory.CreateQBSelect<Document, DocumentSelectDto>(stub.DataContext);
 
 		using var cursor = await qbSelect.SelectAsync();
@@ -243,13 +229,6 @@ public class SelectQueryBuilder_Tests : IDisposable
 		);
 
 		return new MongoQBFactory(dsTypeInfo, DataSourceOptions.CanSelect, null, selectBuilderMethod, null, null, null, null, true);
-	}
-
-	public void Dispose()
-	{
-		//var temp = _serviceProvider as IDisposable;
-		//_serviceProvider = null!;
-		//temp?.Dispose();
 	}
 
 	public class Document
@@ -463,7 +442,9 @@ public class SelectQueryBuilder_Tests : IDisposable
 	}
 
 
-	// We need a DS to make QBCore register document types: Document and DocumentSelectDto
+	/// <summary>
+    /// We need a DS definition to make QBCore register document types: Document and DocumentSelectDto
+    /// </summary>
 	[DsApiController, DataSource(typeof(MongoDataLayer))]
 	public sealed class TestDS : DataSource<int, Document, NotSupported, DocumentSelectDto, NotSupported, NotSupported, NotSupported, TestDS>
 	{

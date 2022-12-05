@@ -1,4 +1,5 @@
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using QBCore.ObjectFactory;
 
 namespace QBCore.DataSource;
@@ -17,12 +18,16 @@ public static class DataSourceDocuments
 
 	public static Func<Type, bool> DocumentExclusionSelector
 	{
+		[MethodImpl(MethodImplOptions.NoInlining)]
 		get => Singleton._documentExclusionSelector;
+
+		[MethodImpl(MethodImplOptions.NoInlining)]
 		set => Interlocked.Exchange(ref Singleton._documentExclusionSelector, value ?? throw new ArgumentNullException(nameof(value)));
 	}
 
 	public static IReadOnlyList<Type> DataContextProviders
 	{
+		[MethodImpl(MethodImplOptions.NoInlining)]
 		get => Singleton._dataContextProviders;
 	}
 

@@ -8,24 +8,20 @@ using MongoDB.Bson.Serialization.Serializers;
 using MongoDB.Driver;
 using QBCore.Configuration;
 using QBCore.Controllers;
+using QBCore.Controllers.Tests;
 using QBCore.DataSource;
 using QBCore.ObjectFactory;
 
 namespace Example1.BLL.Services.Tests;
 
+[Collection(nameof(GlobalTestFixture))]
 public class OrderService_Tests
 {
 	[Fact]
-	public async Task OrderService_()
+	public async Task UnitOfWork_StateUnderTest_ExpectedBehavior()
 	{
-		BsonSerializer.RegisterSerializer(new GuidSerializer(BsonType.String));
-		BsonSerializer.RegisterSerializer(new DateTimeOffsetSerializer(BsonType.String));
-		BsonSerializer.RegisterSerializer(new DecimalSerializer(BsonType.String));
-
-		ConventionRegistry.Register("camelCase", new ConventionPack { new CamelCaseElementNameConvention() }, _ => true);
-
-		var mongoDatabase = new Mock<IMongoDatabase>();
-		var mongoDataContextProvider = new Mock<IMongoDataContextProvider>();
+		var mongoDatabase = new Mock<IMongoDatabase>(MockBehavior.Strict);
+		var mongoDataContextProvider = new Mock<IMongoDataContextProvider>(MockBehavior.Strict);
 		mongoDataContextProvider
 			.Setup(dcp => dcp.Infos)
 			.Returns(new DataContextInfo[]
