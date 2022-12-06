@@ -3,6 +3,7 @@ using System.Reflection;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata;
 using QBCore.Configuration;
+using QBCore.ObjectFactory;
 
 namespace QBCore.DataSource;
 
@@ -39,7 +40,7 @@ internal sealed class EfDocumentInfo : DSDocumentInfo
 			List<DbContext>? dbContexts = new(2);
 			try
 			{
-				foreach (var type in DataSourceDocuments.DataContextProviders.Where(x => x.GetInterfaceOf(typeof(IEfDataContextProvider)) != null))
+				foreach (var type in StaticFactory.Internals.DataContextProviders.Where(x => x.GetInterfaceOf(typeof(IEfDataContextProvider)) != null))
 				{
 					using var provider = (IEfDataContextProvider?)Activator.CreateInstance(type)
 						?? throw new InvalidOperationException($"Data context provider '{type.Name}' must have a public parameterless constructor.");

@@ -17,11 +17,11 @@ public class GlobalTestFixture : IDisposable
 		BsonSerializer.RegisterSerializer(new DecimalSerializer(BsonType.String));
 		ConventionRegistry.Register("camelCase", new ConventionPack { new CamelCaseElementNameConvention() }, _ => true);
 
-		var scopeFactory = new DefaultServiceProviderFactory(new ServiceProviderOptions { ValidateScopes = true });
-		var services = scopeFactory.CreateBuilder(new ServiceCollection())
+		var services = new ServiceCollection();
+		services
 			.AddQBCore(null, typeof(GlobalTestFixture).Assembly);
 
-		ServiceProvider = scopeFactory.CreateServiceProvider(services);
+		ServiceProvider = services.BuildServiceProvider(true);
 	}
 
 	public void Dispose()

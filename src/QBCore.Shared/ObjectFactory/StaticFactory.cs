@@ -1,141 +1,277 @@
+using System.Collections.Concurrent;
+using System.Reflection;
+using QBCore.Configuration;
 using QBCore.DataSource;
 
 namespace QBCore.ObjectFactory;
 
 public static class StaticFactory
 {
-	public static IFactoryObjectDictionary<Type, Lazy<DSDocumentInfo>> Documents { get; } = new ConcurrentFactoryObjectRegistry<Type, Lazy<DSDocumentInfo>>();
-	public static IFactoryObjectDictionary<Type, IDSInfo> DataSources => _dataSources;
-	public static IFactoryObjectDictionary<Type, ICDSInfo> ComplexDataSources => _complexDataSources;
-	public static IFactoryObjectDictionary<string, IAppObjectInfo> AppObjects => _appObjects;
-	public static IFactoryObjectDictionary<string, IAppObjectInfo> AppObjectByControllerNames => _appObjectByControllerNames;
-	public static IFactoryObjectDictionary<string, BusinessObject> BusinessObjects => _businessObjects;
-	public static object SyncRoot => _syncRoot ?? Interlocked.CompareExchange(ref _syncRoot, new object(), null) ?? _syncRoot;
+	public static IReadOnlyDictionary<Type, Lazy<DSDocumentInfo>> Documents => SingletonInstance._documents;
+	public static IReadOnlyDictionary<Type, IDSInfo> DataSources => SingletonInstance._dataSources;
+	public static IReadOnlyDictionary<Type, ICDSInfo> ComplexDataSources => SingletonInstance._complexDataSources;
+	public static IReadOnlyDictionary<string, IAppObjectInfo> AppObjects => SingletonInstance._appObjects;
+	public static IReadOnlyDictionary<string, IAppObjectInfo> AppObjectByControllerNames => SingletonInstance._appObjectByControllerNames;
+	public static IReadOnlyDictionary<string, BusinessObject> BusinessObjects => SingletonInstance._businessObjects;
 
-	private static FactoryObjectRegistry<Type, IDSInfo> _dataSources = new FactoryObjectRegistry<Type, IDSInfo>();
-	private static FactoryObjectRegistry<Type, ICDSInfo> _complexDataSources = new FactoryObjectRegistry<Type, ICDSInfo>();
-	private static FactoryObjectRegistry<string, IAppObjectInfo> _appObjects = new FactoryObjectRegistry<string, IAppObjectInfo>();
-	private static FactoryObjectRegistry<string, IAppObjectInfo> _appObjectByControllerNames = new FactoryObjectRegistry<string, IAppObjectInfo>(StringComparer.OrdinalIgnoreCase);
-	private static FactoryObjectRegistry<string, BusinessObject> _businessObjects = new FactoryObjectRegistry<string, BusinessObject>();
-	private static object? _syncRoot;
 
-	public static List<IDSInfo> RegisterRange(Func<Type, IDSInfo> factoryMethod, IEnumerable<Type> dataSourceTypes)
+	private static class SingletonInstance
 	{
-		if (factoryMethod == null) throw new ArgumentNullException(nameof(factoryMethod));
-		if (dataSourceTypes == null) throw new ArgumentNullException(nameof(dataSourceTypes));
+		public static readonly Func<Assembly, bool> _defaultAssemblySelector = _ => true;
+		public static readonly Func<Type, bool> _defaultDocumentExclusionSelector = _ => false;
+		public static readonly Func<Type, bool> _defaultTypeSelector = _ => true;
 
-		lock (SyncRoot)
+		public static readonly ConcurrentDictionary<Type, Lazy<DSDocumentInfo>> _documents = new ConcurrentDictionary<Type, Lazy<DSDocumentInfo>>();
+		public static IReadOnlyDictionary<Type, IDSInfo> _dataSources = new Dictionary<Type, IDSInfo>().AsReadOnly();
+		public static IReadOnlyDictionary<Type, ICDSInfo> _complexDataSources = new Dictionary<Type, ICDSInfo>().AsReadOnly();
+		public static IReadOnlyDictionary<string, IAppObjectInfo> _appObjects = new Dictionary<string, IAppObjectInfo>().AsReadOnly();
+		public static IReadOnlyDictionary<string, IAppObjectInfo> _appObjectByControllerNames = new Dictionary<string, IAppObjectInfo>(StringComparer.OrdinalIgnoreCase).AsReadOnly();
+		public static IReadOnlyDictionary<string, BusinessObject> _businessObjects = new Dictionary<string, BusinessObject>().AsReadOnly();
+		public static object _syncRoot = new object();
+		public static volatile Func<Type, bool> _documentExclusionSelector = _defaultDocumentExclusionSelector;
+		public static volatile IReadOnlyList<Type> _dataContextProviders = new List<Type>(0).AsReadOnly();
+
+		static SingletonInstance() { }
+	}
+
+	public static class Internals
+	{
+		public static Func<Assembly, bool> DefaultAssemblySelector => SingletonInstance._defaultAssemblySelector;
+		public static Func<Type, bool> DefaultDocumentExclusionSelector => SingletonInstance._defaultDocumentExclusionSelector;
+		public static Func<Type, bool> DefaultTypeSelector => SingletonInstance._defaultTypeSelector;
+
+		public static IReadOnlyList<Type> DataContextProviders => SingletonInstance._dataContextProviders;
+		public static Func<Type, bool> DocumentExclusionSelector => SingletonInstance._documentExclusionSelector;
+
+		public static void AddDocumentExclusionSelector(Func<Type, bool> documentExclusionSelector)
 		{
-			var typesToRegister = dataSourceTypes.Where(x => !DataSources.ContainsKey(x)).ToArray();
-			if (typesToRegister.Length == 0) Enumerable.Empty<Type>();
+			if (documentExclusionSelector == null) throw new ArgumentNullException(nameof(documentExclusionSelector));
 
-			var registered = new List<IDSInfo>(typesToRegister.Length);
-			var newDataSources = new FactoryObjectRegistry<Type, IDSInfo>(DataSources, null);
-			var newAppObjects = new FactoryObjectRegistry<string, IAppObjectInfo>(AppObjects, null);
-			var newAppObjectByControllerNames = new FactoryObjectRegistry<string, IAppObjectInfo>(AppObjectByControllerNames, null);
-			var newBusinessObjects = new FactoryObjectRegistry<string, BusinessObject>(BusinessObjects, null);
+			if (documentExclusionSelector == DefaultDocumentExclusionSelector) return;
 
-			IDSInfo pDSInfo;
-			BusinessObject bo;
-			foreach (var type in typesToRegister)
+			lock (SingletonInstance._syncRoot)
 			{
-				pDSInfo = factoryMethod(type);
+				var current = SingletonInstance._documentExclusionSelector;
+				SingletonInstance._documentExclusionSelector = current != DefaultDocumentExclusionSelector
+					? type => documentExclusionSelector(type) && current(type)
+					: documentExclusionSelector;
+			}
+		}
 
-				registered.Add(pDSInfo);
+		public static List<Type> RegisterDataContextProviders(IEnumerable<Type> dataContextProviders)
+		{
+			if (dataContextProviders == null) throw new ArgumentNullException(nameof(dataContextProviders));
 
-				newDataSources.RegisterObject(type, pDSInfo);
-				
-				newAppObjects.RegisterObject(pDSInfo.Name, pDSInfo);
+			lock (SingletonInstance._syncRoot)
+			{
+				var typesToRegister = dataContextProviders.Except(SingletonInstance._dataContextProviders).ToList();
 
-				if (pDSInfo.ControllerName != null)
+				if (typesToRegister.Count == 0) return typesToRegister;
+
+				var newDataContextProviders = new List<Type>(SingletonInstance._dataContextProviders.Count + typesToRegister.Count);
+				newDataContextProviders.AddRange(SingletonInstance._dataContextProviders);
+				newDataContextProviders.AddRange(typesToRegister);
+
+				SingletonInstance._dataContextProviders = typesToRegister.AsReadOnly();
+
+				return typesToRegister;
+			}
+		}
+
+		public static List<IDSInfo> RegisterDataSources(Func<Type, IDSInfo> factoryMethod, IEnumerable<Type> dataSourceTypes)
+		{
+			if (factoryMethod == null) throw new ArgumentNullException(nameof(factoryMethod));
+			if (dataSourceTypes == null) throw new ArgumentNullException(nameof(dataSourceTypes));
+
+			lock (SingletonInstance._syncRoot)
+			{
+				var typesToRegister = dataSourceTypes.Where(x => !SingletonInstance._dataSources.ContainsKey(x)).ToArray();
+				var registered = new List<IDSInfo>(typesToRegister.Length);
+
+				if (typesToRegister.Length == 0) return registered;
+
+				var newDataSources = new Dictionary<Type, IDSInfo>(SingletonInstance._dataSources, null);
+				newDataSources.EnsureCapacity(newDataSources.Count + typesToRegister.Length);
+
+				var newAppObjects = new Dictionary<string, IAppObjectInfo>(SingletonInstance._appObjects, null);
+				newAppObjects.EnsureCapacity(newAppObjects.Count + typesToRegister.Length);
+
+				var newAppObjectByControllerNames = new Dictionary<string, IAppObjectInfo>(SingletonInstance._appObjectByControllerNames, StringComparer.OrdinalIgnoreCase);
+				newAppObjectByControllerNames.EnsureCapacity(newAppObjectByControllerNames.Count + typesToRegister.Length);
+
+				var newBusinessObjects = new Dictionary<string, BusinessObject>(SingletonInstance._businessObjects, null);
+				newBusinessObjects.EnsureCapacity(newBusinessObjects.Count + typesToRegister.Length);
+
+				IDSInfo pDSInfo;
+				BusinessObject bo;
+				foreach (var type in typesToRegister)
 				{
-					newAppObjectByControllerNames.RegisterObject(pDSInfo.ControllerName, pDSInfo);
+					pDSInfo = factoryMethod(type);
+
+					registered.Add(pDSInfo);
+					newDataSources.Add(type, pDSInfo);
+					newAppObjects.Add(pDSInfo.Name, pDSInfo);
+					if (pDSInfo.ControllerName != null)
+					{
+						newAppObjectByControllerNames.Add(pDSInfo.ControllerName, pDSInfo);
+					}
+
+					bo = new BusinessObject("DS", string.Intern(pDSInfo.Name), pDSInfo.ConcreteType);
+					newBusinessObjects.Add(bo.Key, bo);
 				}
 
-				bo = new BusinessObject("DS", string.Intern(pDSInfo.Name), pDSInfo.ConcreteType);
-				newBusinessObjects.RegisterObject(bo.Key, bo);
+				SingletonInstance._dataSources = newDataSources.AsReadOnly();
+				SingletonInstance._appObjects = newAppObjects.AsReadOnly();
+				SingletonInstance._appObjectByControllerNames = newAppObjectByControllerNames.AsReadOnly();
+				SingletonInstance._businessObjects = newBusinessObjects.AsReadOnly();
+
+				return registered;
 			}
-
-			_dataSources = newDataSources;
-			_appObjects = newAppObjects;
-			_appObjectByControllerNames = newAppObjectByControllerNames;
-			_businessObjects = newBusinessObjects;
-
-			return registered;
 		}
-	}
 
-	public static IList<ICDSInfo> RegisterRange(Func<Type, ICDSInfo> factoryMethod, IEnumerable<Type> complexDataSourceTypes)
-	{
-		if (factoryMethod == null) throw new ArgumentNullException(nameof(factoryMethod));
-		if (complexDataSourceTypes == null) throw new ArgumentNullException(nameof(complexDataSourceTypes));
-
-		lock (SyncRoot)
+		public static IList<ICDSInfo> RegisterComplexDataSources(Func<Type, ICDSInfo> factoryMethod, IEnumerable<Type> complexDataSourceTypes)
 		{
-			var typesToRegister = complexDataSourceTypes.Where(x => !ComplexDataSources.ContainsKey(x)).ToArray();
-			if (typesToRegister.Length == 0) new List<ICDSInfo>(0);
+			if (factoryMethod == null) throw new ArgumentNullException(nameof(factoryMethod));
+			if (complexDataSourceTypes == null) throw new ArgumentNullException(nameof(complexDataSourceTypes));
 
-			var registered = new List<ICDSInfo>(typesToRegister.Length);
-			var newComplexDataSources = new FactoryObjectRegistry<Type, ICDSInfo>(ComplexDataSources, null);
-			var newAppObjects = new FactoryObjectRegistry<string, IAppObjectInfo>(AppObjects, null);
-			var newAppObjectByControllerNames = new FactoryObjectRegistry<string, IAppObjectInfo>(AppObjectByControllerNames, null);
-			var newBusinessObjects = new FactoryObjectRegistry<string, BusinessObject>(BusinessObjects, null);
-
-			ICDSInfo pCDSInfo;
-			BusinessObject bo;
-			foreach (var type in typesToRegister)
+			lock (SingletonInstance._syncRoot)
 			{
-				pCDSInfo = factoryMethod(type);
+				var typesToRegister = complexDataSourceTypes.Where(x => !SingletonInstance._complexDataSources.ContainsKey(x)).ToArray();
+				var registered = new List<ICDSInfo>(typesToRegister.Length);
 
-				registered.Add(pCDSInfo);
+				if (typesToRegister.Length == 0) return registered;
 
-				newComplexDataSources.RegisterObject(type, pCDSInfo);
-				
-				newAppObjects.RegisterObject(pCDSInfo.Name, pCDSInfo);
+				var newComplexDataSources = new Dictionary<Type, ICDSInfo>(SingletonInstance._complexDataSources, null);
+				newComplexDataSources.EnsureCapacity(newComplexDataSources.Count + typesToRegister.Length);
 
-				if (pCDSInfo.ControllerName != null)
+				var newAppObjects = new Dictionary<string, IAppObjectInfo>(SingletonInstance._appObjects, null);
+				newAppObjects.EnsureCapacity(newAppObjects.Count + typesToRegister.Length);
+
+				var newAppObjectByControllerNames = new Dictionary<string, IAppObjectInfo>(SingletonInstance._appObjectByControllerNames, StringComparer.OrdinalIgnoreCase);
+				newAppObjectByControllerNames.EnsureCapacity(newAppObjectByControllerNames.Count + typesToRegister.Length);
+
+				var newBusinessObjects = new Dictionary<string, BusinessObject>(SingletonInstance._businessObjects, null);
+				newBusinessObjects.EnsureCapacity(newBusinessObjects.Count + typesToRegister.Length);
+
+				ICDSInfo pCDSInfo;
+				BusinessObject bo;
+				foreach (var type in typesToRegister)
 				{
-					newAppObjectByControllerNames.RegisterObject(pCDSInfo.ControllerName, pCDSInfo);
+					pCDSInfo = factoryMethod(type);
+
+					registered.Add(pCDSInfo);
+					newComplexDataSources.Add(type, pCDSInfo);
+					newAppObjects.Add(pCDSInfo.Name, pCDSInfo);
+					if (pCDSInfo.ControllerName != null)
+					{
+						newAppObjectByControllerNames.Add(pCDSInfo.ControllerName, pCDSInfo);
+					}
+
+					bo = new BusinessObject("CDS", string.Intern(pCDSInfo.Name), pCDSInfo.ConcreteType);
+					newBusinessObjects.Add(bo.Key, bo);
 				}
 
-				bo = new BusinessObject("CDS", string.Intern(pCDSInfo.Name), pCDSInfo.ConcreteType);
-				newBusinessObjects.RegisterObject(bo.Key, bo);
+				SingletonInstance._complexDataSources = newComplexDataSources.AsReadOnly();
+				SingletonInstance._appObjects = newAppObjects.AsReadOnly();
+				SingletonInstance._appObjectByControllerNames = newAppObjectByControllerNames.AsReadOnly();
+				SingletonInstance._businessObjects = newBusinessObjects.AsReadOnly();
+
+				return registered;
+			}
+		}
+
+		public static Lazy<DSDocumentInfo> GetOrRegisterDocument(Type documentType, IDataLayerInfo dataLayer)
+		{
+			var registry = (ConcurrentDictionary<Type, Lazy<DSDocumentInfo>>)StaticFactory.Documents;
+
+			var doc = registry.GetValueOrDefault(documentType);
+			if (doc == null)
+			{
+				foreach (var selectedType in GetDocumentReferencingTypes(documentType, dataLayer.IsDocumentType, true))
+				{
+					// a new var for each type to do not mess up with types in the lambda expression below
+					var type = selectedType;
+					if (doc == null)
+						doc = registry.GetOrAdd(type, x => new Lazy<DSDocumentInfo>(() => dataLayer.CreateDocumentInfo(type), LazyThreadSafetyMode.ExecutionAndPublication));
+					else
+						registry.GetOrAdd(type, x => new Lazy<DSDocumentInfo>(() => dataLayer.CreateDocumentInfo(type), LazyThreadSafetyMode.ExecutionAndPublication));
+				}
+
+				if (doc == null)
+				{
+					throw new InvalidOperationException($"Could not register '{documentType.ToPretty()}' as a datasource document type.");
+				}
+			}
+			return doc;
+		}
+
+		public static IEnumerable<Type> GetDocumentReferencingTypes(Type documentType, Func<Type, bool> documentTypesSelector, bool includeThisOne = false)
+		{
+			if (documentType == null)
+			{
+				throw new ArgumentNullException(nameof(documentType));
+			}
+			if (documentTypesSelector == null)
+			{
+				throw new ArgumentNullException(nameof(documentTypesSelector));
 			}
 
-			_complexDataSources = newComplexDataSources;
-			_appObjects = newAppObjects;
-			_appObjectByControllerNames = newAppObjectByControllerNames;
-			_businessObjects = newBusinessObjects;
+			if (!documentTypesSelector(documentType))
+			{
+				return Enumerable.Empty<Type>();
+			}
 
-			return registered;
+			var pool = new Dictionary<Type, bool>();
+			if (includeThisOne)
+			{
+				pool.Add(documentType, true);
+			}
+
+			GetDocumentReferencingTypes(documentType, documentTypesSelector, pool);
+
+			return pool.Where(x => x.Value).Select(x => x.Key);
 		}
-	}
-}
-
-public static class ExtensionsForAppObject
-{
-	public static void RegisterObject(this IFactoryObjectDictionary<string, IAppObjectInfo> @this, IAppObjectInfo appObject)
-	{
-		if (!TryRegisterObject(@this, appObject))
+		private static void GetDocumentReferencingTypes(Type documentType, Func<Type, bool> documentTypesSelector, Dictionary<Type, bool> pool)
 		{
-			throw new ArgumentException(nameof(appObject));
+			bool isDocumentType;
+			Type type;
+
+			foreach (var candidate in DSDocumentInfo.GetDataEntryCandidates(documentType))
+			{
+				if (candidate.memberInfo is PropertyInfo propertyInfo)
+				{
+					type = propertyInfo.PropertyType;
+				}
+				else if (candidate.memberInfo is FieldInfo fieldInfo)
+				{
+					type = fieldInfo.FieldType;
+				}
+				else
+				{
+					continue;
+				}
+
+				isDocumentType = documentTypesSelector(type);
+				if (pool.TryAdd(type, isDocumentType))
+				{
+					if (isDocumentType)
+					{
+						GetDocumentReferencingTypes(type, documentTypesSelector, pool);
+					}
+					else
+					{
+						foreach (var genericEnumerable in type.GetInterfacesOf(typeof(IEnumerable<>)))
+						{
+							type = genericEnumerable.GetGenericArguments()[0];
+							isDocumentType = documentTypesSelector(type);
+							if (pool.TryAdd(type, isDocumentType) && isDocumentType)
+							{
+								GetDocumentReferencingTypes(type, documentTypesSelector, pool);
+							}
+						}
+					}
+				}
+			}
 		}
-	}
-
-	public static bool TryRegisterObject(this IFactoryObjectDictionary<string, IAppObjectInfo> @this, IAppObjectInfo appObject)
-	{
-		if (appObject == null) throw new ArgumentNullException(nameof(appObject));
-		if (@this != StaticFactory.AppObjects) throw new InvalidOperationException();
-
-		var registry = (IFactoryObjectRegistry<string, IAppObjectInfo>)StaticFactory.AppObjects;
-		var result = registry.TryRegisterObject(appObject.Name, appObject);
-
-		if (result && appObject.ControllerName != null)
-		{
-			var registryByNames = (IFactoryObjectRegistry<string, IAppObjectInfo>)StaticFactory.AppObjectByControllerNames;
-			registryByNames.RegisterObject(appObject.ControllerName, appObject);
-		}
-
-		return result;
 	}
 }

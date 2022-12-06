@@ -1,6 +1,7 @@
 using Example1.BLL.Services;
 using Example1.DAL.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting.Internal;
 using MongoDB.Bson;
 using MongoDB.Bson.Serialization;
 using MongoDB.Bson.Serialization.Conventions;
@@ -15,10 +16,10 @@ using QBCore.ObjectFactory;
 namespace Example1.BLL.Services.Tests;
 
 [Collection(nameof(GlobalTestFixture))]
-public class OrderService_Tests
+public class BrandServices_Tests
 {
 	[Fact]
-	public async Task OrderService_StateUnderTest_ExpectedBehavior()
+	public async Task BrandService_StateUnderTest_ExpectedBehavior()
 	{
 		var mongoDatabase = new Mock<IMongoDatabase>(MockBehavior.Strict);
 		var mongoDataContextProvider = new Mock<IMongoDataContextProvider>(MockBehavior.Strict);
@@ -36,7 +37,7 @@ public class OrderService_Tests
 
 		var services = new ServiceCollection();
 		services
-			.AddQBCore(null, typeof(Example1.DAL.Entities.Orders.Order).Assembly, typeof(Example1.BLL.Services.OrderService).Assembly)
+			.AddQBCore(null, typeof(Example1.DAL.Entities.Brands.Brand).Assembly, typeof(Example1.BLL.Services.BrandService).Assembly)
 			.AddDataSourcesAsServices(StaticFactory.DataSources.Values)
 			.AddTransient<ITransient<IMongoDataContextProvider>>(sp => mongoDataContextProvider.Object)
 			.AddSingleton<IMongoDataContextProvider>(sp => mongoDataContextProvider.Object)
@@ -50,8 +51,8 @@ public class OrderService_Tests
 		using var scope = rootProvider.CreateScope();
 		var serviceProvider = scope.ServiceProvider;
 
-		var orders = serviceProvider.GetRequiredService<OrderService>();
-		using var transOrders = (OrderService) serviceProvider.GetRequiredService<ITransient<OrderService>>();
+		var brands = serviceProvider.GetRequiredService<BrandService>();
+		using var transBrands = (BrandService) serviceProvider.GetRequiredService<ITransient<BrandService>>();
 
 		await Task.CompletedTask;
 	}

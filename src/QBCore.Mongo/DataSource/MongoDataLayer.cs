@@ -5,6 +5,7 @@ using MongoDB.Bson;
 using QBCore.Configuration;
 using QBCore.DataSource.QueryBuilder;
 using QBCore.DataSource.QueryBuilder.Mongo;
+using QBCore.ObjectFactory;
 
 namespace QBCore.DataSource;
 
@@ -75,7 +76,7 @@ public sealed class MongoDataLayer : IDataLayerInfo
 			if (_standardRefTypes.Contains(type)) return false;
 		}
 
-		if (DataSourceDocuments.DocumentExclusionSelector(type))
+		if (StaticFactory.Internals.DocumentExclusionSelector(type))
 		{
 			return false;
 		}

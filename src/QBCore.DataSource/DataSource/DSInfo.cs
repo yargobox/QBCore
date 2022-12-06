@@ -251,12 +251,12 @@ internal sealed class DSInfo : IDSInfo
 
 		// Register DataSource's document types, including nested ones.
 		//
-		DocumentInfo = DataSourceDocuments.GetOrRegister(DSTypeInfo.TDocument, dataLayer);
-		CreateInfo = DSTypeInfo.TCreate != typeof(NotSupported) ? DataSourceDocuments.GetOrRegister(DSTypeInfo.TCreate, dataLayer) : null;
-		SelectInfo = DSTypeInfo.TSelect != typeof(NotSupported) ? DataSourceDocuments.GetOrRegister(DSTypeInfo.TSelect, dataLayer) : null;
-		UpdateInfo = DSTypeInfo.TUpdate != typeof(NotSupported) ? DataSourceDocuments.GetOrRegister(DSTypeInfo.TUpdate, dataLayer) : null;
-		DeleteInfo = DSTypeInfo.TDelete != typeof(NotSupported) ? DataSourceDocuments.GetOrRegister(DSTypeInfo.TDelete, dataLayer) : null;
-		RestoreInfo = DSTypeInfo.TRestore != typeof(NotSupported) ? DataSourceDocuments.GetOrRegister(DSTypeInfo.TRestore, dataLayer) : null;
+		DocumentInfo = StaticFactory.Internals.GetOrRegisterDocument(DSTypeInfo.TDocument, dataLayer);
+		CreateInfo = DSTypeInfo.TCreate != typeof(NotSupported) ? StaticFactory.Internals.GetOrRegisterDocument(DSTypeInfo.TCreate, dataLayer) : null;
+		SelectInfo = DSTypeInfo.TSelect != typeof(NotSupported) ? StaticFactory.Internals.GetOrRegisterDocument(DSTypeInfo.TSelect, dataLayer) : null;
+		UpdateInfo = DSTypeInfo.TUpdate != typeof(NotSupported) ? StaticFactory.Internals.GetOrRegisterDocument(DSTypeInfo.TUpdate, dataLayer) : null;
+		DeleteInfo = DSTypeInfo.TDelete != typeof(NotSupported) ? StaticFactory.Internals.GetOrRegisterDocument(DSTypeInfo.TDelete, dataLayer) : null;
+		RestoreInfo = DSTypeInfo.TRestore != typeof(NotSupported) ? StaticFactory.Internals.GetOrRegisterDocument(DSTypeInfo.TRestore, dataLayer) : null;
 
 		// Create a query builder factory
 		//

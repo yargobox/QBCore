@@ -4,6 +4,7 @@ using System.Text.RegularExpressions;
 using QBCore.Configuration;
 using QBCore.DataSource.QueryBuilder;
 using QBCore.DataSource.QueryBuilder.EntityFramework;
+using QBCore.ObjectFactory;
 
 namespace QBCore.DataSource;
 
@@ -74,7 +75,7 @@ public sealed class EfDataLayer : IDataLayerInfo
 			if (_standardRefTypes.Contains(type)) return false;
 		}
 
-		if (DataSourceDocuments.DocumentExclusionSelector(type))
+		if (StaticFactory.Internals.DocumentExclusionSelector(type))
 		{
 			return false;
 		}

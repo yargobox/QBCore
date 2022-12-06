@@ -23,9 +23,9 @@ namespace QBCore.Controllers;
 
 public record AddQBCoreOptions
 {
-	public Func<Assembly, bool> AssemblySelector { get; set; } = _ => true;
-	public Func<Type, bool> TypeSelector { get; set; } = _ => true;
-	public Func<Type, bool> DocumentExclusionSelector { get; set; } = _ => false;
+	public Func<Assembly, bool> AssemblySelector { get; set; } = StaticFactory.Internals.DefaultAssemblySelector;
+	public Func<Type, bool> TypeSelector { get; set; } = StaticFactory.Internals.DefaultTypeSelector;
+	public Func<Type, bool> DocumentExclusionSelector { get; set; } = StaticFactory.Internals.DefaultDocumentExclusionSelector;
 	public Func<Type, bool> DataContextProviderSelector { get; set; } = type
 		=> type.IsClass && !type.IsAbstract && !type.IsGenericType && !type.IsGenericTypeDefinition && type.GetInterfaceOf(typeof(IDataContextProvider)) != null;
 	public Func<Type, bool> DataSourceSelector { get; set; } = type
@@ -103,19 +103,14 @@ public static class ExtensionsForAddQBCore
 	}
 	private static IServiceCollection AddQBCoreRegisters(this IServiceCollection services, AddQBCoreOptions options, IEnumerable<Type> types)
 	{
-		if (IsAddQBCoreCalled)
-		{
-			throw new InvalidOperationException(nameof(AddQBCore) + " is already called.");
-		}
 		IsAddQBCoreCalled = true;
 
-		var atypes = (types as Type[]) ?? types.ToArray();
+		var typeArray = (types as Type[]) ?? types.ToArray();
 
-		DataSourceDocuments.DocumentExclusionSelector = options.DocumentExclusionSelector;
-		((List<Type>)DataSourceDocuments.DataContextProviders).AddRange(atypes.Where(x => options.DataContextProviderSelector(x)));
-
-		var registeredDataSources = StaticFactory.RegisterRange(StaticFactory.DataSources.DSInfoFactoryMethod, atypes.Where(x => options.DataSourceSelector(x)));
-		StaticFactory.RegisterRange(StaticFactory.ComplexDataSources.CDSInfoFactoryMethod, atypes.Where(x => options.ComplexDataSourceSelector(x)));
+		StaticFactory.Internals.AddDocumentExclusionSelector(options.DocumentExclusionSelector);
+		StaticFactory.Internals.RegisterDataContextProviders(typeArray.Where(x => options.DataContextProviderSelector(x)));
+		var registeredDataSources = StaticFactory.Internals.RegisterDataSources(DataSourceStaticHelper.CreateDSInfo, typeArray.Where(x => options.DataSourceSelector(x)));
+		StaticFactory.Internals.RegisterComplexDataSources(DataSourceStaticHelper.CreateCDSInfo, typeArray.Where(x => options.ComplexDataSourceSelector(x)));
 
 		services.TryAddSingleton<DataSourceRouteValueTransformer>();
 		services.TryAddScoped<IDSRequestContext>(_ => new DSRequestContext());
@@ -124,7 +119,7 @@ public static class ExtensionsForAddQBCore
 		return services;
 	}
 	
-	private static void AddDataSourcesAsServices(IServiceCollection services, List<IDSInfo> dataSources)
+	public static IServiceCollection AddDataSourcesAsServices(this IServiceCollection services, IEnumerable<IDSInfo> dataSources)
 	{
 		Type transientInterface, transientType = typeof(ITransient<>);
 		Func<IServiceProvider, object> implementationFactory;
@@ -169,6 +164,8 @@ public static class ExtensionsForAddQBCore
 				}
 			}
 		}
+
+		return services;
 	}
 
 	public static IEndpointRouteBuilder MapDataSourceControllers(this IEndpointRouteBuilder endpoints)

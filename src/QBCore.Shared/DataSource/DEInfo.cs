@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Linq.Expressions;
 using System.Reflection;
 using QBCore.Extensions.Linq.Expressions;
+using QBCore.ObjectFactory;
 
 namespace QBCore.DataSource;
 
@@ -163,8 +164,8 @@ public abstract class DEInfo : IComparable<DEInfo>, IEquatable<DEInfo>
 		}
 
 		var documentInfo = dataLayer != null
-			? DataSourceDocuments.GetOrRegister(documentType, dataLayer).Value
-			: DataSourceDocuments.Collection[documentType].Value;
+			? StaticFactory.Internals.GetOrRegisterDocument(documentType, dataLayer).Value
+			: StaticFactory.Documents[documentType].Value;
 
 		return documentInfo.DataEntries.GetValueOrDefault(memberInfos[0].Name);
 	}
@@ -179,8 +180,8 @@ public abstract class DEInfo : IComparable<DEInfo>, IEquatable<DEInfo>
 	{
 		var documentType = memberInfo.GetPropertyOrFieldDeclaringType();
 		var documentInfo = dataLayer != null
-			? DataSourceDocuments.GetOrRegister(documentType, dataLayer).Value
-			: DataSourceDocuments.Collection[documentType].Value;
+			? StaticFactory.Internals.GetOrRegisterDocument(documentType, dataLayer).Value
+			: StaticFactory.Documents[documentType].Value;
 		return documentInfo.DataEntries.GetValueOrDefault(memberInfo.Name);
 	}
 
@@ -212,8 +213,8 @@ public abstract class DEInfo : IComparable<DEInfo>, IEquatable<DEInfo>
 		}
 
 		var documentInfo = dataLayer != null
-			? DataSourceDocuments.GetOrRegister(documentType, dataLayer).Value
-			: DataSourceDocuments.Collection[documentType].Value;
+			? StaticFactory.Internals.GetOrRegisterDocument(documentType, dataLayer).Value
+			: StaticFactory.Documents[documentType].Value;
 		return documentInfo.DataEntries.GetValueOrDefault(propertyOrFieldName);
 	}
 
@@ -235,8 +236,8 @@ public abstract class DEInfo : IComparable<DEInfo>, IEquatable<DEInfo>
 		}
 
 		var documentInfo = dataLayer != null
-			? DataSourceDocuments.GetOrRegister(documentType, dataLayer).Value
-			: DataSourceDocuments.Collection[documentType].Value;
+			? StaticFactory.Internals.GetOrRegisterDocument(documentType, dataLayer).Value
+			: StaticFactory.Documents[documentType].Value;
 		if (ignoreCase)
 		{
 			var de = documentInfo.DataEntries.GetValueOrDefault(propertyOrFieldName);
