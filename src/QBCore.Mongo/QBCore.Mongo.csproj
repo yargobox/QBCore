@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
-    <ProjectReference Include="..\QBCore.QueryBuilder\QBCore.QueryBuilder.csproj" />
+    <ProjectReference Include="..\QBCore.Shared\QBCore.Shared.csproj" />
   </ItemGroup>
 
   <ItemGroup>
