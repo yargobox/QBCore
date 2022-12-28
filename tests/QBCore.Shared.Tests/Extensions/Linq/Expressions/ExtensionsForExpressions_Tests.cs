@@ -10,7 +10,7 @@ public class ExtensionsForExpressions_Tests
 	{
 		public string PropertyA { get; set; } = null!;
 		public string GetPropertyA() => PropertyA;
-		public int FieldA;
+		public int FieldA = 0;
 
 		public BBB EntityBBB { get; set; } = null!;
 		public BBB EntityFieldBBB = null!;
@@ -20,7 +20,7 @@ public class ExtensionsForExpressions_Tests
 	{
 		public string PropertyB { get; set; } = null!;
 		public string GetPropertyB() => PropertyB;
-		public int FieldB;
+		public int FieldB = 0;
 
 		public AAA EntityAAA { get; set; } = null!;
 		public AAA EntityFieldAAA = null!;
@@ -30,22 +30,22 @@ public class ExtensionsForExpressions_Tests
 	public void GetMemberName_ForRegularUseCases_ReturnsName()
 	{
 		LambdaExpression pfnFromProperty = string (AAA p) => p.PropertyA;
-		Assert.Equal(pfnFromProperty.GetMemberName(), nameof(AAA.PropertyA));
+		Assert.Equal(nameof(AAA.PropertyA), pfnFromProperty.GetMemberName());
 
 		LambdaExpression pfnFromField = int (AAA p) => p.FieldA;
-		Assert.Equal(pfnFromField.GetMemberName(), nameof(AAA.FieldA));
+		Assert.Equal(nameof(AAA.FieldA), pfnFromField.GetMemberName());
 
 		LambdaExpression pfnFromConvertExpr1 = object (AAA p) => p.PropertyA;
-		Assert.Equal(pfnFromConvertExpr1.GetMemberName(), nameof(AAA.PropertyA));
+		Assert.Equal(nameof(AAA.PropertyA), pfnFromConvertExpr1.GetMemberName());
 
 		LambdaExpression pfnFromConvertExpr2 = object (AAA p) => p.FieldA;
-		Assert.Equal(pfnFromConvertExpr2.GetMemberName(), nameof(AAA.FieldA));
+		Assert.Equal(nameof(AAA.FieldA), pfnFromConvertExpr2.GetMemberName());
 
 		LambdaExpression pfnFromCallExpr = string (AAA p) => p.GetPropertyA();
-		Assert.Equal(pfnFromCallExpr.GetMemberName(), nameof(AAA.GetPropertyA));
+		Assert.Equal(nameof(AAA.GetPropertyA), pfnFromCallExpr.GetMemberName());
 
 		LambdaExpression pfnFromParamExpr = AAA (AAA argName) => argName;
-		Assert.Equal(pfnFromParamExpr.GetMemberName(), "argName");
+		Assert.Equal("argName", pfnFromParamExpr.GetMemberName());
 	}
 
 	[Fact]
@@ -59,19 +59,19 @@ public class ExtensionsForExpressions_Tests
 	public void GetPropertyOrFieldPath_WithSinglePathElements_ReturnsPath()
 	{
 		LambdaExpression pfnFromProperty = string (AAA p) => p.PropertyA;
-		Assert.Equal(pfnFromProperty.GetPropertyOrFieldPath(), nameof(AAA.PropertyA));
+		Assert.Equal(nameof(AAA.PropertyA), pfnFromProperty.GetPropertyOrFieldPath());
 
 		LambdaExpression pfnFromField = int (AAA p) => p.FieldA;
-		Assert.Equal(pfnFromField.GetPropertyOrFieldPath(), nameof(AAA.FieldA));
+		Assert.Equal(nameof(AAA.FieldA), pfnFromField.GetPropertyOrFieldPath());
 
 		LambdaExpression pfnFromConvertExpr1 = object (AAA p) => p.PropertyA;
-		Assert.Equal(pfnFromConvertExpr1.GetPropertyOrFieldPath(), nameof(AAA.PropertyA));
+		Assert.Equal(nameof(AAA.PropertyA), pfnFromConvertExpr1.GetPropertyOrFieldPath());
 
 		LambdaExpression pfnFromConvertExpr2 = object (AAA p) => p.FieldA;
-		Assert.Equal(pfnFromConvertExpr2.GetPropertyOrFieldPath(), nameof(AAA.FieldA));
+		Assert.Equal(nameof(AAA.FieldA), pfnFromConvertExpr2.GetPropertyOrFieldPath());
 
 		LambdaExpression pfnFromParamExpr = AAA (AAA argName) => argName;
-		Assert.Equal(pfnFromParamExpr.GetPropertyOrFieldPath(true), "");
+		Assert.Equal("", pfnFromParamExpr.GetPropertyOrFieldPath(true));
 		Assert.Throws<ArgumentException>(() => pfnFromParamExpr.GetPropertyOrFieldPath(false));
 	}
 
@@ -79,18 +79,18 @@ public class ExtensionsForExpressions_Tests
 	public void GetPropertyOrFieldPath_WithMultiplePathElements_ReturnsPath()
 	{
 		LambdaExpression pfnFromProperty = string (AAA p) => p.EntityBBB.PropertyB;
-		Assert.Equal(pfnFromProperty.GetPropertyOrFieldPath(), $"{nameof(AAA.EntityBBB)}.{nameof(BBB.PropertyB)}");
+		Assert.Equal($"{nameof(AAA.EntityBBB)}.{nameof(BBB.PropertyB)}", pfnFromProperty.GetPropertyOrFieldPath());
 
 		LambdaExpression pfnFromProperty2 = string (AAA p) => p.EntityBBB.EntityFieldAAA.PropertyA;
-		Assert.Equal(pfnFromProperty2.GetPropertyOrFieldPath(), $"{nameof(AAA.EntityBBB)}.{nameof(BBB.EntityFieldAAA)}.{nameof(AAA.PropertyA)}");
+		Assert.Equal($"{nameof(AAA.EntityBBB)}.{nameof(BBB.EntityFieldAAA)}.{nameof(AAA.PropertyA)}", pfnFromProperty2.GetPropertyOrFieldPath());
 
 		LambdaExpression pfnFromField = int (AAA p) => p.EntityFieldBBB.FieldB;
-		Assert.Equal(pfnFromField.GetPropertyOrFieldPath(), $"{nameof(AAA.EntityFieldBBB)}.{nameof(BBB.FieldB)}");
+		Assert.Equal($"{nameof(AAA.EntityFieldBBB)}.{nameof(BBB.FieldB)}", pfnFromField.GetPropertyOrFieldPath());
 
 		LambdaExpression pfnFromConvertExpr1 = object (AAA p) => p.EntityBBB.EntityAAA.PropertyA;
-		Assert.Equal(pfnFromConvertExpr1.GetPropertyOrFieldPath(), $"{nameof(AAA.EntityBBB)}.{nameof(BBB.EntityAAA)}.{nameof(AAA.PropertyA)}");
+		Assert.Equal($"{nameof(AAA.EntityBBB)}.{nameof(BBB.EntityAAA)}.{nameof(AAA.PropertyA)}", pfnFromConvertExpr1.GetPropertyOrFieldPath());
 
 		LambdaExpression pfnFromConvertExpr2 = object (AAA p) => p.EntityFieldBBB.EntityFieldAAA.FieldA;
-		Assert.Equal(pfnFromConvertExpr2.GetPropertyOrFieldPath(), $"{nameof(AAA.EntityFieldBBB)}.{nameof(BBB.EntityFieldAAA)}.{nameof(AAA.FieldA)}");
+		Assert.Equal($"{nameof(AAA.EntityFieldBBB)}.{nameof(BBB.EntityFieldAAA)}.{nameof(AAA.FieldA)}", pfnFromConvertExpr2.GetPropertyOrFieldPath());
 	}
 }

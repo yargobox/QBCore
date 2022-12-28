@@ -9,7 +9,7 @@ internal sealed class QBRestoreBuilder<TDoc, TDto> : QBCommonBuilder<TDoc, TDto>
 	public QBRestoreBuilder()
 	{
 		if (DocumentInfo.IdField == null)
-			throw new InvalidOperationException($"Document '{typeof(TDoc).ToPretty()}' does not have an id field.");
+			throw new InvalidOperationException($"Document '{typeof(TDoc).ToPretty()}' does not have an id data entry.");
 		var deDeleted = DocumentInfo.DateDeletedField
 			?? throw new InvalidOperationException($"Document '{typeof(TDoc).ToPretty()}' does not have a date deletion field.");
 		if (deDeleted.Flags.HasFlag(DataEntryFlags.ReadOnly))
@@ -44,7 +44,7 @@ internal sealed class QBRestoreBuilder<TDoc, TDto> : QBCommonBuilder<TDoc, TDto>
 	private void AutoBuildSetup(string? tableName)
 	{
 		var deId = DocumentInfo.IdField
-			?? throw new InvalidOperationException($"Document '{typeof(TDoc).ToPretty()}' does not have an id field.");
+			?? throw new InvalidOperationException($"Document '{typeof(TDoc).ToPretty()}' does not have an id data entry.");
 		var deDeleted = DocumentInfo.DateDeletedField
 			?? throw new InvalidOperationException($"Document '{typeof(TDoc).ToPretty()}' does not have a date deletion field.");
 		if (deDeleted.Flags.HasFlag(DataEntryFlags.ReadOnly))

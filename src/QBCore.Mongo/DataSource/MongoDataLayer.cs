@@ -11,7 +11,7 @@ namespace QBCore.DataSource;
 
 public sealed class MongoDataLayer : IDataLayerInfo
 {
-	public static IDataLayerInfo Default => SingletonInstance.Instance;
+	public static IDataLayerInfo Default => Static.Instance;
 
 	public string Name => "Mongo";
 	public Type DataContextInterfaceType => typeof(IMongoDataContext);
@@ -94,12 +94,12 @@ public sealed class MongoDataLayer : IDataLayerInfo
 		return true;
 	}
 
-	static class SingletonInstance
+	static class Static
 	{
 		public static readonly MongoDataLayer Instance = new MongoDataLayer();
 
 		// Explicit static constructor to tell C# compiler not to mark type as beforefieldinit
-		static SingletonInstance() { }
+		static Static() { }
 	}
 
 	private static readonly HashSet<Type> _standardValueTypes = new HashSet<Type>()

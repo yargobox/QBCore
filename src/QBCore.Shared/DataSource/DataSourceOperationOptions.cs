@@ -1,3 +1,6 @@
+using System.Data.Common;
+using QBCore.Configuration;
+
 namespace QBCore.DataSource.Options;
 
 public class DataSourceOperationOptions
@@ -6,6 +9,8 @@ public class DataSourceOperationOptions
 	public object? NativeClientSession;
 	public Action<string>? QueryStringCallback;
 	public Func<string, Task>? QueryStringCallbackAsync;
+	public DbConnection? Connection;
+	public DbTransaction? Transaction;
 }
 
 public class DataSourceIdGeneratorOptions : DataSourceOperationOptions { }

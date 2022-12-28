@@ -9,7 +9,7 @@ internal sealed class QBUpdateBuilder<TDoc, TDto> : QBCommonBuilder<TDoc, TDto>,
 	public QBUpdateBuilder()
 	{
 		if (DocumentInfo.IdField == null)
-			throw new InvalidOperationException($"Document '{typeof(TDoc).ToPretty()}' does not have an id field.");
+			throw new InvalidOperationException($"Document '{typeof(TDoc).ToPretty()}' does not have an id data entry.");
 	}
 	public QBUpdateBuilder(QBUpdateBuilder<TDoc, TDto> other) : base(other) { }
 	public QBUpdateBuilder(IQBBuilder other)
@@ -40,7 +40,7 @@ internal sealed class QBUpdateBuilder<TDoc, TDto> : QBCommonBuilder<TDoc, TDto>,
 	private void AutoBuildSetup(string? tableName)
 	{
 		var deId = DocumentInfo.IdField
-			?? throw new InvalidOperationException($"Document '{typeof(TDoc).ToPretty()}' does not have an id field.");
+			?? throw new InvalidOperationException($"Document '{typeof(TDoc).ToPretty()}' does not have an id data entry.");
 
 		Update(tableName).Condition(deId, FO.Equal, "id");
 	}

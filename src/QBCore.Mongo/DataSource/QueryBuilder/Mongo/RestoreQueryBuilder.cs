@@ -50,7 +50,7 @@ internal sealed class RestoreQueryBuilder<TDocument, TRestore> : QueryBuilder<TD
 		var clientSessionHandle = (IClientSessionHandle?)options?.NativeClientSession;
 
 		var deId = (MongoDEInfo?)Builder.DocumentInfo.IdField
-			?? throw new InvalidOperationException($"Document '{Builder.DocumentInfo.DocumentType.ToPretty()}' does not have an id field.");
+			?? throw new InvalidOperationException($"Document '{Builder.DocumentInfo.DocumentType.ToPretty()}' does not have an id data entry.");
 		var deDeleted = (MongoDEInfo?)Builder.DocumentInfo.DateDeletedField
 			?? throw new InvalidOperationException($"Document '{Builder.DocumentInfo.DocumentType.ToPretty()}' does not have a date deletion field.");
 		if (deDeleted.Flags.HasFlag(DataEntryFlags.ReadOnly))

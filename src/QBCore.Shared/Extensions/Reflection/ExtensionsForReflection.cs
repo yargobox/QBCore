@@ -1,10 +1,23 @@
+using System.Collections;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq.Expressions;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 
 namespace QBCore.Extensions.Reflection;
 
 public static class ExtensionsForReflection
 {
+	private static class Static
+	{
+		static Static() { }
+
+		public static readonly HashSet<Type> _integerTypes = new HashSet<Type>(8)
+		{
+			typeof(sbyte), typeof(byte), typeof(short), typeof(ushort), typeof(int), typeof(uint), typeof(long), typeof(ulong)
+		};
+	}
+
 	public static string ToPretty(this Type type, int recursionLevel = 8, bool expandNullable = false)
 	{
 		if (type.IsArray)
@@ -46,8 +59,11 @@ public static class ExtensionsForReflection
 		return type.Name;
 	}
 
+	[MethodImplAttribute(MethodImplOptions.AggressiveInlining)]
 	public static Type? GetSubclassOf<T>(this Type @this)
-		=> GetSubclassOf(@this, typeof(T));
+	{
+		return GetSubclassOf(@this, typeof(T));
+	}
 
 	public static Type? GetSubclassOf(this Type @this, Type test)
 	{
@@ -95,17 +111,21 @@ public static class ExtensionsForReflection
 		}
 	}
 
+	[MethodImplAttribute(MethodImplOptions.AggressiveInlining)]
+	public static bool IsNullableValueType(this Type type)
+	{
+		return type.IsValueType && Nullable.GetUnderlyingType(type) is not null;
+	}
+
 	public static Type GetUnderlyingSystemType(this Type type)
 	{
-		if (type.IsGenericType)
+		if (type.IsValueType)
 		{
-			return type.GetGenericTypeDefinition() == typeof(Nullable<>) ?
-				type.GenericTypeArguments[0].UnderlyingSystemType :
-				type.UnderlyingSystemType;
+			return Nullable.GetUnderlyingType(type) ?? type.GetUnderlyingSystemType();
 		}
 		else
 		{
-			return Nullable.GetUnderlyingType(type)?.UnderlyingSystemType ?? type.UnderlyingSystemType;
+			return type.GetUnderlyingSystemType();
 		}
 	}
 
@@ -214,45 +234,6 @@ public static class ExtensionsForReflection
 		}
 	}
 
-	public static Expression<Func<T, object?>> ToMemberExpression<T>(this PropertyInfo propertyInfo)
-	{
-		if (propertyInfo == null)
-		{
-			throw new ArgumentNullException(nameof(propertyInfo));
-		}
-
-		var parameterExpression = Expression.Parameter(typeof(T), "item");
-		var memberExpression = Expression.MakeMemberAccess(parameterExpression, propertyInfo);
-		if (propertyInfo.PropertyType == typeof(object))
-		{
-			return Expression.Lambda<Func<T, object?>>(memberExpression, parameterExpression);
-		}
-		else
-		{
-			var convertExpression = Expression.Convert(memberExpression, typeof(object));
-			return Expression.Lambda<Func<T, object?>>(convertExpression, parameterExpression);
-		}
-	}
-	public static Expression<Func<T, object?>> ToMemberExpression<T>(this FieldInfo fieldInfo)
-	{
-		if (fieldInfo == null)
-		{
-			throw new ArgumentNullException(nameof(fieldInfo));
-		}
-
-		var parameterExpression = Expression.Parameter(typeof(T), "item");
-		var memberExpression = Expression.MakeMemberAccess(parameterExpression, fieldInfo);
-		if (fieldInfo.FieldType == typeof(object))
-		{
-			return Expression.Lambda<Func<T, object?>>(memberExpression, parameterExpression);
-		}
-		else
-		{
-			var convertExpression = Expression.Convert(memberExpression, typeof(object));
-			return Expression.Lambda<Func<T, object?>>(convertExpression, parameterExpression);
-		}
-	}
-
 	public static Type GetPropertyOrFieldType(this MemberInfo memberInfo)
 	{
 		if (memberInfo is PropertyInfo propertyInfo)
@@ -289,5 +270,54 @@ public static class ExtensionsForReflection
 		throw new ArgumentException(nameof(memberInfo));
 	}
 
-	public static object? GetDefaultValue(this Type type) => type.IsValueType ? Activator.CreateInstance(type) : null;
+	public static object? GetDefaultValue(this Type type)
+	{
+		return type.IsValueType ? Activator.CreateInstance(type) : null;
+	}
+
+	public static Type? GetEnumerationItemType(this object? value)
+	{
+		if (value is not IEnumerable objectEnumeration)
+		{
+			return null;
+		}
+
+		foreach (var item in objectEnumeration)
+		{
+			if (item is null)
+			{
+				continue;
+			}
+
+			return item.GetType();
+		}
+
+		var types = value.GetType().GetInterfacesOf(typeof(IEnumerable<>)).Select(x => x.GetGenericArguments()[0]);
+		
+		return types.FirstOrDefault(x => x != typeof(object)) ?? types.FirstOrDefault();
+	}
+
+	public static bool TryConvertIntegerToOtherInteger(this object fromValue, Type toType, [NotNullWhen(true)] ref object? toValue)
+	{
+		if (Static._integerTypes.Contains(toType))
+		{
+			var trueType = fromValue.GetType().GetUnderlyingSystemType();
+			if (Static._integerTypes.Contains(trueType))
+			{
+				try
+				{
+					toValue = Convert.ChangeType(fromValue, toType);
+					return true;
+				}
+				catch { }
+			}
+		}
+		return false;
+	}
+
+	[MethodImplAttribute(MethodImplOptions.AggressiveInlining)]
+	public static bool IsOneOfSystemIntegerTypes(this Type type)
+	{
+		return Static._integerTypes.Contains(type);
+	}
 }

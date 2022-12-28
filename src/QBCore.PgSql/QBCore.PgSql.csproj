@@ -2,9 +2,11 @@
 
   <ItemGroup>
     <ProjectReference Include="..\QBCore.Shared\QBCore.Shared.csproj" />
+    <ProjectReference Include="..\QBCore.Sql\QBCore.Sql.csproj" />
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="Dapper" Version="2.0.123" />
     <PackageReference Include="Npgsql" Version="7.0.0" />
   </ItemGroup>
 

@@ -265,7 +265,7 @@ internal abstract class QueryBuilder<TDocument, TProjection> : IQueryBuilder<TDo
 		else if (cond.IsOnParam)
 		{
 			var paramName = (string)cond.Value!;
-			var parameter = parameters.FirstOrDefault(x => x.Name == paramName);
+			var parameter = parameters.FirstOrDefault(x => x.ParameterName == paramName);
 			if (parameter == null)
 			{
 				throw new InvalidOperationException($"Query builder parameter '{paramName}' is not found.");
@@ -298,7 +298,7 @@ internal abstract class QueryBuilder<TDocument, TProjection> : IQueryBuilder<TDo
 		}
 
 		var constValue = cond.IsOnParam ? paramValue : cond.Value;
-		var itemType = GetEnumerationItemType(constValue);
+		var itemType = constValue.GetEnumerationItemType();
 		var leftField = getDBSideName(cond.Alias, cond.Field);
 
 		switch (cond.Operation & _supportedOperations)
@@ -540,7 +540,7 @@ internal abstract class QueryBuilder<TDocument, TProjection> : IQueryBuilder<TDo
 		var type = value.GetType();
 		if (type != cond.FieldType && type != cond.FieldUnderlyingType)
 		{
-			if (!TryConvertIntegerToOtherInteger(value, cond.FieldUnderlyingType, ref value))
+			if (!value.TryConvertIntegerToOtherInteger(cond.FieldUnderlyingType, ref value))
 			{
 				throw new ArgumentException($"Field {cond.Alias}.{cond.FieldPath} has type {cond.FieldType.ToPretty()} not {value!.GetType().ToPretty()}.", nameof(value));
 			}
@@ -590,7 +590,7 @@ internal abstract class QueryBuilder<TDocument, TProjection> : IQueryBuilder<TDo
 			type = value.GetType();
 			if (type != cond.FieldType && type != cond.FieldUnderlyingType)
 			{
-				if (!TryConvertIntegerToOtherInteger(value, cond.FieldUnderlyingType, ref convertedValue))
+				if (!value.TryConvertIntegerToOtherInteger(cond.FieldUnderlyingType, ref convertedValue))
 				{
 					throw new ArgumentException($"Field {cond.Alias}.{cond.FieldPath} has type {cond.FieldType.ToPretty()} not {type.ToPretty()}.", nameof(values));
 				}
@@ -970,39 +970,6 @@ internal abstract class QueryBuilder<TDocument, TProjection> : IQueryBuilder<TDo
 	}
 
 	internal static string MakeVariableName(string name) => name?.ToUnderScoresCase()!.Replace('.', '_')!;
-
-	private static Type? GetEnumerationItemType(object? value)
-	{
-		if (value is not IEnumerable objectEnumeration)
-		{
-			return null;
-		}
-		
-		foreach (var item in objectEnumeration)
-		{
-			if (item == null)
-			{
-				continue;
-			}
-
-			return item.GetType();
-		}
-
-		var types = value.GetType().GetInterfacesOf(typeof(IEnumerable<>)).Select(x => x.GetGenericArguments()[0]);
-		
-		return types.FirstOrDefault(x => x != typeof(object)) ?? types.FirstOrDefault();
-	}
-
-	private static bool TryConvertIntegerToOtherInteger(object fromValue, Type toType, [NotNullWhen(true)] ref object? toValue)
-	{
-		var trueType = fromValue.GetType().GetUnderlyingSystemType();
-		if (_integerTypes.Contains(trueType) && _integerTypes.Contains(toType))
-		{
-			toValue = Convert.ChangeType(fromValue, toType);
-			return true;
-		}
-		return false;
-	}
 
 	public static object CreateEntityInstance(BsonClassMap classMap, IReadOnlyDictionary<string, object?> dataEntryValues)
 	{

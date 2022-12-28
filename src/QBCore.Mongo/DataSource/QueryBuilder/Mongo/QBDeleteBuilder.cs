@@ -9,7 +9,7 @@ internal sealed class QBDeleteBuilder<TDoc, TDto> : QBCommonBuilder<TDoc, TDto>,
 	public QBDeleteBuilder()
 	{
 		if (DocumentInfo.IdField == null)
-			throw new InvalidOperationException($"Document '{typeof(TDoc).ToPretty()}' does not have an id field.");
+			throw new InvalidOperationException($"Document '{typeof(TDoc).ToPretty()}' does not have an id data entry.");
 	}
 	public QBDeleteBuilder(QBDeleteBuilder<TDoc, TDto> other) : base(other) { }
 	public QBDeleteBuilder(IQBBuilder other)
@@ -40,7 +40,7 @@ internal sealed class QBDeleteBuilder<TDoc, TDto> : QBCommonBuilder<TDoc, TDto>,
 	private void AutoBuildSetup(string? tableName)
 	{
 		var deId = DocumentInfo.IdField
-			?? throw new InvalidOperationException($"Document '{typeof(TDoc).ToPretty()}' does not have an id field.");
+			?? throw new InvalidOperationException($"Document '{typeof(TDoc).ToPretty()}' does not have an id data entry.");
 
 		Delete(tableName).Condition(deId, FO.Equal, "id");
 	}

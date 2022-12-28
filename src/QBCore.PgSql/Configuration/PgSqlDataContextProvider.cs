@@ -1,4 +1,7 @@
+using System.Data;
 using Npgsql;
+using NpgsqlTypes;
+using QBCore.DataSource.QueryBuilder;
 using QBCore.ObjectFactory;
 
 namespace QBCore.Configuration;
@@ -43,5 +46,34 @@ public static class ExtensionsForPgSqlDataContext
 	public static NpgsqlDataSource AsNpgsqlDataSource(this IDataContext dataContext)
 	{
 		return dataContext?.Context as NpgsqlDataSource ?? throw new ArgumentException(nameof(dataContext));
+	}
+
+	public static bool IsDbTypeOneOfIntegerTypes(this QBParameter parameter)
+	{
+		if (parameter.DbType is DbType dbType)
+		{
+			switch (dbType)
+			{
+				case DbType.Int32:
+				case DbType.Int64:
+				case DbType.UInt32:
+				case DbType.UInt64:
+				case DbType.Byte:
+				case DbType.SByte:
+				case DbType.Int16:
+				case DbType.UInt16: return true;
+			}
+		}
+		else if (parameter.DbType is NpgsqlDbType npgsqlDbType)
+		{
+			switch (npgsqlDbType)
+			{
+				case NpgsqlDbType.Integer:
+				case NpgsqlDbType.Bigint:
+				case NpgsqlDbType.Smallint: return true;
+			}
+		}
+
+		return false;
 	}
 }

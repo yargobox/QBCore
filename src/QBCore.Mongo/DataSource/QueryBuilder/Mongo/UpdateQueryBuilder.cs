@@ -49,7 +49,7 @@ internal sealed class UpdateQueryBuilder<TDocument, TUpdate> : QueryBuilder<TDoc
 		var clientSessionHandle = (IClientSessionHandle?)options?.NativeClientSession;
 
 		var deId = (MongoDEInfo?)Builder.DocumentInfo.IdField
-			?? throw new InvalidOperationException($"Document '{Builder.DocumentInfo.DocumentType.ToPretty()}' does not have an id field.");
+			?? throw new InvalidOperationException($"Document '{Builder.DocumentInfo.DocumentType.ToPretty()}' does not have an id data entry.");
 		var deUpdated = (MongoDEInfo?)Builder.DocumentInfo.DateUpdatedField;
 		var deModified = (MongoDEInfo?)Builder.DocumentInfo.DateModifiedField;
 

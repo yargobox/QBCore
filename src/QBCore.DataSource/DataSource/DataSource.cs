@@ -57,7 +57,7 @@ public abstract partial class DataSource<TKey, TDocument, TCreate, TSelect, TUpd
 		}
 
 		var getId = DSInfo.DocumentInfo.Value.IdField?.Getter
-			?? throw new InvalidOperationException($"Document '{DSInfo.DocumentInfo.Value.DocumentType.ToPretty()}' does not have an id field.");
+			?? throw new InvalidOperationException($"Document '{DSInfo.DocumentInfo.Value.DocumentType.ToPretty()}' does not have an id data entry.");
 
 		var qb = DSInfo.QBFactory.CreateQBInsert<TDocument, TCreate>(_dataContext);
 		var builder = qb.Builder;
@@ -67,13 +67,13 @@ public abstract partial class DataSource<TKey, TDocument, TCreate, TSelect, TUpd
 		foreach (var param in builder.Parameters.Where(x => x.Direction.HasFlag(ParameterDirection.Input)))
 		{
 			param.ResetValue();
-			if (parameters != null && parameters.TryGetValue(param.Name, out value))
+			if (parameters != null && parameters.TryGetValue(param.ParameterName, out value))
 			{
 				param.Value = value;
 			}
-			else if (param.Name.StartsWith('@') && document is not null)
+			else if (param.ParameterName.StartsWith('@') && document is not null)
 			{
-				deInfo = qb.Builder.ProjectionInfo?.DataEntries.GetValueOrDefault(param.Name.Substring(1));
+				deInfo = qb.Builder.ProjectionInfo?.DataEntries.GetValueOrDefault(param.ParameterName.Substring(1));
 				if (deInfo != null)
 				{
 					param.Value = deInfo.Getter(document!);
@@ -136,7 +136,7 @@ public abstract partial class DataSource<TKey, TDocument, TCreate, TSelect, TUpd
 		}
 
 		var idField = DSInfo.DocumentInfo.Value.IdField
-			?? throw new InvalidOperationException($"Document '{DSInfo.DocumentInfo.Value.DocumentType.ToPretty()}' does not have an id field.");
+			?? throw new InvalidOperationException($"Document '{DSInfo.DocumentInfo.Value.DocumentType.ToPretty()}' does not have an id data entry.");
 
 		var qb = DSInfo.QBFactory.CreateQBSelect<TDocument, TSelect>(_dataContext);
 		var builder = qb.Builder;
@@ -147,7 +147,7 @@ public abstract partial class DataSource<TKey, TDocument, TCreate, TSelect, TUpd
 		foreach (var param in builder.Parameters.Where(x => x.Direction.HasFlag(ParameterDirection.Input)))
 		{
 			param.ResetValue();
-			if (parameters != null && parameters.TryGetValue(param.Name, out value))
+			if (parameters != null && parameters.TryGetValue(param.ParameterName, out value))
 			{
 				param.Value = value;
 			}
@@ -234,7 +234,7 @@ public abstract partial class DataSource<TKey, TDocument, TCreate, TSelect, TUpd
 		foreach (var param in builder.Parameters.Where(x => x.Direction.HasFlag(ParameterDirection.Input)))
 		{
 			param.ResetValue();
-			if (parameters != null && parameters.TryGetValue(param.Name, out value))
+			if (parameters != null && parameters.TryGetValue(param.ParameterName, out value))
 			{
 				param.Value = value;
 			}
@@ -265,17 +265,17 @@ public abstract partial class DataSource<TKey, TDocument, TCreate, TSelect, TUpd
 		foreach (var param in builder.Parameters.Where(x => x.Direction.HasFlag(ParameterDirection.Input)))
 		{
 			param.ResetValue();
-			if (parameters != null && parameters.TryGetValue(param.Name, out value))
+			if (parameters != null && parameters.TryGetValue(param.ParameterName, out value))
 			{
 				param.Value = value;
 			}
-			else if (param.Name == "id")
+			else if (param.ParameterName == "id")
 			{
 				param.Value = id;
 			}
-			else if (param.Name.StartsWith('@') && document is not null)
+			else if (param.ParameterName.StartsWith('@') && document is not null)
 			{
-				deInfo = qb.Builder.ProjectionInfo?.DataEntries.GetValueOrDefault(param.Name.Substring(1));
+				deInfo = qb.Builder.ProjectionInfo?.DataEntries.GetValueOrDefault(param.ParameterName.Substring(1));
 				if (deInfo != null)
 				{
 					param.Value = deInfo.Getter(document!);
@@ -311,17 +311,17 @@ public abstract partial class DataSource<TKey, TDocument, TCreate, TSelect, TUpd
 			foreach (var param in builder.Parameters.Where(x => x.Direction.HasFlag(ParameterDirection.Input)))
 			{
 				param.ResetValue();
-				if (parameters != null && parameters.TryGetValue(param.Name, out value))
+				if (parameters != null && parameters.TryGetValue(param.ParameterName, out value))
 				{
 					param.Value = value;
 				}
-				else if (param.Name == "id")
+				else if (param.ParameterName == "id")
 				{
 					param.Value = id;
 				}
-				else if (param.Name.StartsWith('@') && document is not null)
+				else if (param.ParameterName.StartsWith('@') && document is not null)
 				{
-					deInfo = qb.Builder.ProjectionInfo?.DataEntries.GetValueOrDefault(param.Name.Substring(1));
+					deInfo = qb.Builder.ProjectionInfo?.DataEntries.GetValueOrDefault(param.ParameterName.Substring(1));
 					if (deInfo != null)
 					{
 						param.Value = deInfo.Getter(document!);
@@ -343,17 +343,17 @@ public abstract partial class DataSource<TKey, TDocument, TCreate, TSelect, TUpd
 			foreach (var param in builder.Parameters.Where(x => x.Direction.HasFlag(ParameterDirection.Input)))
 			{
 				param.ResetValue();
-				if (parameters != null && parameters.TryGetValue(param.Name, out value))
+				if (parameters != null && parameters.TryGetValue(param.ParameterName, out value))
 				{
 					param.Value = value;
 				}
-				else if (param.Name == "id")
+				else if (param.ParameterName == "id")
 				{
 					param.Value = id;
 				}
-				else if (param.Name.StartsWith('@') && document is not null)
+				else if (param.ParameterName.StartsWith('@') && document is not null)
 				{
-					deInfo = qb.Builder.ProjectionInfo?.DataEntries.GetValueOrDefault(param.Name.Substring(1));
+					deInfo = qb.Builder.ProjectionInfo?.DataEntries.GetValueOrDefault(param.ParameterName.Substring(1));
 					if (deInfo != null)
 					{
 						param.Value = deInfo.Getter(document!);
@@ -388,17 +388,17 @@ public abstract partial class DataSource<TKey, TDocument, TCreate, TSelect, TUpd
 		foreach (var param in builder.Parameters.Where(x => x.Direction.HasFlag(ParameterDirection.Input)))
 		{
 			param.ResetValue();
-			if (parameters != null && parameters.TryGetValue(param.Name, out value))
+			if (parameters != null && parameters.TryGetValue(param.ParameterName, out value))
 			{
 				param.Value = value;
 			}
-			else if (param.Name == "id")
+			else if (param.ParameterName == "id")
 			{
 				param.Value = id;
 			}
-			else if (param.Name.StartsWith('@') && document is not null)
+			else if (param.ParameterName.StartsWith('@') && document is not null)
 			{
-				deInfo = qb.Builder.ProjectionInfo?.DataEntries.GetValueOrDefault(param.Name.Substring(1));
+				deInfo = qb.Builder.ProjectionInfo?.DataEntries.GetValueOrDefault(param.ParameterName.Substring(1));
 				if (deInfo != null)
 				{
 					param.Value = deInfo.Getter(document!);
@@ -417,11 +417,11 @@ public abstract partial class DataSource<TKey, TDocument, TCreate, TSelect, TUpd
 		{
 			foreach (var param in qbParameters.Where(x => x.Direction.HasFlag(ParameterDirection.Output)))
 			{
-				parameters[param.Name] = param.HasValue
+				parameters[param.ParameterName] = param.HasValue
 					? param.Value
 					: param.IsNullable
 						? null
-						: param.UnderlyingType.GetDefaultValue();
+						: param.ClrType.GetDefaultValue();
 			}
 		}
 	}

@@ -19,7 +19,7 @@ public static class ExtensionsForLinq
 
 	public static bool IsNullEmpty<T>([NotNullWhen(false)] this IEnumerable<T>? @this)
 	{
-		if (@this != null)
+		if (@this is not null)
 		{
 			foreach (var _ in @this) return false;
 		}

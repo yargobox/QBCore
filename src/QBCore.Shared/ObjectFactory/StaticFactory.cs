@@ -7,15 +7,15 @@ namespace QBCore.ObjectFactory;
 
 public static class StaticFactory
 {
-	public static IReadOnlyDictionary<Type, Lazy<DSDocumentInfo>> Documents => SingletonInstance._documents;
-	public static IReadOnlyDictionary<Type, IDSInfo> DataSources => SingletonInstance._dataSources;
-	public static IReadOnlyDictionary<Type, ICDSInfo> ComplexDataSources => SingletonInstance._complexDataSources;
-	public static IReadOnlyDictionary<string, IAppObjectInfo> AppObjects => SingletonInstance._appObjects;
-	public static IReadOnlyDictionary<string, IAppObjectInfo> AppObjectByControllerNames => SingletonInstance._appObjectByControllerNames;
-	public static IReadOnlyDictionary<string, BusinessObject> BusinessObjects => SingletonInstance._businessObjects;
+	public static IReadOnlyDictionary<Type, Lazy<DSDocumentInfo>> Documents => Static._documents;
+	public static IReadOnlyDictionary<Type, IDSInfo> DataSources => Static._dataSources;
+	public static IReadOnlyDictionary<Type, ICDSInfo> ComplexDataSources => Static._complexDataSources;
+	public static IReadOnlyDictionary<string, IAppObjectInfo> AppObjects => Static._appObjects;
+	public static IReadOnlyDictionary<string, IAppObjectInfo> AppObjectByControllerNames => Static._appObjectByControllerNames;
+	public static IReadOnlyDictionary<string, BusinessObject> BusinessObjects => Static._businessObjects;
 
 
-	private static class SingletonInstance
+	private static class Static
 	{
 		public static readonly Func<Assembly, bool> _defaultAssemblySelector = _ => true;
 		public static readonly Func<Type, bool> _defaultDocumentExclusionSelector = _ => false;
@@ -31,17 +31,17 @@ public static class StaticFactory
 		public static volatile Func<Type, bool> _documentExclusionSelector = _defaultDocumentExclusionSelector;
 		public static volatile IReadOnlyList<Type> _dataContextProviders = new List<Type>(0).AsReadOnly();
 
-		static SingletonInstance() { }
+		static Static() { }
 	}
 
 	public static class Internals
 	{
-		public static Func<Assembly, bool> DefaultAssemblySelector => SingletonInstance._defaultAssemblySelector;
-		public static Func<Type, bool> DefaultDocumentExclusionSelector => SingletonInstance._defaultDocumentExclusionSelector;
-		public static Func<Type, bool> DefaultTypeSelector => SingletonInstance._defaultTypeSelector;
+		public static Func<Assembly, bool> DefaultAssemblySelector => Static._defaultAssemblySelector;
+		public static Func<Type, bool> DefaultDocumentExclusionSelector => Static._defaultDocumentExclusionSelector;
+		public static Func<Type, bool> DefaultTypeSelector => Static._defaultTypeSelector;
 
-		public static IReadOnlyList<Type> DataContextProviders => SingletonInstance._dataContextProviders;
-		public static Func<Type, bool> DocumentExclusionSelector => SingletonInstance._documentExclusionSelector;
+		public static IReadOnlyList<Type> DataContextProviders => Static._dataContextProviders;
+		public static Func<Type, bool> DocumentExclusionSelector => Static._documentExclusionSelector;
 
 		public static void AddDocumentExclusionSelector(Func<Type, bool> documentExclusionSelector)
 		{
@@ -49,10 +49,10 @@ public static class StaticFactory
 
 			if (documentExclusionSelector == DefaultDocumentExclusionSelector) return;
 
-			lock (SingletonInstance._syncRoot)
+			lock (Static._syncRoot)
 			{
-				var current = SingletonInstance._documentExclusionSelector;
-				SingletonInstance._documentExclusionSelector = current != DefaultDocumentExclusionSelector
+				var current = Static._documentExclusionSelector;
+				Static._documentExclusionSelector = current != DefaultDocumentExclusionSelector
 					? type => documentExclusionSelector(type) && current(type)
 					: documentExclusionSelector;
 			}
@@ -62,17 +62,17 @@ public static class StaticFactory
 		{
 			if (dataContextProviders == null) throw new ArgumentNullException(nameof(dataContextProviders));
 
-			lock (SingletonInstance._syncRoot)
+			lock (Static._syncRoot)
 			{
-				var typesToRegister = dataContextProviders.Except(SingletonInstance._dataContextProviders).ToList();
+				var typesToRegister = dataContextProviders.Except(Static._dataContextProviders).ToList();
 
 				if (typesToRegister.Count == 0) return typesToRegister;
 
-				var newDataContextProviders = new List<Type>(SingletonInstance._dataContextProviders.Count + typesToRegister.Count);
-				newDataContextProviders.AddRange(SingletonInstance._dataContextProviders);
+				var newDataContextProviders = new List<Type>(Static._dataContextProviders.Count + typesToRegister.Count);
+				newDataContextProviders.AddRange(Static._dataContextProviders);
 				newDataContextProviders.AddRange(typesToRegister);
 
-				SingletonInstance._dataContextProviders = typesToRegister.AsReadOnly();
+				Static._dataContextProviders = typesToRegister.AsReadOnly();
 
 				return typesToRegister;
 			}
@@ -83,23 +83,23 @@ public static class StaticFactory
 			if (factoryMethod == null) throw new ArgumentNullException(nameof(factoryMethod));
 			if (dataSourceTypes == null) throw new ArgumentNullException(nameof(dataSourceTypes));
 
-			lock (SingletonInstance._syncRoot)
+			lock (Static._syncRoot)
 			{
-				var typesToRegister = dataSourceTypes.Where(x => !SingletonInstance._dataSources.ContainsKey(x)).ToArray();
+				var typesToRegister = dataSourceTypes.Where(x => !Static._dataSources.ContainsKey(x)).ToArray();
 				var registered = new List<IDSInfo>(typesToRegister.Length);
 
 				if (typesToRegister.Length == 0) return registered;
 
-				var newDataSources = new Dictionary<Type, IDSInfo>(SingletonInstance._dataSources, null);
+				var newDataSources = new Dictionary<Type, IDSInfo>(Static._dataSources, null);
 				newDataSources.EnsureCapacity(newDataSources.Count + typesToRegister.Length);
 
-				var newAppObjects = new Dictionary<string, IAppObjectInfo>(SingletonInstance._appObjects, null);
+				var newAppObjects = new Dictionary<string, IAppObjectInfo>(Static._appObjects, null);
 				newAppObjects.EnsureCapacity(newAppObjects.Count + typesToRegister.Length);
 
-				var newAppObjectByControllerNames = new Dictionary<string, IAppObjectInfo>(SingletonInstance._appObjectByControllerNames, StringComparer.OrdinalIgnoreCase);
+				var newAppObjectByControllerNames = new Dictionary<string, IAppObjectInfo>(Static._appObjectByControllerNames, StringComparer.OrdinalIgnoreCase);
 				newAppObjectByControllerNames.EnsureCapacity(newAppObjectByControllerNames.Count + typesToRegister.Length);
 
-				var newBusinessObjects = new Dictionary<string, BusinessObject>(SingletonInstance._businessObjects, null);
+				var newBusinessObjects = new Dictionary<string, BusinessObject>(Static._businessObjects, null);
 				newBusinessObjects.EnsureCapacity(newBusinessObjects.Count + typesToRegister.Length);
 
 				IDSInfo pDSInfo;
@@ -120,10 +120,10 @@ public static class StaticFactory
 					newBusinessObjects.Add(bo.Key, bo);
 				}
 
-				SingletonInstance._dataSources = newDataSources.AsReadOnly();
-				SingletonInstance._appObjects = newAppObjects.AsReadOnly();
-				SingletonInstance._appObjectByControllerNames = newAppObjectByControllerNames.AsReadOnly();
-				SingletonInstance._businessObjects = newBusinessObjects.AsReadOnly();
+				Static._dataSources = newDataSources.AsReadOnly();
+				Static._appObjects = newAppObjects.AsReadOnly();
+				Static._appObjectByControllerNames = newAppObjectByControllerNames.AsReadOnly();
+				Static._businessObjects = newBusinessObjects.AsReadOnly();
 
 				return registered;
 			}
@@ -134,23 +134,23 @@ public static class StaticFactory
 			if (factoryMethod == null) throw new ArgumentNullException(nameof(factoryMethod));
 			if (complexDataSourceTypes == null) throw new ArgumentNullException(nameof(complexDataSourceTypes));
 
-			lock (SingletonInstance._syncRoot)
+			lock (Static._syncRoot)
 			{
-				var typesToRegister = complexDataSourceTypes.Where(x => !SingletonInstance._complexDataSources.ContainsKey(x)).ToArray();
+				var typesToRegister = complexDataSourceTypes.Where(x => !Static._complexDataSources.ContainsKey(x)).ToArray();
 				var registered = new List<ICDSInfo>(typesToRegister.Length);
 
 				if (typesToRegister.Length == 0) return registered;
 
-				var newComplexDataSources = new Dictionary<Type, ICDSInfo>(SingletonInstance._complexDataSources, null);
+				var newComplexDataSources = new Dictionary<Type, ICDSInfo>(Static._complexDataSources, null);
 				newComplexDataSources.EnsureCapacity(newComplexDataSources.Count + typesToRegister.Length);
 
-				var newAppObjects = new Dictionary<string, IAppObjectInfo>(SingletonInstance._appObjects, null);
+				var newAppObjects = new Dictionary<string, IAppObjectInfo>(Static._appObjects, null);
 				newAppObjects.EnsureCapacity(newAppObjects.Count + typesToRegister.Length);
 
-				var newAppObjectByControllerNames = new Dictionary<string, IAppObjectInfo>(SingletonInstance._appObjectByControllerNames, StringComparer.OrdinalIgnoreCase);
+				var newAppObjectByControllerNames = new Dictionary<string, IAppObjectInfo>(Static._appObjectByControllerNames, StringComparer.OrdinalIgnoreCase);
 				newAppObjectByControllerNames.EnsureCapacity(newAppObjectByControllerNames.Count + typesToRegister.Length);
 
-				var newBusinessObjects = new Dictionary<string, BusinessObject>(SingletonInstance._businessObjects, null);
+				var newBusinessObjects = new Dictionary<string, BusinessObject>(Static._businessObjects, null);
 				newBusinessObjects.EnsureCapacity(newBusinessObjects.Count + typesToRegister.Length);
 
 				ICDSInfo pCDSInfo;
@@ -171,10 +171,10 @@ public static class StaticFactory
 					newBusinessObjects.Add(bo.Key, bo);
 				}
 
-				SingletonInstance._complexDataSources = newComplexDataSources.AsReadOnly();
-				SingletonInstance._appObjects = newAppObjects.AsReadOnly();
-				SingletonInstance._appObjectByControllerNames = newAppObjectByControllerNames.AsReadOnly();
-				SingletonInstance._businessObjects = newBusinessObjects.AsReadOnly();
+				Static._complexDataSources = newComplexDataSources.AsReadOnly();
+				Static._appObjects = newAppObjects.AsReadOnly();
+				Static._appObjectByControllerNames = newAppObjectByControllerNames.AsReadOnly();
+				Static._businessObjects = newBusinessObjects.AsReadOnly();
 
 				return registered;
 			}

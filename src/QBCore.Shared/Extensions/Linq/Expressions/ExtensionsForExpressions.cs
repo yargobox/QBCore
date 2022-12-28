@@ -478,4 +478,43 @@ L_EXIT_WHILE:
 			}
 		}
 	}
+
+	public static Expression<Func<T, object?>> ToMemberExpression<T>(this PropertyInfo propertyInfo)
+	{
+		if (propertyInfo == null)
+		{
+			throw new ArgumentNullException(nameof(propertyInfo));
+		}
+
+		var parameterExpression = Expression.Parameter(typeof(T), "item");
+		var memberExpression = Expression.MakeMemberAccess(parameterExpression, propertyInfo);
+		if (propertyInfo.PropertyType == typeof(object))
+		{
+			return Expression.Lambda<Func<T, object?>>(memberExpression, parameterExpression);
+		}
+		else
+		{
+			var convertExpression = Expression.Convert(memberExpression, typeof(object));
+			return Expression.Lambda<Func<T, object?>>(convertExpression, parameterExpression);
+		}
+	}
+	public static Expression<Func<T, object?>> ToMemberExpression<T>(this FieldInfo fieldInfo)
+	{
+		if (fieldInfo == null)
+		{
+			throw new ArgumentNullException(nameof(fieldInfo));
+		}
+
+		var parameterExpression = Expression.Parameter(typeof(T), "item");
+		var memberExpression = Expression.MakeMemberAccess(parameterExpression, fieldInfo);
+		if (fieldInfo.FieldType == typeof(object))
+		{
+			return Expression.Lambda<Func<T, object?>>(memberExpression, parameterExpression);
+		}
+		else
+		{
+			var convertExpression = Expression.Convert(memberExpression, typeof(object));
+			return Expression.Lambda<Func<T, object?>>(convertExpression, parameterExpression);
+		}
+	}
 }

@@ -488,10 +488,10 @@ internal sealed class QBSelectBuilder<TDoc, TDto> : QBBuilder<TDoc, TDto>, IQBMo
 			_parameters = new List<QBParameter>(8);
 		}
 
-		var param = _parameters.FirstOrDefault(x => x.Name == name);
+		var param = _parameters.FirstOrDefault(x => x.ParameterName == name);
 		if (param != null)
 		{
-			if (param.UnderlyingType != underlyingType || param.IsNullable != isNullable || param.Direction != direction)
+			if (param.ClrType != underlyingType || param.IsNullable != isNullable || param.Direction != direction)
 			{
 				throw new InvalidOperationException($"Incorrect parameter definition of select query builder '{typeof(TDto).ToPretty()}': parameter '{name}' has already been added before with different properties");
 			}

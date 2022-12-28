@@ -4,27 +4,28 @@ namespace QBCore.DataSource.QueryBuilder;
 
 public record QBParameter
 {
-	public readonly QBParamInfo ParamInfo;
+	public QBParamInfo ParamInfo { get; }
 
-	public string Name => ParamInfo.Name;
-	public Type UnderlyingType => ParamInfo.UnderlyingType;
+	public string ParameterName => ParamInfo.ParameterName;
+	public Type ClrType => ParamInfo.ClrType;
+	public Enum? DbType => ParamInfo.DbType;
+	public string? DbTypeName => ParamInfo.DbTypeName;
+	public string? SourceColumn => ParamInfo.SourceColumn;
+	public int Size => ParamInfo.Size;
 	public ParameterDirection Direction => ParamInfo.Direction;
+	public byte Precision => ParamInfo.Precision;
+	public byte Scale => ParamInfo.Scale;
 	public bool IsNullable => ParamInfo.IsNullable;
 	public bool IsErrorCode => ParamInfo.IsErrorCode;
 	public bool IsErrorMessage => ParamInfo.IsErrorMessage;
-	public string? DbTypeName => ParamInfo.DbTypeName;
-	public short Precision => ParamInfo.Precision;
-	public byte Scale => ParamInfo.Scale;
 
 	protected object? _value;
 	public object? Value
 	{
 		get
 		{
-			if (!HasValue)
-			{
-				throw new InvalidOperationException($"A value of parameter '{Name}' has not been set!.");
-			}
+			if (!HasValue) throw new InvalidOperationException($"A value of parameter '{ParameterName}' has not been set!.");
+
 			return _value;
 		}
 		set
@@ -34,15 +35,20 @@ public record QBParameter
 			_value = value;
 		}
 	}
-	public bool HasValue { get; set; }
+	public bool HasValue { get; protected set; }
 	public bool IsValueUsed { get; set; }
 
-	public QBParameter(QBParamInfo param)
-		=> ParamInfo = param;
-	public QBParameter(string name, Type underlyingType, bool isNullable, ParameterDirection direction, bool isErrorCode = false, bool isErrorMessage = false, string? dbTypeName = null, short precision = 0, byte scale = 0)
-		=> ParamInfo = new QBParamInfo(name, underlyingType, isNullable, direction, isErrorCode, isErrorMessage, dbTypeName, precision, scale);
-	public QBParameter(string name, Type underlyingType, bool isNullable, ParameterDirection direction, bool isErrorCode, bool isErrorMessage, string dbTypeName)
-		=> ParamInfo = new QBParamInfo(name, underlyingType, isNullable, direction, isErrorCode, isErrorMessage, dbTypeName);
+	public QBParameter(QBParamInfo paramInfo)
+	{
+		if (paramInfo == null) throw new ArgumentNullException(nameof(paramInfo));
+
+		ParamInfo = paramInfo;
+	}
+
+	public QBParameter(string parameterName, Type clrType, bool isNullable = false, ParameterDirection direction = ParameterDirection.Input, Enum? dbType = null, string? dbTypeName = null, int size = 0, byte precision = 0, byte scale = 0, bool isErrorCode = false, bool isErrorMessage = false, string? sourceColumn = null)
+	{
+		ParamInfo = new QBParamInfo(parameterName, clrType, isNullable, direction, dbType, dbTypeName, size, precision, scale, isErrorCode, isErrorMessage, sourceColumn);
+	}
 
 	public void ResetValue()
 	{
@@ -54,126 +60,37 @@ public record QBParameter
 
 public record QBParamInfo
 {
-	public readonly string Name;
-	public readonly Type UnderlyingType;
-	public readonly string? DbTypeName;
-	protected readonly uint _binData;
+	public string ParameterName { get; }
+	public Type ClrType { get; }
+	public Enum? DbType { get; }
+	public string? DbTypeName { get; }
+	public string? SourceColumn { get; }
+	public int Size { get; }
+	private readonly uint _binData;
 
-	public short Precision => unchecked((short)_binData);
-	public byte Scale => unchecked((byte)(_binData >> 16));
+	public ParameterDirection Direction => unchecked((ParameterDirection)(_binData >> 27));
+	public byte Precision => unchecked((byte)_binData);
+	public byte Scale => unchecked((byte)(_binData >> 8));
 	public bool IsNullable => (_binData & 0x01000000U) == 0x01000000U;
 	public bool IsErrorCode => (_binData & 0x02000000U) == 0x02000000U;
 	public bool IsErrorMessage => (_binData & 0x04000000U) == 0x04000000U;
-	public ParameterDirection Direction => unchecked((ParameterDirection)(_binData >> 27));
 
-	public QBParamInfo(string name, Type underlyingType, bool isNullable, ParameterDirection direction, bool isErrorCode = false, bool isErrorMessage = false, string? dbTypeName = null, short precision = 0, byte scale = 0)
+	public QBParamInfo(string parameterName, Type clrType, bool isNullable, ParameterDirection direction, Enum? dbType, string? dbTypeName = null, int size = 0, byte precision = 0, byte scale = 0, bool isErrorCode = false, bool isErrorMessage = false, string? sourceColumn = null)
 	{
-		if (name == null)
-		{
-			throw new ArgumentNullException(nameof(name));
-		}
-		if (string.IsNullOrWhiteSpace(name))
-		{
-			throw new ArgumentException(nameof(name));
-		}
-		if (underlyingType == null)
-		{
-			throw new ArgumentNullException(nameof(underlyingType));
-		}
-		if (dbTypeName != null && (string.IsNullOrWhiteSpace(dbTypeName) || dbTypeName?.IndexOf('(') >= 0))
-		{
-			throw new ArgumentException(nameof(dbTypeName));
-		}
-		if (precision < -1 || precision > 8000)
-		{
-			throw new ArgumentException(nameof(precision));
-		}
-		if (scale > 38)
-		{
-			throw new ArgumentException(nameof(scale));
-		}
+		if (parameterName == null) throw new ArgumentNullException(nameof(parameterName));
+		if (clrType == null) throw new ArgumentNullException(nameof(clrType));
+		if (string.IsNullOrEmpty(dbTypeName)) dbTypeName = null;
+		if (dbTypeName?.IndexOf('(') >= 0) throw new ArgumentException(nameof(dbTypeName));
+		if (size < -1) throw new ArgumentException(nameof(size));
+		if (string.IsNullOrEmpty(sourceColumn)) sourceColumn = null;
 
-		Name = name;
-		UnderlyingType = underlyingType;
+		ParameterName = parameterName;
+		ClrType = clrType;
+		DbType = dbType;
 		DbTypeName = dbTypeName;
-		_binData = unchecked((uint)(ushort)precision | (uint)scale << 16 | (uint)direction << 27);
-		if (isNullable) _binData |= 0x01000000U;
-		if (isErrorCode) _binData |= 0x02000000U;
-		if (isErrorMessage) _binData |= 0x04000000U;
-	}
-
-	public QBParamInfo(string name, Type underlyingType, bool isNullable, ParameterDirection direction, bool isErrorCode, bool isErrorMessage, string dbTypeName)
-	{
-		if (name == null)
-		{
-			throw new ArgumentNullException(nameof(name));
-		}
-		if (string.IsNullOrWhiteSpace(name))
-		{
-			throw new ArgumentException(nameof(name));
-		}
-		if (underlyingType == null)
-		{
-			throw new ArgumentNullException(nameof(underlyingType));
-		}
-		if (dbTypeName == null)
-		{
-			throw new ArgumentNullException(nameof(dbTypeName));
-		}
-		if (string.IsNullOrWhiteSpace(dbTypeName))
-		{
-			throw new ArgumentException(nameof(dbTypeName));
-		}
-
-		Name = name;
-		UnderlyingType = underlyingType;
-
-		short precision = 0;
-		byte scale = 0;
-
-		var i = dbTypeName.IndexOf('(');
-		if (i > 0)
-		{
-			var j = dbTypeName.IndexOf(')', i);
-			if (j < 0 || j - i - 2 <= 0 || j != dbTypeName.Length - 1)
-			{
-				throw new ArgumentException(nameof(dbTypeName));
-			}
-
-			DbTypeName = dbTypeName.Substring(0, i);
-
-			var strArgs = dbTypeName.Substring(i + 1, j - i - 2);
-			var args = strArgs.Split(',', 2);
-			if (args[0].ToUpper() == "MAX")
-			{
-				if (args.Length > 1)
-				{
-					throw new ArgumentException(nameof(dbTypeName));
-				}
-
-				precision = -1;
-			}
-			else
-			{
-				if (!short.TryParse(args[0], out precision) || precision < 0 || precision > 8000)
-				{
-					throw new ArgumentException(nameof(dbTypeName));
-				}
-				if (args.Length > 1)
-				{
-					if (!byte.TryParse(args[1], out scale) || scale > 38)
-					{
-						throw new ArgumentException(nameof(dbTypeName));
-					}
-				}
-			}
-		}
-		else
-		{
-			this.DbTypeName = dbTypeName;
-		}
-
-		_binData = unchecked((uint)(ushort)precision | (uint)scale << 16 | (uint)direction << 27);
+		Size = size;
+		SourceColumn = sourceColumn;
+		_binData = unchecked((uint)precision | (uint)scale << 8 | (uint)direction << 27);
 		if (isNullable) _binData |= 0x01000000U;
 		if (isErrorCode) _binData |= 0x02000000U;
 		if (isErrorMessage) _binData |= 0x04000000U;

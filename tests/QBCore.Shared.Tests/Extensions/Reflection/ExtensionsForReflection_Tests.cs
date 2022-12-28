@@ -12,9 +12,9 @@ public class ExtensionsForReflection_Tests
 		public int? NullableValueProperty { get; set; }
 
 		public string NotNullableRefField = null!;
-		public string? NullableRefField;
-		public int NotNullableValueField;
-		public int? NullableValueField;
+		public string? NullableRefField = null;
+		public int NotNullableValueField = 0;
+		public int? NullableValueField = null;
 	}
 
 	[Fact]

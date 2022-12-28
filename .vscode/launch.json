@@ -2,6 +2,26 @@
 	"version": "0.2.0",
 	"configurations": [
 		{
+			"name": ".NET Core Launch (web) - EFCoreDevelop (PostgreSQL)",
+			"type": "coreclr",
+			"request": "launch",
+			"preLaunchTask": "build - EFCoreDevelop",
+			"program": "${workspaceFolder}/examples/EFCoreDevelop/EFCoreDevelop.API/bin/Debug/net7.0/EFCoreDevelop.API.dll",
+			"args": [],
+			"cwd": "${workspaceFolder}/examples/EFCoreDevelop/EFCoreDevelop.API",
+			"stopAtEntry": false,
+			"serverReadyAction": {
+				"action": "openExternally",
+				"pattern": "\\bNow listening on:\\s+(https?://\\S+)"
+			},
+			"env": {
+				"ASPNETCORE_ENVIRONMENT": "Development"
+			},
+			"sourceFileMap": {
+				"/Views": "${workspaceFolder}/Views"
+			}
+		},
+		{
 			"name": ".NET Core Launch (web) - Develop (PostgreSQL)",
 			"type": "coreclr",
 			"request": "launch",
