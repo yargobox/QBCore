@@ -5,6 +5,7 @@ using MongoDB.Bson;
 using QBCore.Configuration;
 using QBCore.DataSource.QueryBuilder;
 using QBCore.DataSource.QueryBuilder.Mongo;
+using QBCore.Extensions.Internals;
 using QBCore.ObjectFactory;
 
 namespace QBCore.DataSource;
@@ -65,110 +66,58 @@ public sealed class MongoDataLayer : IDataLayerInfo
 
 	private bool IsDocumentTypeImplementation(Type type)
 	{
-		if (type.IsEnum || type.IsGenericTypeDefinition) return false;
+		if (type.IsEnum) return false;
+		if (ArgumentHelper.IsStandardValueType(type)) return false;
+		if (ArgumentHelper.IsStandardRefType(type)) return false;
+		if (Static._knownTypes.Contains(type)) return false;
+		if (StaticFactory.Internals.DocumentExclusionSelector(type)) return false;
 
-		if (type.IsValueType)
+		Type gtd;
+		foreach (var i in type.GetInterfaces())
 		{
-			if (_standardValueTypes.Contains(type)) return false;
-		}
-		else if (type.IsClass)
-		{
-			if (_standardRefTypes.Contains(type)) return false;
-		}
-
-		if (StaticFactory.Internals.DocumentExclusionSelector(type))
-		{
-			return false;
-		}
-
-		if (type.GetInterfaceOf(typeof(IEnumerable)) != null || type.GetInterfaceOf(typeof(IEnumerable<>)) != null)
-		{
-			return false;
+			if (i == typeof(IEnumerable)) return false;
+			if (i.IsGenericType)
+			{
+				gtd = type.GetGenericTypeDefinition();
+				if (gtd == typeof(IEnumerable<>) || gtd == typeof(Nullable<>)) return false;
+			}
 		}
 
-		if (type.IsDefined(typeof(DsNotDocumentAttribute), true))
-		{
-			return false;
-		}
+		if (type.IsDefined(typeof(DsNotDocumentAttribute), false)) return false;
 
 		return true;
 	}
 
 	static class Static
 	{
-		public static readonly MongoDataLayer Instance = new MongoDataLayer();
-
 		// Explicit static constructor to tell C# compiler not to mark type as beforefieldinit
 		static Static() { }
+
+		public static readonly MongoDataLayer Instance = new MongoDataLayer();
+
+		public static readonly HashSet<Type> _knownTypes = new HashSet<Type>()
+		{
+			typeof(NotSupported),
+
+			typeof(ObjectId),
+			typeof(ObjectId?),
+			typeof(Decimal128),
+			typeof(Decimal128?),
+
+			typeof(BsonValue),
+			typeof(BsonArray),
+			typeof(BsonDocument),
+			typeof(BsonBinaryData),
+			typeof(BsonUndefined),
+			typeof(BsonTimestamp),
+			typeof(BsonSymbol),
+			typeof(BsonRegularExpression),
+			typeof(BsonNull),
+			typeof(BsonMinKey),
+			typeof(BsonMaxKey),
+			typeof(BsonJavaScriptWithScope),
+			typeof(BsonDateTime),
+			typeof(BsonJavaScript)
+		};
 	}
-
-	private static readonly HashSet<Type> _standardValueTypes = new HashSet<Type>()
-	{
-		typeof(bool),
-		typeof(byte),
-		typeof(sbyte),
-		typeof(short),
-		typeof(ushort),
-		typeof(int),
-		typeof(uint),
-		typeof(long),
-		typeof(ulong),
-		typeof(float),
-		typeof(double),
-		typeof(decimal),
-		typeof(Guid),
-		typeof(DateOnly),
-		typeof(DateTime),
-		typeof(DateTimeOffset),
-		typeof(TimeSpan),
-		typeof(IntPtr),
-		typeof(UIntPtr),
-		typeof(ObjectId),
-		typeof(Decimal128)
-	};
-
-	private static readonly HashSet<Type> _standardRefTypes = new HashSet<Type>()
-	{
-		typeof(NotSupported),
-		typeof(string),
-		typeof(object),
-		typeof(bool?),
-		typeof(byte?),
-		typeof(sbyte?),
-		typeof(byte[]),
-		typeof(short?),
-		typeof(ushort?),
-		typeof(int?),
-		typeof(uint?),
-		typeof(long?),
-		typeof(ulong?),
-		typeof(float?),
-		typeof(Single?),
-		typeof(double?),
-		typeof(decimal?),
-		typeof(Guid?),
-		typeof(DateOnly?),
-		typeof(DateTime?),
-		typeof(DateTimeOffset?),
-		typeof(TimeSpan?),
-		typeof(IntPtr?),
-		typeof(UIntPtr?),
-		typeof(ObjectId?),
-		typeof(Decimal128?),
-		typeof(BsonValue),
-		typeof(BsonArray),
-		typeof(BsonDocument),
-		typeof(BsonBinaryData),
-		typeof(BsonUndefined),
-		typeof(BsonTimestamp),
-		typeof(BsonSymbol),
-		typeof(BsonRegularExpression),
-		typeof(BsonNull),
-		typeof(BsonMinKey),
-		typeof(BsonMaxKey),
-		typeof(BsonJavaScriptWithScope),
-		typeof(BsonDateTime),
-		typeof(BsonJavaScript),
-		typeof(Regex)
-	};
 }

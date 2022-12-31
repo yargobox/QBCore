@@ -3,8 +3,10 @@ using System.Collections.Generic;
 using System.Data.Common;
 using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using System.Text;
 using System.Text.RegularExpressions;
+using Dapper;
 using Npgsql;
 using NpgsqlTypes;
 using QBCore.Configuration;
@@ -57,20 +59,20 @@ internal abstract class QueryBuilder<TDoc, TProj> : IQueryBuilder<TDoc, TProj> w
 
 	#region BuildConditionTree
 
-	protected static StringBuilder? BuildConditionTree(IEnumerable<QBCondition> conditions, Func<string, DEPath, string> getDBSideName, IReadOnlyList<QBParameter> parameters, ref List<NpgsqlParameter> commandParams)
+	protected static void BuildConditionTree(StringBuilder filter, IEnumerable<QBCondition> conditions, Func<string, DEPath, string> getDBSideName, IReadOnlyList<QBParameter> parameters, NpgsqlParameterCollection commandParams)
 	{
-		StringBuilder? filter = null;
+		if (filter is null) throw new ArgumentNullException(nameof(filter));
+		if (commandParams is null) throw new ArgumentNullException(nameof(commandParams));
+
+		int startIndex = filter.Length;
 		bool moveNext = true;
-		commandParams ??= new List<NpgsqlParameter>();
 
 		using (var e = conditions.GetEnumerator())
 		{
 			while (moveNext && (moveNext = e.MoveNext()))
 			{
-				if (filter == null)
+				if (startIndex == filter.Length)
 				{
-					filter = new StringBuilder();
-
 					if (e.Current.Parentheses > 0)
 					{
 						BuildConditionTree(filter, e, ref moveNext, e.Current.Parentheses - 1, getDBSideName, parameters, commandParams);
@@ -111,12 +113,10 @@ internal abstract class QueryBuilder<TDoc, TProj> : IQueryBuilder<TDoc, TProj> w
 					}
 				}
 			}
-
-			return filter;
 		}
 	}
 
-	private static int BuildConditionTree(StringBuilder filter, IEnumerator<QBCondition> e, ref bool moveNext, int parentheses, Func<string, DEPath, string> getDBSideName, IReadOnlyList<QBParameter> parameters, List<NpgsqlParameter> commandParams)
+	private static int BuildConditionTree(StringBuilder filter, IEnumerator<QBCondition> e, ref bool moveNext, int parentheses, Func<string, DEPath, string> getDBSideName, IReadOnlyList<QBParameter> parameters, NpgsqlParameterCollection commandParams)
 	{
 		if (parentheses > 0)
 		{
@@ -185,7 +185,7 @@ internal abstract class QueryBuilder<TDoc, TProj> : IQueryBuilder<TDoc, TProj> w
 		return 0;
 	}
 	
-	private static void BuildCondition(StringBuilder filter, QBCondition cond, Func<string, DEPath, string> getDBSideName, IReadOnlyList<QBParameter> parameters, List<NpgsqlParameter> commandParams)
+	private static void BuildCondition(StringBuilder filter, QBCondition cond, Func<string, DEPath, string> getDBSideName, IReadOnlyList<QBParameter> parameters, NpgsqlParameterCollection commandParams)
 	{
 		if (cond.IsOnField)
 		{
@@ -217,7 +217,7 @@ internal abstract class QueryBuilder<TDoc, TProj> : IQueryBuilder<TDoc, TProj> w
 		}
 	}
 
-	protected static void MakeConditionOnConst(StringBuilder filter, QBCondition cond, Func<string, DEPath, string> getDBSideName, QBParameter? parameter, List<NpgsqlParameter> commandParams)
+	protected static void MakeConditionOnConst(StringBuilder filter, QBCondition cond, Func<string, DEPath, string> getDBSideName, QBParameter? parameter, NpgsqlParameterCollection commandParams)
 	{
 		if (!cond.IsOnParam && !cond.IsOnConst) throw new InvalidOperationException(nameof(MakeConditionOnConst) + " can only make conditions between a field and a constant value.");
 		if (cond.IsOnParam == (parameter == null)) throw new ArgumentException(nameof(parameter));
@@ -437,7 +437,7 @@ internal abstract class QueryBuilder<TDoc, TProj> : IQueryBuilder<TDoc, TProj> w
 		return fieldPath.GetDBSideName();
 	}
 
-	private static void RenderCondition(StringBuilder filter, QBCondition cond, QBParameter? parameter, object? value, bool allowCaseInsensitive, string command, string leftField, List<NpgsqlParameter> commandParams)
+	private static void RenderCondition(StringBuilder filter, QBCondition cond, QBParameter? parameter, object? value, bool allowCaseInsensitive, string command, string leftField, NpgsqlParameterCollection commandParams)
 	{
 		if (value is null)
 		{
@@ -482,7 +482,7 @@ internal abstract class QueryBuilder<TDoc, TProj> : IQueryBuilder<TDoc, TProj> w
 		}
 	}
 
-	private static void RenderConditionInNotIn(StringBuilder filter, QBCondition cond, QBParameter? parameter, object? values, bool allowCaseInsensitive, string command, string leftField, List<NpgsqlParameter> commandParams)
+	private static void RenderConditionInNotIn(StringBuilder filter, QBCondition cond, QBParameter? parameter, object? values, bool allowCaseInsensitive, string command, string leftField, NpgsqlParameterCollection commandParams)
 	{
 		command = command switch
 		{
@@ -507,7 +507,7 @@ internal abstract class QueryBuilder<TDoc, TProj> : IQueryBuilder<TDoc, TProj> w
 		}
 	}
 
-	private static void RenderConditionGroup(StringBuilder filter, QBCondition cond, QBParameter? parameter, object? values, bool allowCaseInsensitive, string command, string leftField, List<NpgsqlParameter> commandParams)
+	private static void RenderConditionGroup(StringBuilder filter, QBCondition cond, QBParameter? parameter, object? values, bool allowCaseInsensitive, string command, string leftField, NpgsqlParameterCollection commandParams)
 	{
 		var col = PrepareCollection(cond, values, allowCaseInsensitive) as IEnumerable ?? throw new ArgumentNullException(nameof(values));
 
@@ -545,7 +545,7 @@ internal abstract class QueryBuilder<TDoc, TProj> : IQueryBuilder<TDoc, TProj> w
 		}
 	}
 
-	private static void RenderConditionBitsAndOr(StringBuilder filter, QBCondition cond, QBParameter? parameter, object? value, string command, string leftField, List<NpgsqlParameter> commandParams)
+	private static void RenderConditionBitsAndOr(StringBuilder filter, QBCondition cond, QBParameter? parameter, object? value, string command, string leftField, NpgsqlParameterCollection commandParams)
 	{
 		if (cond.Operation.HasFlag(FO.CaseInsensitive))
 		{
@@ -578,7 +578,7 @@ internal abstract class QueryBuilder<TDoc, TProj> : IQueryBuilder<TDoc, TProj> w
 			throw new ArgumentException(nameof(command));
 	}
 
-	private static void RenderConditionGroupBitsAnd(StringBuilder filter, QBCondition cond, QBParameter? parameter, object? values, string leftField, List<NpgsqlParameter> commandParams)
+	private static void RenderConditionGroupBitsAnd(StringBuilder filter, QBCondition cond, QBParameter? parameter, object? values, string leftField, NpgsqlParameterCollection commandParams)
 	{
 		if (cond.Operation.HasFlag(FO.CaseInsensitive))
 		{
@@ -621,7 +621,7 @@ internal abstract class QueryBuilder<TDoc, TProj> : IQueryBuilder<TDoc, TProj> w
 		}
 	}
 
-	private static void RenderBetweenCondition(StringBuilder filter, QBCondition cond, QBParameter? parameter, object? values, bool betweenOrNotBetween, string leftField, List<NpgsqlParameter> commandParams)
+	private static void RenderBetweenCondition(StringBuilder filter, QBCondition cond, QBParameter? parameter, object? values, bool betweenOrNotBetween, string leftField, NpgsqlParameterCollection commandParams)
 	{
 		if (cond.Operation.HasFlag(FO.CaseInsensitive))
 		{
@@ -758,6 +758,55 @@ internal abstract class QueryBuilder<TDoc, TProj> : IQueryBuilder<TDoc, TProj> w
 	}
 
 	#endregion
+
+	protected static async IAsyncEnumerable<T> GetAsyncEnumerable<T>(NpgsqlCommand command, bool disposeConnection, [EnumeratorCancellation] CancellationToken cancellationToken)
+	{
+		NpgsqlDataReader? dataReader = null;
+		try
+		{
+			dataReader = await command.ExecuteReaderAsync().ConfigureAwait(false);
+
+			var rowParser = dataReader.GetRowParser<T>();
+
+			while (await dataReader.ReadAsync(cancellationToken).ConfigureAwait(false))
+			{
+				yield return rowParser(dataReader);
+			}
+
+			while (await dataReader.NextResultAsync().ConfigureAwait(false))
+			{ }
+		}
+		finally
+		{
+			var connection = command.Connection;
+
+			if (dataReader != null)
+			{
+				await dataReader.DisposeAsync().ConfigureAwait(false);
+			}
+
+			await command.DisposeAsync().ConfigureAwait(false);
+
+			if (disposeConnection && connection != null)
+			{
+				await connection.DisposeAsync().ConfigureAwait(false);
+			}
+		}
+	}
+
+	protected static (string Schema, string Object) ParseDbObjectName(string dbObjectName)
+	{
+		var i = dbObjectName?.IndexOf('.') ?? throw new ArgumentNullException(nameof(dbObjectName));
+		if (i < 0)
+		{
+			return (string.Empty, dbObjectName);
+		}
+		if (i > 0 && i + 1 < dbObjectName.Length)
+		{
+			return (dbObjectName.Substring(0, i), dbObjectName.Substring(i + 1));
+		}
+		throw new ArgumentException(nameof(dbObjectName));
+	}
 
 	/// <summary>
 	/// Slice the conditions to the smalest possible parts separated by AND

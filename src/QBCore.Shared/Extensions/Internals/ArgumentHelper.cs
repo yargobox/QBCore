@@ -2,6 +2,8 @@ using System.Collections;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
+using System.Runtime.CompilerServices;
+using System.Text.RegularExpressions;
 using QBCore.Extensions.Collections.Concurrent;
 
 namespace QBCore.Extensions.Internals;
@@ -28,6 +30,156 @@ public static class ArgumentHelper
 		public static readonly KeyedPool<KeyValuePair<Type, Type>, Delegate> _objectToValueUncheckedConvertors = new();
 		public static readonly KeyedPool<KeyValuePair<Type, Type>, Delegate> _objectToCollectionConvertors = new();
 		public static readonly KeyedPool<KeyValuePair<Type, Type>, Delegate> _objectToCollectionUncheckedConvertors = new();
+		public static readonly HashSet<Type> _standardValueTypes = new(42)
+		{
+			typeof(bool),
+			typeof(bool?),
+			typeof(char),
+			typeof(char?),
+			typeof(byte),
+			typeof(byte?),
+			typeof(sbyte),
+			typeof(sbyte?),
+			typeof(short),
+			typeof(short?),
+			typeof(ushort),
+			typeof(ushort?),
+			typeof(int),
+			typeof(int?),
+			typeof(uint),
+			typeof(uint?),
+			typeof(long),
+			typeof(long?),
+			typeof(ulong),
+			typeof(ulong?),
+			typeof(float),
+			typeof(float?),
+			typeof(double),
+			typeof(double?),
+			typeof(decimal),
+			typeof(decimal?),
+			typeof(nint),
+			typeof(nint?),
+			typeof(nuint),
+			typeof(nuint?),
+			typeof(Guid),
+			typeof(Guid?),
+			typeof(DateOnly),
+			typeof(DateOnly?),
+			typeof(DateTime),
+			typeof(DateTime?),
+			typeof(DateTimeOffset),
+			typeof(DateTimeOffset?),
+			typeof(TimeOnly),
+			typeof(TimeOnly?),
+			typeof(TimeSpan),
+			typeof(TimeSpan?)
+		};
+		public static readonly HashSet<Type> _standardRefTypes = new(52)
+		{
+			typeof(string),
+			typeof(string[]),
+			typeof(object),
+			typeof(object[]),
+			typeof(Regex),
+			typeof(Regex[]),
+			typeof(Array),
+			typeof(Array[]),
+			typeof(BitArray),
+			typeof(BitArray[]),
+
+			typeof(bool[]),
+			typeof(bool?[]),
+			typeof(char[]),
+			typeof(char?[]),
+			typeof(byte[]),
+			typeof(byte?[]),
+			typeof(sbyte[]),
+			typeof(sbyte?[]),
+			typeof(short[]),
+			typeof(short?[]),
+			typeof(ushort[]),
+			typeof(ushort?[]),
+			typeof(int[]),
+			typeof(int?[]),
+			typeof(uint[]),
+			typeof(uint?[]),
+			typeof(long[]),
+			typeof(long?[]),
+			typeof(ulong[]),
+			typeof(ulong?[]),
+			typeof(float[]),
+			typeof(float?[]),
+			typeof(double[]),
+			typeof(double?[]),
+			typeof(decimal[]),
+			typeof(decimal?[]),
+			typeof(nint[]),
+			typeof(nint?[]),
+			typeof(nuint[]),
+			typeof(nuint?[]),
+			typeof(Guid[]),
+			typeof(Guid?[]),
+			typeof(DateOnly[]),
+			typeof(DateOnly?[]),
+			typeof(DateTime[]),
+			typeof(DateTime?[]),
+			typeof(DateTimeOffset[]),
+			typeof(DateTimeOffset?[]),
+			typeof(TimeOnly[]),
+			typeof(TimeOnly?[]),
+			typeof(TimeSpan[]),
+			typeof(TimeSpan?[])
+		};
+	}
+
+	public static object GetNowValue(Type dateTimeType)
+	{
+		if (dateTimeType == typeof(DateTime)) return DateTime.Now;
+		if (dateTimeType == typeof(DateTimeOffset)) return DateTimeOffset.Now;
+		if (dateTimeType == typeof(DateOnly)) return DateOnly.FromDateTime(DateTime.Now);
+		if (dateTimeType == typeof(TimeOnly)) return TimeOnly.FromDateTime(DateTime.Now);
+		if (dateTimeType == typeof(TimeSpan)) return TimeSpan.FromTicks(DateTime.Now.Ticks);
+		if (dateTimeType == typeof(long)) return DateTime.Now.Ticks;
+		throw new ArgumentException(nameof(dateTimeType));
+	}
+	public static object GetUtcNowValue(Type dateTimeType)
+	{
+		if (dateTimeType == typeof(DateTime)) return DateTime.UtcNow;
+		if (dateTimeType == typeof(DateTimeOffset)) return DateTimeOffset.UtcNow;
+		if (dateTimeType == typeof(DateOnly)) return DateOnly.FromDateTime(DateTime.UtcNow);
+		if (dateTimeType == typeof(TimeOnly)) return TimeOnly.FromDateTime(DateTime.UtcNow);
+		if (dateTimeType == typeof(TimeSpan)) return TimeSpan.FromTicks(DateTime.UtcNow.Ticks);
+		if (dateTimeType == typeof(long)) return DateTime.UtcNow.Ticks;
+		throw new ArgumentException(nameof(dateTimeType));
+	}
+
+	/// <summary>
+    /// Is the type one of the most commonly used standard value types?
+    /// </summary>
+    /// <remarks>
+    /// The method recognizes these types and their <see cref="Nullable{T}"/> equivalents:<para />
+    /// <see cref="bool" />, <see cref="char" />, <see cref="byte" />, <see cref="sbyte" />, <see cref="short" />, <see cref="ushort" />, <see cref="int" />, <see cref="uint" />, <see cref="long" />, <see cref="ulong" />, <see cref="float" />, <see cref="double" />, <see cref="decimal" />, <see cref="nint" />, <see cref="nuint" />, <see cref="Guid" />, <see cref="DateOnly" />, <see cref="DateTime" />, <see cref="DateTimeOffset" />, <see cref="TimeOnly" />, <see cref="TimeSpan" />.
+    /// </remarks>
+	[MethodImplAttribute(MethodImplOptions.AggressiveInlining)]
+	public static bool IsStandardValueType(Type type)
+	{
+		return type.IsValueType && !type.IsEnum && Static._standardValueTypes.Contains(type);
+	}
+
+	/// <summary>
+    /// Is the type one of the most commonly used standard reference types?
+    /// </summary>
+    /// <remarks>
+    /// The method recognizes these reference types and one-dimensional arrays based on them:<para />
+    /// <see cref="string" />, <see cref="object" />, <see cref="Regex" />, <see cref="Array" />, <see cref="BitArray" />.<para />
+    /// Also, the method recognizes one-dimensional arrays based on these value types and their <see cref="Nullable{T}"/> equivalents:<para />
+    /// <see cref="bool" />, <see cref="char" />, <see cref="byte" />, <see cref="sbyte" />, <see cref="short" />, <see cref="ushort" />, <see cref="int" />, <see cref="uint" />, <see cref="long" />, <see cref="ulong" />, <see cref="float" />, <see cref="double" />, <see cref="decimal" />, <see cref="nint" />, <see cref="nuint" />, <see cref="Guid" />, <see cref="DateOnly" />, <see cref="DateTime" />, <see cref="DateTimeOffset" />, <see cref="TimeOnly" />, <see cref="TimeSpan" />.
+    /// </remarks>
+	[MethodImplAttribute(MethodImplOptions.AggressiveInlining)]
+	public static bool IsStandardRefType(Type type)
+	{
+		return !type.IsValueType && Static._standardRefTypes.Contains(type);
 	}
 
     /// <summary>

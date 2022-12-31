@@ -1,162 +1,280 @@
-using Microsoft.EntityFrameworkCore;
-
+using System.Data;
+using System.Text;
+using Dapper;
+using Npgsql;
 using QBCore.Configuration;
 using QBCore.DataSource.Options;
+using QBCore.Extensions.Internals;
 
 namespace QBCore.DataSource.QueryBuilder.PgSql;
 
-internal sealed class UpdateQueryBuilder<TDocument, TUpdate> : QueryBuilder<TDocument, TUpdate>, IUpdateQueryBuilder<TDocument, TUpdate> where TDocument : class
+internal sealed class UpdateQueryBuilder<TDoc, TUpdate> : QueryBuilder<TDoc, TUpdate>, IUpdateQueryBuilder<TDoc, TUpdate> where TDoc : class
 {
 	public override QueryBuilderTypes QueryBuilderType => QueryBuilderTypes.Update;
 
-	public UpdateQueryBuilder(UpdateQBBuilder<TDocument, TUpdate> building, IDataContext dataContext) : base(building, dataContext)
+	public UpdateQueryBuilder(UpdateQBBuilder<TDoc, TUpdate> builder, IDataContext dataContext)
+		: base(builder, dataContext as IPgSqlDataContext ?? throw new ArgumentException(nameof(dataContext)))
 	{
-		building.Normalize();
+		builder.Normalize();
 	}
 
-	public async Task<TDocument?> UpdateAsync(object id, TUpdate document, IReadOnlySet<string>? validFieldNames = null, DataSourceUpdateOptions? options = null, CancellationToken cancellationToken = default(CancellationToken))
+	public async Task<TDoc?> UpdateAsync(object id, TUpdate document, IReadOnlySet<string>? validFieldNames = null, DataSourceUpdateOptions? options = null, CancellationToken cancellationToken = default(CancellationToken))
 	{
-		if (id == null)
+		if (id is null) throw EX.QueryBuilder.Make.IdentifierValueNotSpecified(nameof(id));
+		if (document is null) throw EX.QueryBuilder.Make.DocumentNotSpecified(nameof(document));
+
+		var top = Builder.Containers.FirstOrDefault();
+		if (top?.ContainerOperation != ContainerOperations.Delete && top?.ContainerOperation != ContainerOperations.Exec)
 		{
-			throw new ArgumentNullException(nameof(id), "Identifier value not specified.");
-		}
-		if (document == null)
-		{
-			throw new ArgumentNullException(nameof(document), "Document not specified.");
-		}
-		if (options?.FetchResultDocument == true)
-		{
-			throw new NotSupportedException($"PostgreSQL update query builder does not support fetching the result document.");
+			throw EX.QueryBuilder.Make.QueryBuilderOperationNotSupported(Builder.DataLayer.Name, QueryBuilderType.ToString(), top?.ContainerOperation.ToString());
 		}
 
-		var top = Builder.Containers.First();
-		if (top.ContainerOperation != ContainerOperations.Update)
+		NpgsqlConnection? connection = null;
+		NpgsqlTransaction? transaction = null;
+		if (options != null)
 		{
-			throw new NotSupportedException($"PostgreSQL update query builder does not support an operation like '{top.ContainerOperation.ToString()}'.");
-		}
-
-		var dbContext = _dataContext.AsDbContext();
-
-		var deId = (SqlDEInfo?)Builder.DocumentInfo.IdField
-			?? throw new InvalidOperationException($"Document '{Builder.DocumentInfo.DocumentType.ToPretty()}' does not have an id data entry.");
-		if (deId.Setter == null) throw new InvalidOperationException($"Document '{Builder.DocumentInfo.DocumentType.ToPretty()}' does not have an id data entry setter.");
-		var deUpdated = (SqlDEInfo?)Builder.DocumentInfo.DateUpdatedField;
-		var deModified = (SqlDEInfo?)Builder.DocumentInfo.DateModifiedField;
-
-	/* 		if (Builder.Conditions.Count != 1)
+			if (options.Connection != null)
 			{
-				throw new NotSupportedException($"PostgreSQL update query builder must have one single equality condition for the id data entry.");
+				connection = (options.Connection as NpgsqlConnection) ?? throw new ArgumentException(nameof(options.Connection));
 			}
-			var cond = Builder.Conditions.Single();
-			if (cond.Alias != top.Alias || cond.Operation != FO.Equal || !cond.IsOnParam || cond.Field.Name != deId.Name)
+			if (options.Transaction != null)
 			{
-				throw new NotSupportedException($"PostgreSQL update query builder does not support custom conditions.");
-			} */
-
-		var update = Activator.CreateInstance<TDocument>();
-		deId.Setter(update, id);
-		dbContext.Attach<TDocument>(update);
-
-		try
-		{
-			object? value;
-			bool isSetValue, isUpdatedSet = false, isModifiedSet = false, hasFieldToUpdate = false;
-			var dataEntries = Builder.DocumentInfo.DataEntries.Values.Cast<SqlDEInfo>();
-			SqlDEInfo? deProjInfo;
-
-			foreach (var deDocInfo in dataEntries.Where(x => x.Property != null && x.Name != deId.Name && (validFieldNames == null || validFieldNames.Contains(x.Name))))
-			{
-				deProjInfo = (SqlDEInfo?)(Builder.ProjectionInfo?.DataEntries ?? Builder.DocumentInfo.DataEntries).GetValueOrDefault(deDocInfo.Name);
-				if (deProjInfo == null)
+				transaction = (options.Transaction as NpgsqlTransaction) ?? throw new ArgumentException(nameof(options.Transaction));
+				
+				if (transaction.Connection != connection)
 				{
-					continue;
+					throw  EX.QueryBuilder.Make.SpecifiedTransactionOpenedForDifferentConnection();
+				}
+			}
+		}
+
+		if (top.ContainerOperation == ContainerOperations.Update)
+		{
+			if (Builder.Conditions.Count == 0)
+			{
+				throw EX.QueryBuilder.Make.QueryBuilderMustHaveAtLeastOneCondition(Builder.DataLayer.Name, QueryBuilderType.ToString());
+			}
+
+			var deId = (SqlDEInfo?)Builder.DocumentInfo.IdField
+				?? throw EX.QueryBuilder.Make.DocumentDoesNotHaveIdDataEntry(Builder.DocumentInfo.DocumentType.ToPretty());
+			if (deId.Setter == null)
+				throw EX.QueryBuilder.Make.DataEntryDoesNotHaveSetter(Builder.DocumentInfo.DocumentType.ToPretty(), deId.Name);
+			var deUpdated = (SqlDEInfo?)Builder.DocumentInfo.DateUpdatedField;
+			var deModified = (SqlDEInfo?)Builder.DocumentInfo.DateModifiedField;
+
+			string queryString;
+			var sb = new StringBuilder();
+			var dbo = ParseDbObjectName(top.DBSideName);
+			var command = new NpgsqlCommand();
+
+			sb.Append("UPDATE ");
+			if (dbo.Schema.Length > 0)
+			{
+				sb.Append(dbo.Schema).Append('.');
+			}
+			sb.Append('"').Append(dbo.Object).AppendLine("\" SET");
+
+			var dataEntries = (Builder.ProjectionInfo?.DataEntries ?? Builder.DocumentInfo.DataEntries).Values.Cast<SqlDEInfo>();
+			bool isSetValue, isUpdatedSet = false, isModifiedSet = false, next = false;
+			object? value;
+			SqlDEInfo? deDoc;
+			QBParameter? qbParam;
+
+			foreach (var deProj in dataEntries.Where(x => x.Name != deId.Name && (validFieldNames == null || validFieldNames.Contains(x.Name))))
+			{
+				if (deProj.Document == Builder.DocumentInfo)
+				{
+					deDoc = deProj;
+				}
+				else
+				{
+					deDoc = (SqlDEInfo?)Builder.DocumentInfo.DataEntries.GetValueOrDefault(deProj.Name);
+					if (deDoc == null)
+					{
+						continue;
+					}
 				}
 
 				isSetValue = true;
-				value = deProjInfo.Getter(document);
+				value = deProj.Getter(document);
 
-				if (deDocInfo == deUpdated)
+				if (deDoc == deUpdated)
 				{
-					isUpdatedSet = isSetValue = value is not null && value != deDocInfo.UnderlyingType.GetDefaultValue();
+					isUpdatedSet = isSetValue = value is not null && value != deProj.UnderlyingType.GetDefaultValue();
 				}
-				else if (deDocInfo == deModified)
+				else if (deDoc == deModified)
 				{
-					isModifiedSet = isSetValue = value is not null && value != deDocInfo.UnderlyingType.GetDefaultValue();
+					isModifiedSet = isSetValue = value is not null && value != deProj.UnderlyingType.GetDefaultValue();
 				}
 
 				if (isSetValue)
 				{
-					if (deDocInfo.Setter == null) throw new InvalidOperationException($"Document '{Builder.DocumentInfo.DocumentType.ToPretty()}' does not have an {deDocInfo.Name} field setter.");
+					if (next) sb.AppendLine(","); else next = true;
 
-					deDocInfo.Setter(update, value);
-					hasFieldToUpdate = true;
+					qbParam = Builder.Parameters.FirstOrDefault(x => x.ParameterName == deProj.Name);
+					command.Parameters.Add(MakeUnnamedParameter(qbParam, value));
+
+					sb.Append("\t\"").Append(deDoc.DBSideName).Append("\" = $").Append(command.Parameters.Count);
 				}
 			}
 
-			if (!hasFieldToUpdate)
+			if (!next)
 			{
-				return default(TDocument?);
+				if (options?.FetchResultDocument == true)
+				{
+					sb.Clear();
+					
+					sb.Append("SELECT * FROM ");
+					if (dbo.Schema.Length > 0)
+					{
+						sb.Append(dbo.Schema).Append('.');
+					}
+					sb.Append('"').Append(dbo.Object).Append('"');
+
+					foreach (var p in Builder.Parameters.Where(x => (x.Direction & ParameterDirection.Input) == ParameterDirection.Input && x.ParameterName == "@id"))
+					{
+						p.Value = id;
+						break;
+					}
+
+					sb.AppendLine().Append("WHERE ");
+					BuildConditionTree(sb, Builder.Conditions, GetDBSideName, Builder.Parameters, command.Parameters);
+					sb.AppendLine().Append("LIMIT 1");
+
+					queryString = sb.ToString();
+
+					if (options != null)
+					{
+						if (options.QueryStringCallbackAsync != null)
+						{
+							await options.QueryStringCallbackAsync(queryString).ConfigureAwait(false);
+						}
+						else if (options.QueryStringCallback != null)
+						{
+							options.QueryStringCallback(queryString);
+						}
+					}
+
+					try
+					{
+						command.CommandText = queryString;
+						command.CommandType = CommandType.Text;
+
+						connection ??= await DataContext.AsNpgsqlDataSource().OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
+						command.Connection = connection;
+						command.Transaction = transaction;
+
+						await foreach (var result in GetAsyncEnumerable<TDoc>(command, options?.Connection == null, cancellationToken))
+						{
+							command = null;
+							connection = null;
+							return result;
+						}
+
+						throw EX.QueryBuilder.Make.OperationFailedNoSuchRecord(QueryBuilderType.ToString(), id.ToString(), Builder.DocumentInfo.DocumentType.ToPretty());
+					}
+					finally
+					{
+						if (command != null)
+						{
+							await command.DisposeAsync().ConfigureAwait(false);
+						}
+
+						if (connection != null && options?.Connection == null)
+						{
+							await connection.DisposeAsync().ConfigureAwait(false);
+						}
+					}
+				}
+				else
+				{
+					return default(TDoc?);
+				}
 			}
 
 			if (deUpdated != null && !isUpdatedSet)
 			{
-				if (deUpdated.Setter == null) throw new InvalidOperationException($"Document '{Builder.DocumentInfo.DocumentType.ToPretty()}' does not have an {deUpdated.Name} field setter.");
-
-				deUpdated.Setter(update, Convert.ChangeType(DateTime.UtcNow, deUpdated.UnderlyingType));
+				sb.AppendLine(",").Append("\t\"").Append(deUpdated.DBSideName).Append("\" = NOW()");
 			}
 			if (deModified != null && !isModifiedSet)
 			{
-				if (deModified.Setter == null) throw new InvalidOperationException($"Document '{Builder.DocumentInfo.DocumentType.ToPretty()}' does not have an {deModified.Name} field setter.");
-
-				deModified.Setter(update, Convert.ChangeType(DateTime.UtcNow, deModified.UnderlyingType));
+				sb.AppendLine(",").Append("\t\"").Append(deModified.DBSideName).Append("\" = NOW()");
 			}
 
-			AttachQueryStringCallback(options, dbContext);
+			foreach (var p in Builder.Parameters.Where(x => (x.Direction & ParameterDirection.Input) == ParameterDirection.Input && x.ParameterName == "@id"))
+			{
+				p.Value = id;
+				break;
+			}
+
+			sb.AppendLine().Append("WHERE ");
+			BuildConditionTree(sb, Builder.Conditions, GetDBSideName, Builder.Parameters, command.Parameters);
+
+			if (options?.FetchResultDocument == true)
+			{
+				sb.AppendLine().Append("RETURNING *");
+			}
+
+			queryString = sb.ToString();
+
+			if (options != null)
+			{
+				if (options.QueryStringCallbackAsync != null)
+				{
+					await options.QueryStringCallbackAsync(queryString).ConfigureAwait(false);
+				}
+				else if (options.QueryStringCallback != null)
+				{
+					options.QueryStringCallback(queryString);
+				}
+			}
 
 			try
 			{
-				await dbContext.SaveChangesAsync(cancellationToken);
+				command.CommandText = queryString;
+				command.CommandType = CommandType.Text;
 
-				return default(TDocument?);
-			}
-			catch (DbUpdateException ex)
-			{
-				throw new KeyNotFoundException($"The update operation failed: there is no such record as '{id.ToString()}' in '{Builder.DocumentInfo.DocumentType.ToPretty()}'.", ex);
+				connection ??= await DataContext.AsNpgsqlDataSource().OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
+				command.Connection = connection;
+				command.Transaction = transaction;
+
+				if (options?.FetchResultDocument == true)
+				{
+					var dataReader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+					var rowParser = dataReader.GetRowParser<TDoc>();
+					TDoc? result = null;
+					
+					while (await dataReader.ReadAsync(cancellationToken).ConfigureAwait(false))
+					{
+						result ??= rowParser(dataReader);
+					}
+					while (await dataReader.NextResultAsync().ConfigureAwait(false))
+					{ }
+
+					return result ?? throw EX.QueryBuilder.Make.OperationFailedNoSuchRecord(QueryBuilderType.ToString(), id.ToString(), Builder.DocumentInfo.DocumentType.ToPretty());
+				}
+				else
+				{
+					var rowsAffected = await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+					if (rowsAffected == 0)
+					{
+						throw EX.QueryBuilder.Make.OperationFailedNoSuchRecord(QueryBuilderType.ToString(), id.ToString(), Builder.DocumentInfo.DocumentType.ToPretty());
+					}
+
+					return default(TDoc?);
+				}
 			}
 			finally
 			{
-				DetachQueryStringCallback(options, dbContext);
+				await command.DisposeAsync().ConfigureAwait(false);
+				if (connection != null && options?.Connection == null) await connection.DisposeAsync().ConfigureAwait(false);
 			}
 		}
-		finally
+		else/*  if (top.ContainerOperation == ContainerOperations.Exec) */
 		{
-			dbContext.Entry<TDocument>(update).State = EntityState.Detached;
-		}
-	}
+			if (options?.FetchResultDocument == true) throw new NotSupportedException($"Procedure-based update query builder does not support fetching the result document.");
 
-	private static void AttachQueryStringCallback(DataSourceOperationOptions? options, DbContext dbContext)
-	{
-		if (options?.QueryStringCallback != null)
-		{
-			var logger = (dbContext as IEfDbContextLogger)
-				?? throw new NotSupportedException($"Database context '{dbContext.GetType().Name}' should have supported the {nameof(IEfDbContextLogger)} interface for logging query strings.");
-
-			logger.QueryStringCallback += options.QueryStringCallback;
-		}
-		else if (options?.QueryStringCallbackAsync != null)
-		{
-			throw new NotSupportedException($"{nameof(DataSourceOperationOptions)}.{nameof(DataSourceOperationOptions.QueryStringCallbackAsync)} is not supported.");
-		}
-	}
-
-	private static void DetachQueryStringCallback(DataSourceOperationOptions? options, DbContext dbContext)
-	{
-		if (options?.QueryStringCallback != null)
-		{
-			var logger = (dbContext as IEfDbContextLogger)
-				?? throw new NotSupportedException($"Database context '{dbContext.GetType().Name}' should have supported the {nameof(IEfDbContextLogger)} interface for logging query strings.");
-
-			logger.QueryStringCallback -= options.QueryStringCallback;
+			throw new NotImplementedException();
 		}
 	}
 }

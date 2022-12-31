@@ -2,6 +2,7 @@ using MongoDB.Bson.Serialization;
 using MongoDB.Driver;
 using QBCore.Configuration;
 using QBCore.DataSource.Options;
+using QBCore.Extensions.Internals;
 
 namespace QBCore.DataSource.QueryBuilder.Mongo;
 
@@ -16,19 +17,13 @@ internal sealed class UpdateQueryBuilder<TDocument, TUpdate> : QueryBuilder<TDoc
 
 	public async Task<TDocument?> UpdateAsync(object id, TUpdate document, IReadOnlySet<string>? validFieldNames = null, DataSourceUpdateOptions? options = null, CancellationToken cancellationToken = default(CancellationToken))
 	{
-		if (id == null)
-		{
-			throw new ArgumentNullException(nameof(id), "Identifier value not specified.");
-		}
-		if (document == null)
-		{
-			throw new ArgumentNullException(nameof(document), "Document not specified.");
-		}
+		if (id is null) throw EX.QueryBuilder.Make.IdentifierValueNotSpecified(nameof(id));
+		if (document is null) throw EX.QueryBuilder.Make.DocumentNotSpecified(nameof(document));
 
 		var top = Builder.Containers.First();
 		if (top.ContainerOperation != ContainerOperations.Update)
 		{
-			throw new NotSupportedException($"Mongo update query builder does not support an operation like '{top.ContainerOperation.ToString()}'.");
+			throw EX.QueryBuilder.Make.QueryBuilderOperationNotSupported(Builder.DataLayer.Name, QueryBuilderType.ToString(), top?.ContainerOperation.ToString());
 		}
 
 		if (options != null)
@@ -49,7 +44,7 @@ internal sealed class UpdateQueryBuilder<TDocument, TUpdate> : QueryBuilder<TDoc
 		var clientSessionHandle = (IClientSessionHandle?)options?.NativeClientSession;
 
 		var deId = (MongoDEInfo?)Builder.DocumentInfo.IdField
-			?? throw new InvalidOperationException($"Document '{Builder.DocumentInfo.DocumentType.ToPretty()}' does not have an id data entry.");
+			?? throw EX.QueryBuilder.Make.DocumentDoesNotHaveIdDataEntry(Builder.DocumentInfo.DocumentType.ToPretty());
 		var deUpdated = (MongoDEInfo?)Builder.DocumentInfo.DateUpdatedField;
 		var deModified = (MongoDEInfo?)Builder.DocumentInfo.DateModifiedField;
 
@@ -99,7 +94,7 @@ internal sealed class UpdateQueryBuilder<TDocument, TUpdate> : QueryBuilder<TDoc
 				}
 
 				return foundDocument
-					?? throw new KeyNotFoundException($"The update operation failed: there is no such record as '{id.ToString()}' in '{Builder.DocumentInfo.DocumentType.ToPretty()}'.");
+					?? throw EX.QueryBuilder.Make.OperationFailedNoSuchRecord(QueryBuilderType.ToString(), id.ToString(), Builder.DocumentInfo.DocumentType.ToPretty());
 			}
 			else
 			{
@@ -136,7 +131,7 @@ internal sealed class UpdateQueryBuilder<TDocument, TUpdate> : QueryBuilder<TDoc
 			}
 
 			return foundDocument
-				?? throw new KeyNotFoundException($"The update operation failed: there is no such record as '{id.ToString()}' in '{Builder.DocumentInfo.DocumentType.ToPretty()}'.");
+				?? throw EX.QueryBuilder.Make.OperationFailedNoSuchRecord(QueryBuilderType.ToString(), id.ToString(), Builder.DocumentInfo.DocumentType.ToPretty());
 		}
 		else
 		{
@@ -157,12 +152,12 @@ internal sealed class UpdateQueryBuilder<TDocument, TUpdate> : QueryBuilder<TDoc
 			{
 				if (result.ModifiedCount <= 0)
 				{
-					throw new KeyNotFoundException($"The update operation failed: there is no such record as '{id.ToString()}' in '{Builder.DocumentInfo.DocumentType.ToPretty()}'.");
+					throw EX.QueryBuilder.Make.OperationFailedNoSuchRecord(QueryBuilderType.ToString(), id.ToString(), Builder.DocumentInfo.DocumentType.ToPretty());
 				}
 			}
 			else
 			{
-				throw new ApplicationException($"The update operation failed: no acknowledgment to restore record '{id.ToString()}' in '{Builder.DocumentInfo.DocumentType.ToPretty()}'.");
+				throw EX.QueryBuilder.Make.OperationFailedNoAcknowledgment(QueryBuilderType.ToString(), id.ToString(), Builder.DocumentInfo.DocumentType.ToPretty());
 			}
 
 			return default(TDocument?);

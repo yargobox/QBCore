@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using QBCore.Configuration;
 using QBCore.DataSource.Options;
+using QBCore.Extensions.Internals;
 
 namespace QBCore.DataSource.QueryBuilder.EfCore;
 
@@ -19,7 +20,7 @@ internal sealed class InsertQueryBuilder<TDocument, TCreate> : QueryBuilder<TDoc
 		var top = Builder.Containers.First();
 		if (top.ContainerOperation != ContainerOperations.Insert)
 		{
-			throw new NotSupportedException($"EF insert query builder does not support an operation like '{top.ContainerOperation.ToString()}'.");
+			throw EX.QueryBuilder.Make.QueryBuilderOperationNotSupported(Builder.DataLayer.Name, QueryBuilderType.ToString(), top?.ContainerOperation.ToString());
 		}
 
 		var dbContext = _dataContext.AsDbContext();

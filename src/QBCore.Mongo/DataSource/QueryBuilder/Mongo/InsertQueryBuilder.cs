@@ -2,6 +2,7 @@ using MongoDB.Bson;
 using MongoDB.Driver;
 using QBCore.Configuration;
 using QBCore.DataSource.Options;
+using QBCore.Extensions.Internals;
 
 namespace QBCore.DataSource.QueryBuilder.Mongo;
 
@@ -19,7 +20,7 @@ internal sealed class InsertQueryBuilder<TDocument, TCreate> : QueryBuilder<TDoc
 		var top = Builder.Containers.First();
 		if (top.ContainerOperation != ContainerOperations.Insert)
 		{
-			throw new NotSupportedException($"Mongo insert query builder does not support an operation like '{top.ContainerOperation.ToString()}'.");
+			throw EX.QueryBuilder.Make.QueryBuilderOperationNotSupported(Builder.DataLayer.Name, QueryBuilderType.ToString(), top?.ContainerOperation.ToString());
 		}
 
 		if (options != null)
@@ -72,7 +73,7 @@ internal sealed class InsertQueryBuilder<TDocument, TCreate> : QueryBuilder<TDoc
 					var zero = deCreated.DataEntryType.GetDefaultValue();
 					if (dateValue == zero)
 					{
-						dateValue = Convert.ChangeType(DateTimeOffset.Now, deCreated.UnderlyingType);
+						dateValue = ArgumentHelper.GetNowValue(deCreated.UnderlyingType);
 						deCreated.Setter(document!, dateValue);
 					}
 				}
@@ -86,7 +87,7 @@ internal sealed class InsertQueryBuilder<TDocument, TCreate> : QueryBuilder<TDoc
 					var zero = deModified.DataEntryType.GetDefaultValue();
 					if (dateValue == zero)
 					{
-						dateValue = Convert.ChangeType(DateTimeOffset.Now, deModified.DataEntryType);
+						dateValue = ArgumentHelper.GetNowValue(deModified.DataEntryType);
 						deModified.Setter(document!, dateValue);
 					}
 				}

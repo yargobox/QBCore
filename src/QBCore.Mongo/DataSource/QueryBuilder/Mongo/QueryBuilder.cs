@@ -540,10 +540,7 @@ internal abstract class QueryBuilder<TDocument, TProjection> : IQueryBuilder<TDo
 		var type = value.GetType();
 		if (type != cond.FieldType && type != cond.FieldUnderlyingType)
 		{
-			if (!value.TryConvertIntegerToOtherInteger(cond.FieldUnderlyingType, ref value))
-			{
-				throw new ArgumentException($"Field {cond.Alias}.{cond.FieldPath} has type {cond.FieldType.ToPretty()} not {value!.GetType().ToPretty()}.", nameof(value));
-			}
+			throw new ArgumentException($"Field {cond.Alias}.{cond.FieldPath} has type {cond.FieldType.ToPretty()} not {value!.GetType().ToPretty()}.", nameof(value));
 		}
 		
 		if (cond.Operation.HasFlag(FO.CaseInsensitive))
@@ -571,7 +568,6 @@ internal abstract class QueryBuilder<TDocument, TProjection> : IQueryBuilder<TDo
 
 		var bsonArray = new BsonArray();
 		IBsonSerializer? serializer = null;
-		object? convertedValue = null;
 		Type type;
 
 		foreach (var value in objectValues)
@@ -590,12 +586,7 @@ internal abstract class QueryBuilder<TDocument, TProjection> : IQueryBuilder<TDo
 			type = value.GetType();
 			if (type != cond.FieldType && type != cond.FieldUnderlyingType)
 			{
-				if (!value.TryConvertIntegerToOtherInteger(cond.FieldUnderlyingType, ref convertedValue))
-				{
-					throw new ArgumentException($"Field {cond.Alias}.{cond.FieldPath} has type {cond.FieldType.ToPretty()} not {type.ToPretty()}.", nameof(values));
-				}
-
-				bsonArray.Add(new BsonDocumentWrapper(convertedValue, serializer ?? (serializer = BsonSerializer.SerializerRegistry.GetSerializer(cond.FieldType))));
+				throw new ArgumentException($"Field {cond.Alias}.{cond.FieldPath} has type {cond.FieldType.ToPretty()} not {type.ToPretty()}.", nameof(values));
 			}
 			else if (type == typeof(string))
 			{

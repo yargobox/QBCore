@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 
 using QBCore.Configuration;
 using QBCore.DataSource.Options;
+using QBCore.Extensions.Internals;
 
 namespace QBCore.DataSource.QueryBuilder.EfCore;
 
@@ -16,30 +17,22 @@ internal sealed class UpdateQueryBuilder<TDocument, TUpdate> : QueryBuilder<TDoc
 
 	public async Task<TDocument?> UpdateAsync(object id, TUpdate document, IReadOnlySet<string>? validFieldNames = null, DataSourceUpdateOptions? options = null, CancellationToken cancellationToken = default(CancellationToken))
 	{
-		if (id == null)
-		{
-			throw new ArgumentNullException(nameof(id), "Identifier value not specified.");
-		}
-		if (document == null)
-		{
-			throw new ArgumentNullException(nameof(document), "Document not specified.");
-		}
-		if (options?.FetchResultDocument == true)
-		{
-			throw new NotSupportedException($"EF update query builder does not support fetching the result document.");
-		}
+		if (id is null) throw EX.QueryBuilder.Make.IdentifierValueNotSpecified(nameof(id));
+		if (document is null) throw EX.QueryBuilder.Make.DocumentNotSpecified(nameof(document));
+		if (options?.FetchResultDocument == true) throw new NotSupportedException($"EF update query builder does not support fetching the result document.");
 
 		var top = Builder.Containers.First();
 		if (top.ContainerOperation != ContainerOperations.Update)
 		{
-			throw new NotSupportedException($"EF update query builder does not support an operation like '{top.ContainerOperation.ToString()}'.");
+			throw EX.QueryBuilder.Make.QueryBuilderOperationNotSupported(Builder.DataLayer.Name, QueryBuilderType.ToString(), top?.ContainerOperation.ToString());
 		}
 
 		var dbContext = _dataContext.AsDbContext();
 
 		var deId = (EfCoreDEInfo?)Builder.DocumentInfo.IdField
-			?? throw new InvalidOperationException($"Document '{Builder.DocumentInfo.DocumentType.ToPretty()}' does not have an id data entry.");
-		if (deId.Setter == null) throw new InvalidOperationException($"Document '{Builder.DocumentInfo.DocumentType.ToPretty()}' does not have an id data entry setter.");
+			?? throw EX.QueryBuilder.Make.DocumentDoesNotHaveIdDataEntry(Builder.DocumentInfo.DocumentType.ToPretty());
+		if (deId.Setter == null)
+			throw EX.QueryBuilder.Make.DataEntryDoesNotHaveSetter(Builder.DocumentInfo.DocumentType.ToPretty(), deId.Name);
 		var deUpdated = (EfCoreDEInfo?)Builder.DocumentInfo.DateUpdatedField;
 		var deModified = (EfCoreDEInfo?)Builder.DocumentInfo.DateModifiedField;
 
@@ -86,7 +79,8 @@ internal sealed class UpdateQueryBuilder<TDocument, TUpdate> : QueryBuilder<TDoc
 
 				if (isSetValue)
 				{
-					if (deDocInfo.Setter == null) throw new InvalidOperationException($"Document '{Builder.DocumentInfo.DocumentType.ToPretty()}' does not have an {deDocInfo.Name} field setter.");
+					if (deDocInfo.Setter == null)
+						throw EX.QueryBuilder.Make.DataEntryDoesNotHaveSetter(Builder.DocumentInfo.DocumentType.ToPretty(), deDocInfo.Name);
 
 					deDocInfo.Setter(update, value);
 					hasFieldToUpdate = true;
@@ -100,13 +94,15 @@ internal sealed class UpdateQueryBuilder<TDocument, TUpdate> : QueryBuilder<TDoc
 
 			if (deUpdated != null && !isUpdatedSet)
 			{
-				if (deUpdated.Setter == null) throw new InvalidOperationException($"Document '{Builder.DocumentInfo.DocumentType.ToPretty()}' does not have an {deUpdated.Name} field setter.");
+				if (deUpdated.Setter == null)
+					throw EX.QueryBuilder.Make.DataEntryDoesNotHaveSetter(Builder.DocumentInfo.DocumentType.ToPretty(), deUpdated.Name);
 
 				deUpdated.Setter(update, Convert.ChangeType(DateTime.UtcNow, deUpdated.UnderlyingType));
 			}
 			if (deModified != null && !isModifiedSet)
 			{
-				if (deModified.Setter == null) throw new InvalidOperationException($"Document '{Builder.DocumentInfo.DocumentType.ToPretty()}' does not have an {deModified.Name} field setter.");
+				if (deModified.Setter == null)
+					throw EX.QueryBuilder.Make.DataEntryDoesNotHaveSetter(Builder.DocumentInfo.DocumentType.ToPretty(), deModified.Name);
 
 				deModified.Setter(update, Convert.ChangeType(DateTime.UtcNow, deModified.UnderlyingType));
 			}
@@ -121,7 +117,7 @@ internal sealed class UpdateQueryBuilder<TDocument, TUpdate> : QueryBuilder<TDoc
 			}
 			catch (DbUpdateException ex)
 			{
-				throw new KeyNotFoundException($"The update operation failed: there is no such record as '{id.ToString()}' in '{Builder.DocumentInfo.DocumentType.ToPretty()}'.", ex);
+				throw EX.QueryBuilder.Make.OperationFailedNoSuchRecord(QueryBuilderType.ToString(), id.ToString(), Builder.DocumentInfo.DocumentType.ToPretty(), ex);
 			}
 			finally
 			{

@@ -1,6 +1,4 @@
 using System.Collections;
-using System.Diagnostics.CodeAnalysis;
-using System.Linq.Expressions;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 
@@ -8,16 +6,6 @@ namespace QBCore.Extensions.Reflection;
 
 public static class ExtensionsForReflection
 {
-	private static class Static
-	{
-		static Static() { }
-
-		public static readonly HashSet<Type> _integerTypes = new HashSet<Type>(8)
-		{
-			typeof(sbyte), typeof(byte), typeof(short), typeof(ushort), typeof(int), typeof(uint), typeof(long), typeof(ulong)
-		};
-	}
-
 	public static string ToPretty(this Type type, int recursionLevel = 8, bool expandNullable = false)
 	{
 		if (type.IsArray)
@@ -295,29 +283,5 @@ public static class ExtensionsForReflection
 		var types = value.GetType().GetInterfacesOf(typeof(IEnumerable<>)).Select(x => x.GetGenericArguments()[0]);
 		
 		return types.FirstOrDefault(x => x != typeof(object)) ?? types.FirstOrDefault();
-	}
-
-	public static bool TryConvertIntegerToOtherInteger(this object fromValue, Type toType, [NotNullWhen(true)] ref object? toValue)
-	{
-		if (Static._integerTypes.Contains(toType))
-		{
-			var trueType = fromValue.GetType().GetUnderlyingSystemType();
-			if (Static._integerTypes.Contains(trueType))
-			{
-				try
-				{
-					toValue = Convert.ChangeType(fromValue, toType);
-					return true;
-				}
-				catch { }
-			}
-		}
-		return false;
-	}
-
-	[MethodImplAttribute(MethodImplOptions.AggressiveInlining)]
-	public static bool IsOneOfSystemIntegerTypes(this Type type)
-	{
-		return Static._integerTypes.Contains(type);
 	}
 }

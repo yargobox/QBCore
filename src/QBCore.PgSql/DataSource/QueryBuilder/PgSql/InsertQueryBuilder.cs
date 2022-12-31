@@ -1,94 +1,186 @@
+using System.Data;
+using System.Text;
+using Npgsql;
 using QBCore.Configuration;
 using QBCore.DataSource.Options;
+using QBCore.Extensions.Internals;
 
 namespace QBCore.DataSource.QueryBuilder.PgSql;
 
-internal sealed class InsertQueryBuilder<TDocument, TCreate> : QueryBuilder<TDocument, TCreate>, IInsertQueryBuilder<TDocument, TCreate>
-	where TDocument : class
+internal sealed class InsertQueryBuilder<TDoc, TCreate> : QueryBuilder<TDoc, TCreate>, IInsertQueryBuilder<TDoc, TCreate> where TDoc : class
 {
 	public override QueryBuilderTypes QueryBuilderType => QueryBuilderTypes.Insert;
 
-	public InsertQueryBuilder(InsertQBBuilder<TDocument, TCreate> building, IDataContext dataContext) : base(building, dataContext)
+	public InsertQueryBuilder(InsertQBBuilder<TDoc, TCreate> builder, IDataContext dataContext)
+		: base(builder, dataContext as IPgSqlDataContext ?? throw new ArgumentException(nameof(dataContext)))
 	{
-		building.Normalize();
+		builder.Normalize();
 	}
 
-	public async Task<TDocument> InsertAsync(TDocument document, DataSourceInsertOptions? options = null, CancellationToken cancellationToken = default(CancellationToken))
+	public async Task<TDoc> InsertAsync(TDoc document, DataSourceInsertOptions? options = null, CancellationToken cancellationToken = default(CancellationToken))
 	{
-		var top = Builder.Containers.First();
-		if (top.ContainerOperation != ContainerOperations.Insert)
+		if (document is null) throw EX.QueryBuilder.Make.DocumentNotSpecified(nameof(document));
+
+		var top = Builder.Containers.FirstOrDefault();
+		if (top?.ContainerOperation != ContainerOperations.Insert && top?.ContainerOperation != ContainerOperations.Exec)
 		{
-			throw new NotSupportedException($"PostgreSQL insert query builder does not support an operation like '{top.ContainerOperation.ToString()}'.");
+			throw EX.QueryBuilder.Make.QueryBuilderOperationNotSupported(Builder.DataLayer.Name, QueryBuilderType.ToString(), top?.ContainerOperation.ToString());
 		}
 
-		var dbContext = _dataContext.AsDbContext();
-		var logger = dbContext as IEfDbContextLogger;
-
-		var deCreated = (SqlDEInfo?)Builder.DocumentInfo.DateCreatedField;
-		var deModified = (SqlDEInfo?)Builder.DocumentInfo.DateModifiedField;
-
-		if (deCreated?.Flags.HasFlag(DataEntryFlags.ReadOnly) == false && deCreated.Setter != null)
+		NpgsqlConnection? connection = null;
+		NpgsqlTransaction? transaction = null;
+		if (options != null)
 		{
-			var dateValue = deCreated.Getter(document!);
-			var zero = deCreated.DataEntryType.GetDefaultValue();
-			if (dateValue == zero)
+			if (options.Connection != null)
 			{
-				dateValue = Convert.ChangeType(DateTime.UtcNow, deCreated.UnderlyingType);
-				deCreated.Setter(document!, dateValue);
+				connection = (options.Connection as NpgsqlConnection) ?? throw new ArgumentException(nameof(options.Connection));
+			}
+			if (options.Transaction != null)
+			{
+				transaction = (options.Transaction as NpgsqlTransaction) ?? throw new ArgumentException(nameof(options.Transaction));
+				
+				if (transaction.Connection != connection)
+				{
+					throw  EX.QueryBuilder.Make.SpecifiedTransactionOpenedForDifferentConnection();
+				}
 			}
 		}
 
-		if (deModified?.Flags.HasFlag(DataEntryFlags.ReadOnly) == false && deModified.Setter != null)
+		if (top.ContainerOperation == ContainerOperations.Insert)
 		{
-			var dateValue = deModified.Getter(document!);
-			var zero = deModified.DataEntryType.GetDefaultValue();
-			if (dateValue == zero)
+			var deId = (SqlDEInfo?)Builder.DocumentInfo.IdField;
+			var deCreated = (SqlDEInfo?)Builder.DocumentInfo.DateCreatedField;
+			var deModified = (SqlDEInfo?)Builder.DocumentInfo.DateModifiedField;
+
+			var dbo = ParseDbObjectName(top.DBSideName);
+			var sb = new StringBuilder();
+
+			sb.Append("INSERT INTO ");
+			if (dbo.Schema.Length > 0)
 			{
-				dateValue = Convert.ChangeType(DateTime.UtcNow, deModified.DataEntryType);
-				deModified.Setter(document!, dateValue);
+				sb.Append(dbo.Schema).Append('.');
 			}
-		}
+			sb.Append('"').Append(dbo.Object).Append('"').Append('(');
 
-		AttachQueryStringCallback(options, dbContext);
+			var command = new NpgsqlCommand();
+			bool isSetValue, isCreatedSet = false, isModifiedSet = false, next = false;
+			object? value;
+			QBParameter? param;
 
-		try
-		{
-			await dbContext.AddAsync<TDocument>(document, cancellationToken);
-			await dbContext.SaveChangesAsync(cancellationToken);
+			foreach (var de in Builder.DocumentInfo.DataEntries.Values.Cast<SqlDEInfo>())
+			{
+				isSetValue = true;
+				value = de.Getter(document);
+
+				if (de == deCreated)
+				{
+					isCreatedSet = isSetValue = value is not null && value != de.UnderlyingType.GetDefaultValue();
+				}
+				else if (de == deModified)
+				{
+					isModifiedSet = isSetValue = value is not null && value != de.UnderlyingType.GetDefaultValue();
+				}
+
+				if (isSetValue)
+				{
+					if (next) sb.Append(", "); else next = true;
+
+					sb.Append('"').Append(de.DBSideName!).Append('"');
+
+					param = Builder.Parameters.FirstOrDefault(x => x.ParameterName == de.Name);
+					command.Parameters.Add(MakeUnnamedParameter(param, value));
+				}
+			}
+
+			if (deCreated != null && !isCreatedSet)
+			{
+				if (next) sb.Append(", "); else next = true;
+
+				sb.Append('"').Append(deCreated.DBSideName!).Append('"');
+			}
+			if (deModified != null && !isModifiedSet)
+			{
+				if (next) sb.Append(", "); else next = true;
+
+				sb.Append('"').Append(deModified.DBSideName!).Append('"');
+			}
+
+			sb.AppendLine(")").Append("VALUES (");
+			int i;
+			for (i = 1; i <= command.Parameters.Count; i++)
+			{
+				if (i > 1) sb.Append(", ");
+
+				sb.Append("$").Append(i);
+			}
+
+			if (deCreated != null && !isCreatedSet)
+			{
+				if (i++ > 1) sb.Append(", ");
+
+				sb.Append("NOW()");
+			}
+			if (deModified != null && !isModifiedSet)
+			{
+				if (i++ > 1) sb.Append(", ");
+
+				sb.Append("NOW()");
+			}
+
+			sb.Append(')');
+
+			if (deId?.Setter != null)
+			{
+				sb.Append(" RETURNING \"").Append(deId.DBSideName).Append('"');
+			}
+
+			var queryString = sb.ToString();
+
+			if (options != null)
+			{
+				if (options.QueryStringCallbackAsync != null)
+				{
+					await options.QueryStringCallbackAsync(queryString).ConfigureAwait(false);
+				}
+				else if (options.QueryStringCallback != null)
+				{
+					options.QueryStringCallback(queryString);
+				}
+			}
+
+			try
+			{
+				command.CommandText = queryString;
+				command.CommandType = CommandType.Text;
+				connection ??= await DataContext.AsNpgsqlDataSource().OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
+				command.Connection = connection;
+				command.Transaction = transaction;
+
+				if (deId?.Setter != null)
+				{
+					value = await command.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false);
+					deId.Setter(document, value);
+				}
+				else
+				{
+					await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+				}
+			}
+			finally
+			{
+				await command.DisposeAsync().ConfigureAwait(false);
+
+				if (connection != null && options?.Connection == null)
+				{
+					await connection.DisposeAsync().ConfigureAwait(false);
+				}
+			}
 
 			return document;
 		}
-		finally
+		else/*  if (top.ContainerOperation == ContainerOperations.Exec) */
 		{
-			dbContext.Entry<TDocument>(document).State = EntityState.Detached;
-
-			DetachQueryStringCallback(options, dbContext);
-		}
-	}
-
-	private static void AttachQueryStringCallback(DataSourceOperationOptions? options, DbContext dbContext)
-	{
-		if (options?.QueryStringCallback != null)
-		{
-			var logger = (dbContext as IEfDbContextLogger)
-				?? throw new NotSupportedException($"Database context '{dbContext.GetType().Name}' should have supported the {nameof(IEfDbContextLogger)} interface for logging query strings.");
-
-			logger.QueryStringCallback += options.QueryStringCallback;
-		}
-		else if (options?.QueryStringCallbackAsync != null)
-		{
-			throw new NotSupportedException($"{nameof(DataSourceOperationOptions)}.{nameof(DataSourceOperationOptions.QueryStringCallbackAsync)} is not supported.");
-		}
-	}
-
-	private static void DetachQueryStringCallback(DataSourceOperationOptions? options, DbContext dbContext)
-	{
-		if (options?.QueryStringCallback != null)
-		{
-			var logger = (dbContext as IEfDbContextLogger)
-				?? throw new NotSupportedException($"Database context '{dbContext.GetType().Name}' should have supported the {nameof(IEfDbContextLogger)} interface for logging query strings.");
-
-			logger.QueryStringCallback -= options.QueryStringCallback;
+			throw new NotImplementedException();
 		}
 	}
 }

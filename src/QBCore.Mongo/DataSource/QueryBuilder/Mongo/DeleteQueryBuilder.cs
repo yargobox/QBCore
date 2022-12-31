@@ -2,6 +2,7 @@ using MongoDB.Bson.Serialization;
 using MongoDB.Driver;
 using QBCore.Configuration;
 using QBCore.DataSource.Options;
+using QBCore.Extensions.Internals;
 
 namespace QBCore.DataSource.QueryBuilder.Mongo;
 
@@ -16,19 +17,13 @@ internal sealed class DeleteQueryBuilder<TDocument, TDelete> : QueryBuilder<TDoc
 
 	public async Task DeleteAsync(object id, TDelete? document = default(TDelete?), DataSourceDeleteOptions? options = null, CancellationToken cancellationToken = default)
 	{
-		if (id == null)
-		{
-			throw new ArgumentNullException(nameof(id), "Identifier value not specified.");
-		}
-		if (document == null && typeof(TDelete) != typeof(EmptyDto))
-		{
-			throw new ArgumentNullException(nameof(document), "Document not specified.");
-		}
+		if (id is null) throw EX.QueryBuilder.Make.IdentifierValueNotSpecified(nameof(id));
+		if (document is null && typeof(TDelete) != typeof(EmptyDto)) throw EX.QueryBuilder.Make.DocumentNotSpecified(nameof(document));
 
 		var top = Builder.Containers.First();
 		if (top.ContainerOperation != ContainerOperations.Delete)
 		{
-			throw new NotSupportedException($"Mongo delete query builder does not support an operation like '{top.ContainerOperation.ToString()}'.");
+			throw EX.QueryBuilder.Make.QueryBuilderOperationNotSupported(Builder.DataLayer.Name, QueryBuilderType.ToString(), top?.ContainerOperation.ToString());
 		}
 
 		if (options != null)
@@ -49,7 +44,7 @@ internal sealed class DeleteQueryBuilder<TDocument, TDelete> : QueryBuilder<TDoc
 		var clientSessionHandle = (IClientSessionHandle?)options?.NativeClientSession;
 
 		var deId = (MongoDEInfo?)Builder.DocumentInfo.IdField
-			?? throw new InvalidOperationException($"Document '{Builder.DocumentInfo.DocumentType.ToPretty()}' does not have an id data entry.");
+			?? throw EX.QueryBuilder.Make.DocumentDoesNotHaveIdDataEntry(Builder.DocumentInfo.DocumentType.ToPretty());
 
 		var filter = Builders<TDocument>.Filter.Eq(deId.Name, id);
 
@@ -87,12 +82,12 @@ internal sealed class DeleteQueryBuilder<TDocument, TDelete> : QueryBuilder<TDoc
 		{
 			if (result.DeletedCount <= 0)
 			{
-				throw new KeyNotFoundException($"The delete operation failed: there is no such record as '{id.ToString()}' in '{Builder.DocumentInfo.DocumentType.ToPretty()}'.");
+				throw EX.QueryBuilder.Make.OperationFailedNoSuchRecord(QueryBuilderType.ToString(), id.ToString(), Builder.DocumentInfo.DocumentType.ToPretty());
 			}
 		}
 		else
 		{
-			throw new ApplicationException($"The delete operation failed: no acknowledgment to delete record '{id.ToString()}' in '{Builder.DocumentInfo.DocumentType.ToPretty()}'.");
+			throw EX.QueryBuilder.Make.OperationFailedNoAcknowledgment(QueryBuilderType.ToString(), id.ToString(), Builder.DocumentInfo.DocumentType.ToPretty());
 		}
 	}
 }

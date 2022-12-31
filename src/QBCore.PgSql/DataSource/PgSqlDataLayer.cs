@@ -1,9 +1,11 @@
 using System.Collections;
 using System.Reflection;
 using System.Text.RegularExpressions;
+using NpgsqlTypes;
 using QBCore.Configuration;
 using QBCore.DataSource.QueryBuilder;
 using QBCore.DataSource.QueryBuilder.PgSql;
+using QBCore.Extensions.Internals;
 using QBCore.ObjectFactory;
 
 namespace QBCore.DataSource;
@@ -64,92 +66,75 @@ public sealed class PgSqlDataLayer : IDataLayerInfo
 
 	private bool IsDocumentTypeImplementation(Type type)
 	{
-		if (type.IsEnum || type.IsGenericTypeDefinition) return false;
+		if (type.IsEnum) return false;
+		if (ArgumentHelper.IsStandardValueType(type)) return false;
+		if (ArgumentHelper.IsStandardRefType(type)) return false;
+		if (Static._knownTypes.Contains(type)) return false;
+		if (StaticFactory.Internals.DocumentExclusionSelector(type)) return false;
 
-		if (type.IsValueType)
+		Type gtd;
+		foreach (var i in type.GetInterfaces())
 		{
-			if (_standardValueTypes.Contains(type)) return false;
-		}
-		else if (type.IsClass)
-		{
-			if (_standardRefTypes.Contains(type)) return false;
-		}
-
-		if (StaticFactory.Internals.DocumentExclusionSelector(type))
-		{
-			return false;
-		}
-
-		if (type.GetInterfaceOf(typeof(IEnumerable)) != null || type.GetInterfaceOf(typeof(IEnumerable<>)) != null)
-		{
-			return false;
+			if (i == typeof(IEnumerable)) return false;
+			if (i.IsGenericType)
+			{
+				gtd = type.GetGenericTypeDefinition();
+				if (gtd == typeof(IEnumerable<>) || gtd == typeof(Nullable<>) || gtd == typeof(NpgsqlRange<>)) return false;
+			}
 		}
 
-		if (type.IsDefined(typeof(DsNotDocumentAttribute), true))
-		{
-			return false;
-		}
+		if (type.IsDefined(typeof(DsNotDocumentAttribute), false)) return false;
 
 		return true;
 	}
 
 	static class Static
 	{
-		public static readonly PgSqlDataLayer Instance = new PgSqlDataLayer();
-
 		// Explicit static constructor to tell C# compiler not to mark type as beforefieldinit
 		static Static() { }
+
+		public static readonly PgSqlDataLayer Instance = new PgSqlDataLayer();
+
+		public static readonly HashSet<Type> _knownTypes = new()
+		{
+			typeof(NotSupported),
+			
+			typeof(Dictionary<string, string>),
+			typeof(IDictionary<string, string>),
+
+			typeof(System.Net.IPAddress),
+
+			typeof(NpgsqlTsQuery),
+			typeof(NpgsqlTsVector),
+
+			typeof(ArraySegment<byte>),
+			typeof(ArraySegment<byte>?),
+			typeof(System.Numerics.BigInteger),
+			typeof(System.Numerics.BigInteger?),
+			typeof(ValueTuple<System.Net.IPAddress, int>), // instead typeof(NpgsqlInet)
+			typeof(ValueTuple<System.Net.IPAddress, int>?),
+
+			typeof(NpgsqlBox),
+			typeof(NpgsqlBox?),
+			typeof(NpgsqlCircle),
+			typeof(NpgsqlCircle?),
+			typeof(NpgsqlInterval),
+			typeof(NpgsqlInterval?),
+			typeof(NpgsqlLine),
+			typeof(NpgsqlLine?),
+			typeof(NpgsqlLogSequenceNumber),
+			typeof(NpgsqlLogSequenceNumber?),
+			typeof(NpgsqlLSeg),
+			typeof(NpgsqlLSeg?),
+			typeof(NpgsqlPath),
+			typeof(NpgsqlPath?),
+			typeof(NpgsqlPoint),
+			typeof(NpgsqlPoint?),
+			typeof(NpgsqlPolygon),
+			typeof(NpgsqlPolygon?),
+			//typeof(NpgsqlRange<>),
+			typeof(NpgsqlTid),
+			typeof(NpgsqlTid?)
+		};
 	}
-
-	private static readonly HashSet<Type> _standardValueTypes = new HashSet<Type>()
-	{
-		typeof(bool),
-		typeof(byte),
-		typeof(sbyte),
-		typeof(short),
-		typeof(ushort),
-		typeof(int),
-		typeof(uint),
-		typeof(long),
-		typeof(ulong),
-		typeof(float),
-		typeof(double),
-		typeof(decimal),
-		typeof(Guid),
-		typeof(DateOnly),
-		typeof(DateTime),
-		typeof(DateTimeOffset),
-		typeof(TimeSpan),
-		typeof(IntPtr),
-		typeof(UIntPtr)
-	};
-
-	private static readonly HashSet<Type> _standardRefTypes = new HashSet<Type>()
-	{
-		typeof(NotSupported),
-		typeof(string),
-		typeof(object),
-		typeof(bool?),
-		typeof(byte?),
-		typeof(sbyte?),
-		typeof(byte[]),
-		typeof(short?),
-		typeof(ushort?),
-		typeof(int?),
-		typeof(uint?),
-		typeof(long?),
-		typeof(ulong?),
-		typeof(float?),
-		typeof(Single?),
-		typeof(double?),
-		typeof(decimal?),
-		typeof(Guid?),
-		typeof(DateOnly?),
-		typeof(DateTime?),
-		typeof(DateTimeOffset?),
-		typeof(TimeSpan?),
-		typeof(IntPtr?),
-		typeof(UIntPtr?),
-		typeof(Regex)
-	};
 }

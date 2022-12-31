@@ -3,6 +3,7 @@ using MongoDB.Bson.Serialization;
 using MongoDB.Driver;
 using QBCore.Configuration;
 using QBCore.DataSource.Options;
+using QBCore.Extensions.Internals;
 
 namespace QBCore.DataSource.QueryBuilder.Mongo;
 
@@ -17,19 +18,13 @@ internal sealed class RestoreQueryBuilder<TDocument, TRestore> : QueryBuilder<TD
 
 	public async Task RestoreAsync(object id, TRestore? document = default(TRestore?), DataSourceRestoreOptions? options = null, CancellationToken cancellationToken = default)
 	{
-		if (id == null)
-		{
-			throw new ArgumentNullException(nameof(id), "Identifier value not specified.");
-		}
-		if (document == null && typeof(TRestore) != typeof(EmptyDto))
-		{
-			throw new ArgumentNullException(nameof(document), "Document not specified.");
-		}
+		if (id is null) throw EX.QueryBuilder.Make.IdentifierValueNotSpecified(nameof(id));
+		if (document is null && typeof(TRestore) != typeof(EmptyDto)) throw EX.QueryBuilder.Make.DocumentNotSpecified(nameof(document));
 
 		var top = Builder.Containers.First();
 		if (top.ContainerOperation != ContainerOperations.Update)
 		{
-			throw new NotSupportedException($"Mongo restore query builder does not support an operation like '{top.ContainerOperation.ToString()}'.");
+			throw EX.QueryBuilder.Make.QueryBuilderOperationNotSupported(Builder.DataLayer.Name, QueryBuilderType.ToString(), top?.ContainerOperation.ToString());
 		}
 
 		if (options != null)
@@ -50,9 +45,9 @@ internal sealed class RestoreQueryBuilder<TDocument, TRestore> : QueryBuilder<TD
 		var clientSessionHandle = (IClientSessionHandle?)options?.NativeClientSession;
 
 		var deId = (MongoDEInfo?)Builder.DocumentInfo.IdField
-			?? throw new InvalidOperationException($"Document '{Builder.DocumentInfo.DocumentType.ToPretty()}' does not have an id data entry.");
+			?? throw EX.QueryBuilder.Make.DocumentDoesNotHaveIdDataEntry(Builder.DocumentInfo.DocumentType.ToPretty());
 		var deDeleted = (MongoDEInfo?)Builder.DocumentInfo.DateDeletedField
-			?? throw new InvalidOperationException($"Document '{Builder.DocumentInfo.DocumentType.ToPretty()}' does not have a date deletion field.");
+			?? throw EX.QueryBuilder.Make.DocumentDoesNotHaveDeletedDataEntry(Builder.DocumentInfo.DocumentType.ToPretty());
 		if (deDeleted.Flags.HasFlag(DataEntryFlags.ReadOnly))
 			throw new InvalidOperationException($"Document '{Builder.DocumentInfo.DocumentType.ToPretty()}' has a readonly date deletion field!");
 
@@ -117,12 +112,12 @@ internal sealed class RestoreQueryBuilder<TDocument, TRestore> : QueryBuilder<TD
 		{
 			if (result.ModifiedCount <= 0)
 			{
-				throw new KeyNotFoundException($"The restore operation failed: there is no such record as '{id.ToString()}' in '{Builder.DocumentInfo.DocumentType.ToPretty()}' or it has already been restored.");
+				throw EX.QueryBuilder.Make.OperationFailedNoSuchRecord(QueryBuilderType.ToString(), id.ToString(), Builder.DocumentInfo.DocumentType.ToPretty());
 			}
 		}
 		else
 		{
-			throw new ApplicationException($"The restore operation failed: no acknowledgment to restore record '{id.ToString()}' in '{Builder.DocumentInfo.DocumentType.ToPretty()}'.");
+			throw EX.QueryBuilder.Make.OperationFailedNoAcknowledgment(QueryBuilderType.ToString(), id.ToString(), Builder.DocumentInfo.DocumentType.ToPretty());
 		}
 	}
 }

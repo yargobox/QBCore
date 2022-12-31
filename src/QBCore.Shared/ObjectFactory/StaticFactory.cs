@@ -1,6 +1,5 @@
 using System.Collections.Concurrent;
 using System.Reflection;
-using QBCore.Configuration;
 using QBCore.DataSource;
 
 namespace QBCore.ObjectFactory;
@@ -183,38 +182,37 @@ public static class StaticFactory
 		public static Lazy<DSDocumentInfo> GetOrRegisterDocument(Type documentType, IDataLayerInfo dataLayer)
 		{
 			var registry = (ConcurrentDictionary<Type, Lazy<DSDocumentInfo>>)StaticFactory.Documents;
+			
+			Lazy<DSDocumentInfo>? doc, other;
 
-			var doc = registry.GetValueOrDefault(documentType);
-			if (doc == null)
+			if (registry.TryGetValue(documentType, out doc))
 			{
-				foreach (var selectedType in GetDocumentReferencingTypes(documentType, dataLayer.IsDocumentType, true))
+				return doc;
+			}
+
+			documentType = Nullable.GetUnderlyingType(documentType) ?? documentType;
+
+			foreach (var selectedType in GetDocumentReferencingTypes(documentType, dataLayer.IsDocumentType, true))
+			{
+				var type = selectedType; // a new var for each type to do not mess up with types in the lambda expression below
+				
+				other = registry.GetOrAdd(type, x => new Lazy<DSDocumentInfo>(() => dataLayer.CreateDocumentInfo(type), LazyThreadSafetyMode.ExecutionAndPublication));
+
+				if (selectedType.IsValueType)
 				{
-					// a new var for each type to do not mess up with types in the lambda expression below
-					var type = selectedType;
-					if (doc == null)
-						doc = registry.GetOrAdd(type, x => new Lazy<DSDocumentInfo>(() => dataLayer.CreateDocumentInfo(type), LazyThreadSafetyMode.ExecutionAndPublication));
-					else
-						registry.GetOrAdd(type, x => new Lazy<DSDocumentInfo>(() => dataLayer.CreateDocumentInfo(type), LazyThreadSafetyMode.ExecutionAndPublication));
+					registry.TryAdd(typeof(Nullable<>).MakeGenericType(selectedType), other);
 				}
 
-				if (doc == null)
-				{
-					throw new InvalidOperationException($"Could not register '{documentType.ToPretty()}' as a datasource document type.");
-				}
+				doc ??= other;
 			}
-			return doc;
+
+			return doc ?? throw new InvalidOperationException($"Could not register '{documentType.ToPretty()}' as a datasource document type.");
 		}
 
-		public static IEnumerable<Type> GetDocumentReferencingTypes(Type documentType, Func<Type, bool> documentTypesSelector, bool includeThisOne = false)
+		private static IEnumerable<Type> GetDocumentReferencingTypes(Type documentType, Func<Type, bool> documentTypesSelector, bool includeThisOne = false)
 		{
-			if (documentType == null)
-			{
-				throw new ArgumentNullException(nameof(documentType));
-			}
-			if (documentTypesSelector == null)
-			{
-				throw new ArgumentNullException(nameof(documentTypesSelector));
-			}
+			if (documentType == null) throw new ArgumentNullException(nameof(documentType));
+			if (documentTypesSelector == null) throw new ArgumentNullException(nameof(documentTypesSelector));
 
 			if (!documentTypesSelector(documentType))
 			{
@@ -234,7 +232,19 @@ public static class StaticFactory
 		private static void GetDocumentReferencingTypes(Type documentType, Func<Type, bool> documentTypesSelector, Dictionary<Type, bool> pool)
 		{
 			bool isDocumentType;
-			Type type;
+			Type? type, gtd;
+
+			type = documentType.BaseType;
+			while (type != null && type != typeof(object))
+			{
+				isDocumentType = documentTypesSelector(type);
+				if (pool.TryAdd(type, isDocumentType) && isDocumentType)
+				{
+					GetDocumentReferencingTypes(type, documentTypesSelector, pool);
+				}
+
+				type = documentType.BaseType;
+			}
 
 			foreach (var candidate in DSDocumentInfo.GetDataEntryCandidates(documentType))
 			{
@@ -260,13 +270,17 @@ public static class StaticFactory
 					}
 					else
 					{
-						foreach (var genericEnumerable in type.GetInterfacesOf(typeof(IEnumerable<>)))
+						foreach (var i in type.GetInterfaces().Where(i => i.IsGenericTypeDefinition))
 						{
-							type = genericEnumerable.GetGenericArguments()[0];
-							isDocumentType = documentTypesSelector(type);
-							if (pool.TryAdd(type, isDocumentType) && isDocumentType)
+							gtd = i.GetGenericTypeDefinition();
+							if (gtd == typeof(IEnumerable<>) || gtd == typeof(Nullable<>))
 							{
-								GetDocumentReferencingTypes(type, documentTypesSelector, pool);
+								type = i.GetGenericArguments()[0];
+								isDocumentType = documentTypesSelector(type);
+								if (pool.TryAdd(type, isDocumentType) && isDocumentType)
+								{
+									GetDocumentReferencingTypes(type, documentTypesSelector, pool);
+								}
 							}
 						}
 					}

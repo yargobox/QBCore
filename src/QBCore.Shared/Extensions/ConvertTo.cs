@@ -1,5 +1,6 @@
 using System.Linq.Expressions;
 using System.Runtime.CompilerServices;
+using QBCore.Extensions.Internals;
 
 namespace QBCore.Extensions;
 
@@ -109,7 +110,7 @@ public static class ConvertTo<To>
 					Expression ifthen = Expression.Return(returnTarget, convert);
 					BlockExpression block = Expression.Block(
 						Expression.IfThen(test, ifthen),
-						Expression.Throw(Expression.Constant(new ArgumentNullException($"Value type '{typeof(From).ToPretty()}' cannot be null."))),
+						Expression.Throw(Expression.Constant(EX.Shared.Make.ValueTypeCannotBeNull(typeof(From).ToPretty()))),
 						Expression.Label(returnTarget, Expression.Constant(default(To))));
 
 					return Expression.Lambda<Func<From, To>>(block, param).Compile();
@@ -121,7 +122,7 @@ public static class ConvertTo<To>
 			}
 			catch
 			{
-				return _ => throw new ArgumentException($"No coercion operator or type conversion available from {typeof(From).ToPretty()} to {typeof(To).ToPretty()}.");
+				return _ => throw EX.Shared.Make.NoCoercionOperatorOrTypeConversionAvailable(typeof(From).ToPretty(), typeof(To).ToPretty());
 			}
 		}
 
@@ -139,7 +140,7 @@ public static class ConvertTo<To>
 					Expression ifthen = Expression.Return(returnTarget, convert);
 					BlockExpression block = Expression.Block(
 						Expression.IfThen(test, ifthen),
-						Expression.Throw(Expression.Constant(new ArgumentNullException($"Value type '{typeof(From).ToPretty()}' cannot be null."))),
+						Expression.Throw(Expression.Constant(EX.Shared.Make.ValueTypeCannotBeNull(typeof(From).ToPretty()))),
 						Expression.Label(returnTarget, Expression.Constant(default(To))));
 
 					return Expression.Lambda<Func<From, To>>(block, param).Compile();
@@ -151,7 +152,7 @@ public static class ConvertTo<To>
 			}
 			catch
 			{
-				return _ => throw new ArgumentException($"No coercion operator or type conversion available from {typeof(From).ToPretty()} to {typeof(To).ToPretty()}.");
+				return _ => throw EX.Shared.Make.NoCoercionOperatorOrTypeConversionAvailable(typeof(From).ToPretty(), typeof(To).ToPretty());
 			}
 		}
 	}

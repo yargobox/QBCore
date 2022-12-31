@@ -5,6 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 using QBCore.Configuration;
 using QBCore.DataSource.Options;
 using QBCore.DataSource.QueryBuilder;
+using QBCore.Extensions.Internals;
 using QBCore.Extensions.Threading.Tasks;
 using QBCore.ObjectFactory;
 
@@ -130,9 +131,9 @@ public abstract partial class DataSource<TKey, TDocument, TCreate, TSelect, TUpd
 			throw new InvalidOperationException($"DataSource {DSInfo.Name} does not support the select operation.");
 		}
 
-		if (default(TKey) == null && id == null)
+		if (default(TKey) is null && id is null)
 		{
-			throw new ArgumentNullException(nameof(id), "Identifier value not specified.");
+			throw EX.QueryBuilder.Make.IdentifierValueNotSpecified(nameof(id));
 		}
 
 		var idField = DSInfo.DocumentInfo.Value.IdField
