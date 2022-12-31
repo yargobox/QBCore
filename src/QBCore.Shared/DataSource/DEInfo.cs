@@ -53,13 +53,13 @@ public abstract class DEInfo : IComparable<DEInfo>, IEquatable<DEInfo>
 		if (memberInfo is PropertyInfo propertyInfo)
 		{
 			DataEntryType = propertyInfo.PropertyType;
-			UnderlyingType = propertyInfo.PropertyType.GetUnderlyingSystemType();
+			UnderlyingType = propertyInfo.PropertyType.GetUnderlyingType();
 			IsNullable = propertyInfo.IsNullable();
 		}
 		else if (memberInfo is FieldInfo fieldInfo)
 		{
 			DataEntryType = fieldInfo.FieldType;
-			UnderlyingType = fieldInfo.FieldType.GetUnderlyingSystemType();
+			UnderlyingType = fieldInfo.FieldType.GetUnderlyingType();
 			IsNullable = fieldInfo.IsNullable();
 		}
 		else

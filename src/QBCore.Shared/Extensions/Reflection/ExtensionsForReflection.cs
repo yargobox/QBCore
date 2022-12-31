@@ -99,22 +99,14 @@ public static class ExtensionsForReflection
 		}
 	}
 
-	[MethodImplAttribute(MethodImplOptions.AggressiveInlining)]
 	public static bool IsNullableValueType(this Type type)
 	{
 		return type.IsValueType && Nullable.GetUnderlyingType(type) is not null;
 	}
 
-	public static Type GetUnderlyingSystemType(this Type type)
+	public static Type GetUnderlyingType(this Type type)
 	{
-		if (type.IsValueType)
-		{
-			return Nullable.GetUnderlyingType(type) ?? type.GetUnderlyingSystemType();
-		}
-		else
-		{
-			return type.GetUnderlyingSystemType();
-		}
+		return type.IsValueType ? Nullable.GetUnderlyingType(type) ?? type : type;
 	}
 
 	public static bool IsNullable(this PropertyInfo propertyInfo)

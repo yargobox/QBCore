@@ -45,8 +45,8 @@ public record QBConditionInfo
 		Value = value;
 		Operation = operation;
 
-		FieldUnderlyingType = Field.DataEntryType.GetUnderlyingSystemType();
-		RefFieldUnderlyingType = RefField?.DataEntryType.GetUnderlyingSystemType();
+		FieldUnderlyingType = Field.DataEntryType.GetUnderlyingType();
+		RefFieldUnderlyingType = RefField?.DataEntryType.GetUnderlyingType();
 	}
 }
 
