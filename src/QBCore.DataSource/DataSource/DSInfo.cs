@@ -226,7 +226,7 @@ internal sealed class DSInfo : IDSInfo
 			}
 			else
 			{
-				throw new InvalidOperationException($"Invalid datasource servive interface {building.ServiceInterface.ToPretty()}.");
+				throw new InvalidOperationException($"Invalid datasource service interface {building.ServiceInterface.ToPretty()}.");
 			}
 		}
 		else

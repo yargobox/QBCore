@@ -1,8 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
-using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.Options;
 using QBCore.Configuration;
 using QBCore.DataSource;
 
@@ -11,7 +9,7 @@ namespace Develop.DAL.Configuration;
 public sealed class EfDataContextProvider : IEfCoreDataContextProvider, IDesignTimeDbContextFactory<DbDevelopContext>
 {
 	private const string _defaultDataContextName = "default";
-	private const string _appSettingsRelFilePath = "appsettings.json";
+	private const string _appSettingsRelFilePath = "EFCoreDevelop.API/appsettings.json";
 
 	private OptionsListener<SqlDbSettings>? _listener;
 	private SqlDbSettings? _settings;
@@ -22,7 +20,7 @@ public sealed class EfDataContextProvider : IEfCoreDataContextProvider, IDesignT
 	{
 		get
 		{
-			yield return new DataContextInfo(_defaultDataContextName, typeof(DbDevelopContext), () => EfCoreDataLayer.Default);
+			yield return new DataContextInfo(_defaultDataContextName, () => EfCoreDataLayer.Default);
 		}
 	}
 
@@ -93,11 +91,11 @@ public sealed class EfDataContextProvider : IEfCoreDataContextProvider, IDesignT
 
 		if (_listener == null && _settings == null)
 		{
-			var filePath = Path.Combine(Environment.CurrentDirectory, _appSettingsRelFilePath);
+			var filePath = Path.Combine(Path.GetDirectoryName(Environment.CurrentDirectory)!, _appSettingsRelFilePath);
 			var configurationBuilder = new ConfigurationBuilder();
 			configurationBuilder.AddJsonFile(filePath);
 			var configurationRoot = configurationBuilder.Build();
-			_settings = configurationRoot.GetRequiredSection(nameof(SqlDbSettings)).Get<SqlDbSettings>()
+			_settings = configurationRoot.GetSection(nameof(SqlDbSettings)).Get<SqlDbSettings>()
 				?? throw new InvalidOperationException($"Database context settings '{nameof(SqlDbSettings)}' is not set in the file '{filePath}'.");
 		}
 
@@ -108,26 +106,17 @@ public sealed class EfDataContextProvider : IEfCoreDataContextProvider, IDesignT
 
 	public void Dispose()
 	{
-		GC.SuppressFinalize(this);
-
 		if (!IsDisposed)
 		{
 			IsDisposed = true;
 
-			//var listener = _listener as IDisposable;
-			var dataContext = _dataContext as IDisposable;
+			var disposable = _dataContext?.Context as IDisposable;
 
 			_listener = null;
 			_settings = null;
 			_dataContext = null;
 
-			//listener?.Dispose(); // Don't dispose, it's a singleton
-			dataContext?.Dispose();
+			disposable?.Dispose();
 		}
-	}
-
-	~EfDataContextProvider()
-	{
-		Dispose();
 	}
 }

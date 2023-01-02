@@ -1,25 +1,58 @@
-var builder = WebApplication.CreateBuilder(args);
+using Develop.API.Configuration;
+using Develop.API.Middlewares;
+using Npgsql;
+using QBCore.Configuration;
+using QBCore.Controllers;
+using QBCore.ObjectFactory;
 
-// Add services to the container.
+var appBuilder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddControllers();
-// Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
-builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+var builder = appBuilder.Services
+	.AddControllers(options =>
+	{
+		options.SuppressAsyncSuffixInActionNames = true;
+		options.Conventions.Add(new DataSourceControllerRouteConvention
+		{
+			RoutePrefix = "api/"
+		});
+		
+	})
+	.AddApplicationPart(typeof(Develop.Entities.DVP.Project).Assembly)
+	.AddQBCore(options => { })
+	.ConfigureApplicationPartManager(partManager =>
+	{
+		partManager.FeatureProviders.Add(new DataSourceControllerFeatureProvider());
+	});
 
-var app = builder.Build();
+builder.Services
+	.AddAutoMapper(config =>
+	{
+		config.AddProfile(new DataSourceMappings((source, dest) => true));
+	})
+	.Configure<SqlDbSettings>(appBuilder.Configuration.GetRequiredSection(nameof(SqlDbSettings)))
+	.AddSingleton<OptionsListener<SqlDbSettings>>()
+	.AddTransient<ITransient<IPgSqlDataContextProvider>, DevelopDataContextProvider>()
+	.AddSingleton<IPgSqlDataContextProvider, DevelopDataContextProvider>()
+	.AddSingleton<NpgsqlDataSource>(sp => sp.GetRequiredService<IPgSqlDataContextProvider>().GetDataContext().AsNpgsqlDataSource())
+	.AddRouting(options =>
+	{
+		options.LowercaseUrls = true;
+		options.AppendTrailingSlash = true;
+	})
+	.AddEndpointsApiExplorer()
+	.AddSwaggerGen();
 
-// Configure the HTTP request pipeline.
+var app = appBuilder.Build();
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
     app.UseSwaggerUI();
 }
-
+app.UseMiddleware<ExceptionHandlingMiddleware>();
 app.UseHttpsRedirection();
-
+app.UseRouting();
 app.UseAuthorization();
-
 app.MapControllers();
+app.MapDataSourceControllers();
 
 app.Run();

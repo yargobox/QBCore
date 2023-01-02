@@ -9,7 +9,7 @@ namespace QBCore.Configuration;
 /// <summary>
 /// Data context interface of the PostgreSQL data layer
 /// </summary>
-public interface IPgSqlDataContext : IDataContext, IDisposable
+public interface IPgSqlDataContext : IDataContext
 {
 }
 
@@ -20,7 +20,7 @@ public interface IPgSqlDataContext : IDataContext, IDisposable
 /// Client code must implement this interface as a <see cref="PgSqlDataContext" /> object factory
 /// and add it to a DI container with a singleton lifecycle.
 /// </remarks>
-public interface IPgSqlDataContextProvider : IDataContextProvider, ITransient<IPgSqlDataContextProvider>, IDisposable
+public interface IPgSqlDataContextProvider : IDataContextProvider, ITransient<IPgSqlDataContextProvider>, IAsyncDisposable
 {
 }
 

@@ -1,9 +1,7 @@
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 using MongoDB.Driver;
 using QBCore.Configuration;
 using QBCore.DataSource;
-using QBCore.ObjectFactory;
 
 namespace Example1.DAL.Configuration;
 
@@ -16,13 +14,14 @@ public sealed class MongoDataContextProvider : IMongoDataContextProvider
 	private OptionsListener<MongoDbSettings>? _listener;
 	private MongoDbSettings? _settings;
 	private IMongoDataContext? _dataContext;
-	private object _lock;
+	private object? _syncRoot;
 
+	private object SyncRoot => _syncRoot ?? Interlocked.CompareExchange(ref _syncRoot, new object(), null) ?? _syncRoot;
 	public IEnumerable<DataContextInfo> Infos
 	{
 		get
 		{
-			yield return new DataContextInfo(_defaultDataContextName, typeof(IMongoDatabase), () => MongoDataLayer.Default);
+			yield return new DataContextInfo(_defaultDataContextName, () => MongoDataLayer.Default);
 		}
 	}
 
@@ -30,7 +29,6 @@ public sealed class MongoDataContextProvider : IMongoDataContextProvider
 	{
 		if (options == null) throw new ArgumentNullException(nameof(options));
 
-		_lock = new object();
 		_settings = options.Value;
 		_logger = logger;
 	} */
@@ -39,7 +37,6 @@ public sealed class MongoDataContextProvider : IMongoDataContextProvider
 	{
 		if (optionsListener == null) throw new ArgumentNullException(nameof(optionsListener));
 
-		_lock = new object();
 		_listener = optionsListener;
 		_logger = logger;
 	}
@@ -47,7 +44,6 @@ public sealed class MongoDataContextProvider : IMongoDataContextProvider
 	public IDataContext GetDataContext(string dataContextName = "default")
 	{
 		if (_listener == null && _settings == null) throw new ObjectDisposedException(nameof(MongoDataContextProvider));
-
 		if (dataContextName != _defaultDataContextName) throw new InvalidOperationException($"Unknown data context '{dataContextName}'.");
 	
 		if (_dataContext == null || _settings == null || (_listener != null && _settings != _listener.Value1))
@@ -55,7 +51,7 @@ public sealed class MongoDataContextProvider : IMongoDataContextProvider
 			IMongoDataContext? oldDataContext = null;
 			bool isChanged = false;
 
-			lock (_lock)
+			lock (SyncRoot)
 			{
 				if (_dataContext == null || _settings == null || (_listener != null && _settings != _listener.Value1))
 				{
@@ -76,7 +72,7 @@ public sealed class MongoDataContextProvider : IMongoDataContextProvider
 			{
 				_logger.LogInformation($"Mongo data context '{dataContextName}' has changed to {_settings.ToString()}");
 
-				if (oldDataContext is IDisposable disposable)
+				if (oldDataContext.Context is IDisposable disposable)
 				{
 					// Dispose oldDataContext after 2 minutes
 					Task.Delay(120000).ContinueWith(_ => disposable.Dispose()).ConfigureAwait(false);
@@ -84,7 +80,7 @@ public sealed class MongoDataContextProvider : IMongoDataContextProvider
 			}
 			else if (isChanged)
 			{
-				_logger.LogInformation($"Mongo data context '{dataContextName}' has set to {_settings.ToString()}");
+				_logger.LogInformation($"Mongo data context '{dataContextName}' has been set to {_settings.ToString()}");
 			}
 		}
 
@@ -93,21 +89,12 @@ public sealed class MongoDataContextProvider : IMongoDataContextProvider
 
 	public void Dispose()
 	{
-		GC.SuppressFinalize(this);
-
-		var listener = _listener as IDisposable;
-		var dataContext = _dataContext as IDisposable;
+		var context = _dataContext?.Context as IDisposable;
 
 		_listener = null;
 		_settings = null;
 		_dataContext = null;
 
-		listener?.Dispose();
-		dataContext?.Dispose();
-	}
-
-	~MongoDataContextProvider()
-	{
-		Dispose();
+		context?.Dispose();
 	}
 }

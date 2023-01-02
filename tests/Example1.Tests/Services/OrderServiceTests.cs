@@ -26,7 +26,7 @@ public class OrderService_Tests
 			.Setup(dcp => dcp.Infos)
 			.Returns(new DataContextInfo[]
 				{
-					new DataContextInfo("default", typeof(IMongoDatabase), () => MongoDataLayer.Default)
+					new DataContextInfo("default", () => MongoDataLayer.Default)
 				});
 		mongoDataContextProvider
 			.Setup(dcp => dcp.GetDataContext(It.Is((string x) => x == "default")))

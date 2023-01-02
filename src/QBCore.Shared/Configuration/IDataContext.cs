@@ -13,11 +13,6 @@ public interface IDataContext
 	string Name { get; }
 
 	/// <summary>
-	/// Data Context Interface Type
-	/// </summary>
-	Type InterfaceType { get; }
-
-	/// <summary>
 	/// Data context optional (tenant) arguments
 	/// </summary>
 	IReadOnlyDictionary<string, object?>? Args { get; }
@@ -35,10 +30,9 @@ public interface IDataContextProvider
 	IDataContext GetDataContext(string dataContextName = "default");
 }
 
-public abstract class DataContext : IDataContext, IDisposable
+public abstract class DataContext : IDataContext
 {
 	public string Name => _dataContextName;
-	public Type InterfaceType => Context.GetType();
 	public IReadOnlyDictionary<string, object?>? Args => _args;
 	public object Context => _context ?? throw new ObjectDisposedException(GetType().Name);
 	public bool IsDisposed => _context == null;
@@ -56,27 +50,6 @@ public abstract class DataContext : IDataContext, IDisposable
 		_dataContextName = dataContextName;
 		_args = args?.Count > 0 ? args : null;
 	}
-
-	protected virtual void Dispose(bool disposing)
-	{
-		var context = _context as IDisposable;
-
-		_context = null;
-		_args = null;
-
-		context?.Dispose();
-	}
-
-	public void Dispose()
-	{
-		GC.SuppressFinalize(this);
-		Dispose(true);
-	}
-
-	~DataContext()
-	{
-		Dispose(false);
-	}
 }
 
 public record DataContextInfo
@@ -87,21 +60,15 @@ public record DataContextInfo
 	public string Name { get; }
 
 	/// <summary>
-	/// Data Context Concrete Type
-	/// </summary>
-	public Type ConcreteType { get; }
-
-	/// <summary>
 	/// Data Layer
 	/// </summary>
 	public IDataLayerInfo DataLayer => _funcIDataLayerInfo();
 
 	private readonly Func<IDataLayerInfo> _funcIDataLayerInfo;
 
-	public DataContextInfo(string name, Type concreteType, Func<IDataLayerInfo> getDataLayer)
+	public DataContextInfo(string name, Func<IDataLayerInfo> getDataLayer)
 	{
 		Name = name ?? throw new ArgumentNullException(nameof(name));
-		ConcreteType = concreteType ?? throw new ArgumentNullException(nameof(concreteType));
 		_funcIDataLayerInfo = getDataLayer ?? throw new ArgumentNullException(nameof(getDataLayer));
 	}
 }

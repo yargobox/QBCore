@@ -25,6 +25,22 @@ public class DeReadOnlyAttribute : Attribute
 }
 
 [AttributeUsage(AttributeTargets.Property | AttributeTargets.Field, Inherited = true)]
+public class DeNoStorageAttribute : Attribute
+{
+}
+
+[AttributeUsage(AttributeTargets.Property | AttributeTargets.Field, Inherited = true)]
+public class DeDependsOnAttribute : Attribute
+{
+	public string[] DataEntries { get; init; } = Array.Empty<string>();
+
+	public DeDependsOnAttribute(params string[] dataEntries)
+	{
+		DataEntries = dataEntries;
+	}
+}
+
+[AttributeUsage(AttributeTargets.Property | AttributeTargets.Field, Inherited = true)]
 public class DeForeignIdAttribute : Attribute
 {
 }

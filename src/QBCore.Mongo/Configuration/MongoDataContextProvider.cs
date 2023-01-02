@@ -6,7 +6,7 @@ namespace QBCore.Configuration;
 /// <summary>
 /// Data context interface of the Mongo data layer
 /// </summary>
-public interface IMongoDataContext : IDataContext, IDisposable
+public interface IMongoDataContext : IDataContext
 {
 }
 

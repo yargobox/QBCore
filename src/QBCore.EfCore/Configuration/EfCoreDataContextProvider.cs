@@ -10,7 +10,7 @@ namespace QBCore.Configuration;
 /// <summary>
 /// Data context interface of the Entity Framework data layer
 /// </summary>
-public interface IEfCoreDataContext : IDataContext, IDisposable
+public interface IEfCoreDataContext : IDataContext
 {
 }
 

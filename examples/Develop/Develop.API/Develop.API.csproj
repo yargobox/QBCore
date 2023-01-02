@@ -1,9 +1,10 @@
-<Project Sdk="Microsoft.NET.Sdk.Web">
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
 
   <PropertyGroup>
     <TargetFramework>net7.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+    <UserSecretsId>9c302355-aa04-4cd0-b316-0d0d8d8b3019</UserSecretsId>
   </PropertyGroup>
 
   <ItemGroup>
@@ -14,6 +15,10 @@
   <ItemGroup>
     <ProjectReference Include="..\Develop.Domain\Develop.Domain.csproj" />
     <ProjectReference Include="..\Develop.Infrastructure\Develop.Infrastructure.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\src\QBCore.Main\QBCore.Main.csproj" />
   </ItemGroup>
 
 </Project>

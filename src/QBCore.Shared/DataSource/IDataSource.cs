@@ -10,7 +10,7 @@ public interface IDataSource
 	void Init(DSKeyName? keyName = null, bool shared = true);
 }
 
-public interface IDataSource<TKey, TDocument, TCreate, TSelect, TUpdate, TDelete, TRestore> : IDataSource
+public interface IDataSource<TKey, TCreate, TSelect, TUpdate, TDelete, TRestore> : IDataSource
 {
 	Task<TKey> InsertAsync(
 		TCreate document,
@@ -71,4 +71,9 @@ public interface IDataSource<TKey, TDocument, TCreate, TSelect, TUpdate, TDelete
 		DataSourceRestoreOptions? options = null,
 		CancellationToken cancellationToken = default(CancellationToken)
 	);
+}
+
+public interface IDataSource<TKey, TDocument, TCreate, TSelect, TUpdate, TDelete, TRestore>
+	: IDataSource<TKey, TCreate, TSelect, TUpdate, TDelete, TRestore>
+{
 }

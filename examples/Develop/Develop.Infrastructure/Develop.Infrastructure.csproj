@@ -4,6 +4,7 @@
     <ProjectReference Include="..\Develop.Domain\Develop.Domain.csproj" />
     <ProjectReference Include="..\..\..\src\QBCore.DataSource\QBCore.DataSource.csproj" />
     <ProjectReference Include="..\..\..\src\QBCore.PgSql\QBCore.PgSql.csproj" />
+	<ProjectReference Include="..\..\..\src\QBCore.Sql\QBCore.Sql.csproj" />
   </ItemGroup>
 
   <PropertyGroup>
