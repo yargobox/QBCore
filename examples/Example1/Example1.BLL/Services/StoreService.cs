@@ -12,11 +12,11 @@ public sealed class StoreService : DataSource<int?, Store, StoreCreateDto, Store
 {
 	public StoreService(IServiceProvider serviceProvider) : base(serviceProvider) { }
 
-	static void SoftDelBuilder(IQBMongoSoftDelBuilder<Store, SoftDelDto> qb)
+	static void SoftDelBuilder(IMongoSoftDelQBBuilder<Store, SoftDelDto> qb)
 	{
 		qb.Update("stores");
 	}
-	static void RestoreBuilder(IQBMongoRestoreBuilder<Store, SoftDelDto> qb)
+	static void RestoreBuilder(IMongoRestoreQBBuilder<Store, SoftDelDto> qb)
 	{
 		qb.Update("stores");
 	}

@@ -3,9 +3,9 @@ using QBCore.ObjectFactory;
 
 namespace QBCore.DataSource.Core;
 
-public sealed class DSWorkListener<TKey, TDocument, TCreate, TSelect, TUpdate, TDelete, TRestore> : DataSourceListener<TKey, TDocument, TCreate, TSelect, TUpdate, TDelete, TRestore>
+public sealed class DSWorkListener<TKey, TDoc, TCreate, TSelect, TUpdate, TDelete, TRestore> : DataSourceListener<TKey, TDoc, TCreate, TSelect, TUpdate, TDelete, TRestore>
 {
-	IDataSource<TKey, TDocument, TCreate, TSelect, TUpdate, TDelete, TRestore> _dataSource = null!;
+	IDataSource<TKey, TDoc, TCreate, TSelect, TUpdate, TDelete, TRestore> _dataSource = null!;
 
 	public DSWorkListener(OKeyName keyName)
 	{
@@ -16,7 +16,7 @@ public sealed class DSWorkListener<TKey, TDocument, TCreate, TSelect, TUpdate, T
 
 	public override async ValueTask OnAttachAsync(IDataSource dataSource)
 	{
-		_dataSource = (IDataSource<TKey, TDocument, TCreate, TSelect, TUpdate, TDelete, TRestore>)dataSource;
+		_dataSource = (IDataSource<TKey, TDoc, TCreate, TSelect, TUpdate, TDelete, TRestore>)dataSource;
 		await ValueTask.CompletedTask;
 	}
 	public override async ValueTask OnDetachAsync(IDataSource dataSource)

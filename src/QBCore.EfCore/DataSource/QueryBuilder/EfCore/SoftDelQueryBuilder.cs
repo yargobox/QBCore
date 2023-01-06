@@ -5,12 +5,11 @@ using QBCore.Extensions.Internals;
 
 namespace QBCore.DataSource.QueryBuilder.EfCore;
 
-internal sealed class SoftDelQueryBuilder<TDocument, TDelete> : QueryBuilder<TDocument, TDelete>, IDeleteQueryBuilder<TDocument, TDelete>
-	where TDocument : class
+internal sealed class SoftDelQueryBuilder<TDoc, TDelete> : QueryBuilder<TDoc, TDelete>, IDeleteQueryBuilder<TDoc, TDelete> where TDoc : class
 {
 	public override QueryBuilderTypes QueryBuilderType => QueryBuilderTypes.SoftDel;
 
-	public SoftDelQueryBuilder(QBSoftDelBuilder<TDocument, TDelete> building, IDataContext dataContext) : base(building, dataContext)
+	public SoftDelQueryBuilder(SoftDelQBBuilder<TDoc, TDelete> building, IDataContext dataContext) : base(building, dataContext)
 	{
 		building.Normalize();
 	}
@@ -29,14 +28,14 @@ internal sealed class SoftDelQueryBuilder<TDocument, TDelete> : QueryBuilder<TDo
 		var dbContext = _dataContext.AsDbContext();
 		var logger = dbContext as IEfCoreDbContextLogger;
 
-		var deId = (EfCoreDEInfo?)Builder.DocumentInfo.IdField
-			?? throw EX.QueryBuilder.Make.DocumentDoesNotHaveIdDataEntry(Builder.DocumentInfo.DocumentType.ToPretty());
+		var deId = (EfCoreDEInfo?)Builder.DocInfo.IdField
+			?? throw EX.QueryBuilder.Make.DocumentDoesNotHaveIdDataEntry(Builder.DocInfo.DocumentType.ToPretty());
 		if (deId.Setter == null)
-			throw EX.QueryBuilder.Make.DataEntryDoesNotHaveSetter(Builder.DocumentInfo.DocumentType.ToPretty(), deId.Name);
-		var deDeleted = (EfCoreDEInfo?)Builder.DocumentInfo.DateDeletedField
-			?? throw EX.QueryBuilder.Make.DocumentDoesNotHaveDeletedDataEntry(Builder.DocumentInfo.DocumentType.ToPretty());
+			throw EX.QueryBuilder.Make.DataEntryDoesNotHaveSetter(Builder.DocInfo.DocumentType.ToPretty(), deId.Name);
+		var deDeleted = (EfCoreDEInfo?)Builder.DocInfo.DateDeletedField
+			?? throw EX.QueryBuilder.Make.DocumentDoesNotHaveDeletedDataEntry(Builder.DocInfo.DocumentType.ToPretty());
 		if (deDeleted.Flags.HasFlag(DataEntryFlags.ReadOnly))
-			throw new InvalidOperationException($"Document '{Builder.DocumentInfo.DocumentType.ToPretty()}' has a readonly date deletion field!");
+			throw new InvalidOperationException($"Document '{Builder.DocInfo.DocumentType.ToPretty()}' has a readonly date deletion field!");
 
 		if (Builder.Conditions.Count != 1)
 		{
@@ -52,7 +51,7 @@ internal sealed class SoftDelQueryBuilder<TDocument, TDelete> : QueryBuilder<TDo
 
 		if (document is not null)
 		{
-			var getDateDelFromDto = Builder.ProjectionInfo?.DateDeletedField?.Getter ?? Builder.ProjectionInfo?.DataEntries.GetValueOrDefault(deDeleted.Name)?.Getter;
+			var getDateDelFromDto = Builder.DtoInfo?.DateDeletedField?.Getter ?? Builder.DtoInfo?.DataEntries.GetValueOrDefault(deDeleted.Name)?.Getter;
 			if (getDateDelFromDto != null)
 			{
 				dateDel = getDateDelFromDto(document);
@@ -90,7 +89,7 @@ internal sealed class SoftDelQueryBuilder<TDocument, TDelete> : QueryBuilder<TDo
 				
 				if ((deletedCount ?? 0) <= 0)
 				{
-					throw EX.QueryBuilder.Make.OperationFailedNoSuchRecord(QueryBuilderType.ToString(), id.ToString(), Builder.DocumentInfo.DocumentType.ToPretty());
+					throw EX.QueryBuilder.Make.OperationFailedNoSuchRecord(QueryBuilderType.ToString(), id.ToString(), Builder.DocInfo.DocumentType.ToPretty());
 				}
 		}
 		finally

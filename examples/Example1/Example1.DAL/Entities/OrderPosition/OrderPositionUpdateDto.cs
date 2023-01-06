@@ -9,7 +9,7 @@ public class OrderPositionUpdateDto
 	[DeForeignId] public int? ProductId { get; set; }
 	public decimal? Quantity { get; set; }
 
-	private static void Builder(IQBMongoUpdateBuilder<OrderPosition, OrderPositionUpdateDto> builder)
+	private static void Builder(IMongoUpdateQBBuilder<OrderPosition, OrderPositionUpdateDto> builder)
 	{
 		builder.Update("order_positions");
 	}

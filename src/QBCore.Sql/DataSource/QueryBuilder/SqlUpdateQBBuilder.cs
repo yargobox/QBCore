@@ -1,4 +1,5 @@
 using System.Linq.Expressions;
+using QBCore.Extensions.Internals;
 
 namespace QBCore.DataSource.QueryBuilder;
 
@@ -8,52 +9,59 @@ internal abstract class SqlUpdateQBBuilder<TDoc, TUpdate> : SqlCommonQBBuilder<T
 
 	public SqlUpdateQBBuilder()
 	{
-		if (DocumentInfo.IdField == null)
-			throw new InvalidOperationException($"Document '{typeof(TDoc).ToPretty()}' does not have an id data entry.");
+		if (DocInfo.IdField == null) throw new InvalidOperationException($"Document '{typeof(TDoc).ToPretty()}' does not have an id data entry.");
 	}
 	public SqlUpdateQBBuilder(SqlUpdateQBBuilder<TDoc, TUpdate> other) : base(other) { }
-	public SqlUpdateQBBuilder(IQBBuilder other)
+	public SqlUpdateQBBuilder(IQBBuilder other) : this()
 	{
-		if (other.DocumentType != typeof(TDoc))
+		if (other is null) throw new ArgumentNullException(nameof(other));
+
+		if (other.DocType != typeof(TDoc))
 		{
-			throw new InvalidOperationException($"Could not make update query builder '{typeof(TDoc).ToPretty()}, {typeof(TUpdate).ToPretty()}' from '{other.DocumentType.ToPretty()}, {other.ProjectionType.ToPretty()}'.");
+			throw new InvalidOperationException($"Could not make update query builder '{typeof(TDoc).ToPretty()}, {typeof(TUpdate).ToPretty()}' from '{other.DocType.ToPretty()}, {other.DtoType.ToPretty()}'.");
 		}
 
-		var container = other.Containers.FirstOrDefault();
-		if (container?.DocumentType == null || container.DocumentType != typeof(TDoc) || container.ContainerType != ContainerTypes.Table)
+		other.Prepare();
+
+		var top = other.Containers.FirstOrDefault();
+		if (top?.DocumentType != typeof(TDoc) || (top.ContainerType != ContainerTypes.Table && top.ContainerType != ContainerTypes.View))
 		{
-			throw new InvalidOperationException($"Could not make update query builder '{typeof(TDoc).ToPretty()}, {typeof(TUpdate).ToPretty()}' from '{other.DocumentType.ToPretty()}, {other.ProjectionType.ToPretty()}'.");
+			throw new InvalidOperationException($"Could not make update query builder '{typeof(TDoc).ToPretty()}, {typeof(TUpdate).ToPretty()}' from '{other.DocType.ToPretty()}, {other.DtoType.ToPretty()}'.");
 		}
 
-		AutoBuildSetup(container.DBSideName);
+		AutoBuild(top.DBSideName);
 	}
 
-	public override QBBuilder<TDoc, TUpdate> AutoBuild()
+	protected override void OnPrepare()
+	{
+		var top = Containers.FirstOrDefault();
+		if (top?.ContainerOperation != ContainerOperations.Update)
+		{
+			throw new InvalidOperationException($"Incompatible configuration of update query builder '{typeof(TUpdate).ToPretty()}'.");
+		}
+
+		if (Conditions.Count == 0)
+		{
+			throw EX.QueryBuilder.Make.QueryBuilderMustHaveAtLeastOneCondition(DataLayer.Name, QueryBuilderType.ToString());
+		}
+	}
+
+	public override QBBuilder<TDoc, TUpdate> AutoBuild(string? tableName = null)
 	{
 		if (Containers.Count > 0)
 		{
 			throw new InvalidOperationException($"Update query builder '{typeof(TUpdate).ToPretty()}' has already been initialized.");
 		}
 
-		AutoBuildSetup(null);
+		Update(tableName)
+			.Condition(DocInfo.IdField!, FO.Equal, "@id");
+
 		return this;
 	}
-	private void AutoBuildSetup(string? tableName)
+	ISqlUpdateQBBuilder<TDoc, TUpdate> ISqlUpdateQBBuilder<TDoc, TUpdate>.AutoBuild(string? tableName)
 	{
-		var deId = DocumentInfo.IdField
-			?? throw new InvalidOperationException($"Document '{typeof(TDoc).ToPretty()}' does not have an id data entry.");
-
-		Update(tableName).Condition(deId, FO.Equal, "id");
-	}
-
-	protected override void OnNormalize()
-	{
-		base.OnNormalize();
-
-		if (Containers.First().ContainerOperation != ContainerOperations.Update)
-		{
-			throw new InvalidOperationException($"Incompatible configuration of update query builder '{typeof(TUpdate).ToPretty()}'.");
-		}
+		AutoBuild(tableName);
+		return this;
 	}
 
 	public override QBBuilder<TDoc, TUpdate> Update(string? tableName = null)

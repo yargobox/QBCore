@@ -11,6 +11,6 @@ public class BrandUpdateDto
 	{
 		builder
 			.Update("brands")
-				.Condition(doc => doc.Id, FO.Equal, "id");
+				.Condition(doc => doc.Id, FO.Equal, "@id");
 	} */
 }

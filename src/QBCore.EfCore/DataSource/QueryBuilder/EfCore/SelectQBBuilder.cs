@@ -3,8 +3,7 @@ using QBCore.Extensions.Linq;
 
 namespace QBCore.DataSource.QueryBuilder.EfCore;
 
-internal sealed class QBSelectBuilder<TDoc, TDto> : QBBuilder<TDoc, TDto>, IQBEfCoreSelectBuilder<TDoc, TDto>
-	 where TDoc : class
+internal sealed class SelectQBBuilder<TDoc, TSelect> : QBBuilder<TDoc, TSelect>, IEfCoreSelectQBBuilder<TDoc, TSelect> where TDoc : class
 {
 	public override QueryBuilderTypes QueryBuilderType => QueryBuilderTypes.Select;
 	public override IDataLayerInfo DataLayer => EfCoreDataLayer.Default;
@@ -29,8 +28,8 @@ internal sealed class QBSelectBuilder<TDoc, TDto> : QBBuilder<TDoc, TDto>, IQBEf
 	private bool? _isByOr;
 	private int _autoOpenedParentheses;
 
-	public QBSelectBuilder() { }
-	public QBSelectBuilder(QBSelectBuilder<TDoc, TDto> other) : base(other)
+	public SelectQBBuilder() { }
+	public SelectQBBuilder(SelectQBBuilder<TDoc, TSelect> other) : base(other)
 	{
 		if (other._containers != null) _containers = new List<QBContainer>(other._containers);
 		if (other._fields != null) _fields = new List<QBField>(other._fields);
@@ -40,43 +39,42 @@ internal sealed class QBSelectBuilder<TDoc, TDto> : QBBuilder<TDoc, TDto>, IQBEf
 		if (other._sortOrders != null) _sortOrders = new List<QBSortOrder>(other._sortOrders);
 		if (other._aggregations != null) _aggregations = new List<QBAggregation>(other._aggregations);
 	}
-	public QBSelectBuilder(IQBBuilder other)
+	public SelectQBBuilder(IQBBuilder other)
 	{
-		if (other.DocumentType != typeof(TDoc))
+		if (other is null) throw new ArgumentNullException(nameof(other));
+
+		if (other.DocType != typeof(TDoc))
 		{
-			throw new InvalidOperationException($"Could not make select query builder '{typeof(TDoc).ToPretty()}, {typeof(TDto).ToPretty()}' from '{other.DocumentType.ToPretty()}, {other.ProjectionType.ToPretty()}'.");
+			throw new InvalidOperationException($"Could not make select query builder '{typeof(TDoc).ToPretty()}, {typeof(TSelect).ToPretty()}' from '{other.DocType.ToPretty()}, {other.DtoType.ToPretty()}'.");
 		}
 
-		var container = other.Containers.FirstOrDefault();
-		if (container?.DocumentType == null || container.DocumentType != typeof(TDoc) || container.ContainerType != ContainerTypes.Table)
+		other.Prepare();
+
+		var top = other.Containers.FirstOrDefault();
+		if (top?.DocumentType != typeof(TDoc) || top.ContainerType != ContainerTypes.Table)
 		{
-			throw new InvalidOperationException($"Could not make select query builder '{typeof(TDoc).ToPretty()}, {typeof(TDto).ToPretty()}' from '{other.DocumentType.ToPretty()}, {other.ProjectionType.ToPretty()}'.");
+			throw new InvalidOperationException($"Could not make select query builder '{typeof(TDoc).ToPretty()}, {typeof(TSelect).ToPretty()}' from '{other.DocType.ToPretty()}, {other.DtoType.ToPretty()}'.");
 		}
 
-		Select(container.DBSideName);
-	}
-	public override QBBuilder<TDoc, TDto> AutoBuild()
-	{
-		if (Containers.Count > 0)
-		{
-			throw new InvalidOperationException($"Select query builder '{typeof(TDto).ToPretty()}' has already been initialized.");
-		}
-
-		Select();
-		return this;
+		AutoBuild(top.DBSideName);
 	}
 
 	protected override void OnNormalize()
 	{
 		if (_isByOr != null || _parentheses > 0)
 		{
-			throw new InvalidOperationException($"Incorrect condition definition of select query builder '{typeof(TDto).ToPretty()}'.");
+			throw new InvalidOperationException($"Incorrect condition definition of select query builder '{typeof(TSelect).ToPretty()}'.");
 		}
 
 		CompleteAutoOpenedParentheses();
 		if (_sumParentheses != 0 || _autoOpenedParentheses != 0)
 		{
-			throw new InvalidOperationException($"Incorrect condition definition of select query builder '{typeof(TDto).ToPretty()}'.");
+			throw new InvalidOperationException($"Incorrect condition definition of select query builder '{typeof(TSelect).ToPretty()}'.");
+		}
+
+		if (_containers == null || _containers.Count == 0)
+		{
+			return;
 		}
 
 		var containers = _containers ?? EmptyLists.Containers;
@@ -85,12 +83,12 @@ internal sealed class QBSelectBuilder<TDoc, TDto> : QBBuilder<TDoc, TDto>, IQBEf
 		var rootIndex = containers.FindIndex(x => x.ContainerOperation == ContainerOperations.Select);
 		if (rootIndex < 0)
 		{
-			throw new InvalidOperationException($"Incompatible configuration of select query builder '{typeof(TDto).ToPretty()}'.");
+			throw new InvalidOperationException($"Incompatible configuration of select query builder '{typeof(TSelect).ToPretty()}'.");
 		}
 
 		if (containers.Any(x => x.ContainerType != ContainerTypes.Table && x.ContainerType != ContainerTypes.View))
 		{
-			throw new InvalidOperationException($"Incompatible configuration of select query builder '{typeof(TDto).ToPretty()}'.");
+			throw new InvalidOperationException($"Incompatible configuration of select query builder '{typeof(TSelect).ToPretty()}'.");
 		}
 
 		QBContainer? top, bottom, temp;
@@ -108,7 +106,7 @@ internal sealed class QBSelectBuilder<TDoc, TDto> : QBBuilder<TDoc, TDto>, IQBEf
 		//
 		if (connects.Any(x => x.Alias == top.Alias))
 		{
-			throw new InvalidOperationException($"Incorrect definition of select query builder '{typeof(TDto).ToPretty()}'.");
+			throw new InvalidOperationException($"Incorrect definition of select query builder '{typeof(TSelect).ToPretty()}'.");
 		}
 
 		// Check for connect conditions.
@@ -124,14 +122,14 @@ internal sealed class QBSelectBuilder<TDoc, TDto> : QBBuilder<TDoc, TDto>, IQBEf
 			{
 				if (!connects.Any(x => x.IsConnectOnField && x.Alias == temp.Alias))
 				{
-					throw new InvalidOperationException($"Incorrect definition of select query builder '{typeof(TDto).ToPretty()}': JOIN (LEFT JOIN) has to have at least one connect condition on a field.");
+					throw new InvalidOperationException($"Incorrect definition of select query builder '{typeof(TSelect).ToPretty()}': JOIN (LEFT JOIN) has to have at least one connect condition on a field.");
 				}
 			}
 			else if (temp.ContainerOperation == ContainerOperations.CrossJoin)
 			{
 				if (connects.Any(x => x.IsConnectOnField && x.Alias == temp.Alias))
 				{
-					throw new InvalidOperationException($"Incorrect definition of select query builder '{typeof(TDto).ToPretty()}': CROSS JOIN cannot have connection conditions on fields.");
+					throw new InvalidOperationException($"Incorrect definition of select query builder '{typeof(TSelect).ToPretty()}': CROSS JOIN cannot have connection conditions on fields.");
 				}
 
 				containers.RemoveAt(i);
@@ -163,7 +161,7 @@ internal sealed class QBSelectBuilder<TDoc, TDto> : QBBuilder<TDoc, TDto>, IQBEf
 						// The signal for an infinite loop is the return of the container to its previous position
 						if (bottom == temp)
 						{
-							throw new InvalidOperationException($"Incorrect definition of select query builder '{typeof(TDto).ToPretty()}'.");
+							throw new InvalidOperationException($"Incorrect definition of select query builder '{typeof(TSelect).ToPretty()}'.");
 						}
 
 						containers.Swap(i, j);
@@ -174,7 +172,17 @@ internal sealed class QBSelectBuilder<TDoc, TDto> : QBBuilder<TDoc, TDto>, IQBEf
 		}
 	}
 
-	private QBSelectBuilder<TDoc, TDto> AddContainer(
+	protected override void OnPrepare()
+	{
+		base.OnPrepare();
+
+		if (Containers.Count == 0)
+		{
+			throw new InvalidOperationException($"Incompatible configuration of select query builder '{typeof(TSelect).ToPretty()}'.");
+		}
+	}
+
+	private SelectQBBuilder<TDoc, TSelect> AddContainer(
 		Type documentType,
 		string? alias,
 		string? dbSideName,
@@ -183,7 +191,7 @@ internal sealed class QBSelectBuilder<TDoc, TDto> : QBBuilder<TDoc, TDto>, IQBEf
 	{
 		if (_isByOr != null || _parentheses > 0)
 		{
-			throw new InvalidOperationException($"Incorrect condition definition of select query builder '{typeof(TDto).ToPretty()}'.");
+			throw new InvalidOperationException($"Incorrect condition definition of select query builder '{typeof(TSelect).ToPretty()}'.");
 		}
 
 		dbSideName ??= EfCoreDataLayer.Default.GetDefaultDBSideContainerName(documentType);
@@ -191,15 +199,15 @@ internal sealed class QBSelectBuilder<TDoc, TDto> : QBBuilder<TDoc, TDto>, IQBEf
 
 		if ((containerOperation & ContainerOperations.MainMask) != ContainerOperations.None && Containers.Any(x => x.ContainerOperation.HasFlag(ContainerOperations.MainMask)))
 		{
-			throw new InvalidOperationException($"Incorrect definition of select query builder '{typeof(TDto).ToPretty()}': another initial container has already been added before.");
+			throw new InvalidOperationException($"Incorrect definition of select query builder '{typeof(TSelect).ToPretty()}': another initial container has already been added before.");
 		}
 		if (alias.Contains('.'))
 		{
-			throw new InvalidOperationException($"Incorrect definition of select query builder '{typeof(TDto).ToPretty()}': container alias '{alias}' cannot contain a period character '.'.");
+			throw new InvalidOperationException($"Incorrect definition of select query builder '{typeof(TSelect).ToPretty()}': container alias '{alias}' cannot contain a period character '.'.");
 		}
 		if (Containers.Any(x => x.Alias == alias))
 		{
-			throw new InvalidOperationException($"Incorrect definition of select query builder '{typeof(TDto).ToPretty()}': initial container '{alias}' has already been added before.");
+			throw new InvalidOperationException($"Incorrect definition of select query builder '{typeof(TSelect).ToPretty()}': initial container '{alias}' has already been added before.");
 		}
 
 		if (_containers == null)
@@ -219,7 +227,7 @@ internal sealed class QBSelectBuilder<TDoc, TDto> : QBBuilder<TDoc, TDto>, IQBEf
 		return this;
 	}
 
-	private QBSelectBuilder<TDoc, TDto> AddCondition<TLocal, TRef>(
+	private SelectQBBuilder<TDoc, TSelect> AddCondition<TLocal, TRef>(
 		QBConditionFlags flags,
 		string? alias,
 		DEPathDefinition<TLocal> field,
@@ -240,7 +248,7 @@ internal sealed class QBSelectBuilder<TDoc, TDto> : QBBuilder<TDoc, TDto>, IQBEf
 			operation
 		);
 	}
-	private QBSelectBuilder<TDoc, TDto> AddCondition<TLocal, TRef>(
+	private SelectQBBuilder<TDoc, TSelect> AddCondition<TLocal, TRef>(
 		QBConditionFlags flags,
 		string? alias,
 		Expression<Func<TLocal, object?>> field,
@@ -261,7 +269,7 @@ internal sealed class QBSelectBuilder<TDoc, TDto> : QBBuilder<TDoc, TDto>, IQBEf
 			operation
 		);
 	}
-	private QBSelectBuilder<TDoc, TDto> AddCondition<TLocal, TRef>(
+	private SelectQBBuilder<TDoc, TSelect> AddCondition<TLocal, TRef>(
 		QBConditionFlags flags,
 		string? alias,
 		DEPath field,
@@ -271,14 +279,14 @@ internal sealed class QBSelectBuilder<TDoc, TDto> : QBBuilder<TDoc, TDto>, IQBEf
 		string? paramName,
 		FO operation)
 	{
-		var trueContainerType = typeof(TLocal) == typeof(TDto) ? typeof(TDoc) : typeof(TLocal);
+		var trueContainerType = typeof(TLocal) == typeof(TSelect) ? typeof(TDoc) : typeof(TLocal);
 		if (alias == null)
 		{
 			alias = Containers.Single(x => x.DocumentType == trueContainerType).Alias;
 		}
 		else if (!Containers.Any(x => x.Alias == alias && x.DocumentType == trueContainerType))
 		{
-			throw new InvalidOperationException($"Incorrect condition definition of select query builder '{typeof(TDto).ToPretty()}': referenced container '{alias}' of  document '{trueContainerType.ToPretty()}' has not been added yet.");
+			throw new InvalidOperationException($"Incorrect condition definition of select query builder '{typeof(TSelect).ToPretty()}': referenced container '{alias}' of  document '{trueContainerType.ToPretty()}' has not been added yet.");
 		}
 
 		if (field == null)
@@ -304,7 +312,7 @@ internal sealed class QBSelectBuilder<TDoc, TDto> : QBBuilder<TDoc, TDto>, IQBEf
 			}
 			else if (!Containers.Any(x => x.Alias == refAlias && x.DocumentType == typeof(TRef)))
 			{
-				throw new InvalidOperationException($"Incorrect condition definition of select query builder '{typeof(TDto).ToPretty()}': referenced container '{refAlias}' of  document '{typeof(TRef).ToPretty()}' has not been added yet.");
+				throw new InvalidOperationException($"Incorrect condition definition of select query builder '{typeof(TSelect).ToPretty()}': referenced container '{refAlias}' of  document '{typeof(TRef).ToPretty()}' has not been added yet.");
 			}
 
 			if (refField == null)
@@ -438,7 +446,7 @@ internal sealed class QBSelectBuilder<TDoc, TDto> : QBBuilder<TDoc, TDto>, IQBEf
 
 						if (_autoOpenedParentheses != 0 || cond.Parentheses < 0)
 						{
-							throw new InvalidOperationException($"Incorrect condition definition of select query builder '{typeof(TDto).ToPretty()}': messed up with automatically opening parentheses.");
+							throw new InvalidOperationException($"Incorrect condition definition of select query builder '{typeof(TSelect).ToPretty()}': messed up with automatically opening parentheses.");
 						}
 
 						_conditions[startIndex] = cond with { Parentheses = cond.Parentheses + 1 };
@@ -482,7 +490,7 @@ internal sealed class QBSelectBuilder<TDoc, TDto> : QBBuilder<TDoc, TDto>, IQBEf
 		return this;
 	}
 
-	private QBSelectBuilder<TDoc, TDto> AddParameter(string name, Type underlyingType, bool isNullable, System.Data.ParameterDirection direction)
+	private SelectQBBuilder<TDoc, TSelect> AddParameter(string name, Type underlyingType, bool isNullable, System.Data.ParameterDirection direction)
 	{
 		if (_parameters == null)
 		{
@@ -494,7 +502,7 @@ internal sealed class QBSelectBuilder<TDoc, TDto> : QBBuilder<TDoc, TDto>, IQBEf
 		{
 			if (param.ClrType != underlyingType || param.IsNullable != isNullable || param.Direction != direction)
 			{
-				throw new InvalidOperationException($"Incorrect parameter definition of select query builder '{typeof(TDto).ToPretty()}': parameter '{name}' has already been added before with different properties");
+				throw new InvalidOperationException($"Incorrect parameter definition of select query builder '{typeof(TSelect).ToPretty()}': parameter '{name}' has already been added before with different properties");
 			}
 		}
 		else
@@ -506,7 +514,7 @@ internal sealed class QBSelectBuilder<TDoc, TDto> : QBBuilder<TDoc, TDto>, IQBEf
 		return this;
 	}
 
-	private QBSelectBuilder<TDoc, TDto> AddInclude<TRef>(DEPathDefinition<TDto> field, string? refAlias, DEPathDefinition<TRef>? refField)
+	private SelectQBBuilder<TDoc, TSelect> AddInclude<TRef>(DEPathDefinition<TSelect> field, string? refAlias, DEPathDefinition<TRef>? refField)
 	{
 		return AddInclude<TRef>(
 			field.ToDataEntryPath(EfCoreDataLayer.Default),
@@ -514,24 +522,24 @@ internal sealed class QBSelectBuilder<TDoc, TDto> : QBBuilder<TDoc, TDto>, IQBEf
 			refField?.ToDataEntryPath(EfCoreDataLayer.Default)
 		);
 	}
-	private QBSelectBuilder<TDoc, TDto> AddInclude<TRef>(Expression<Func<TDto, object?>> field, string? refAlias, Expression<Func<TRef, object?>> refField)
+	private SelectQBBuilder<TDoc, TSelect> AddInclude<TRef>(Expression<Func<TSelect, object?>> field, string? refAlias, Expression<Func<TRef, object?>> refField)
 	{
 		return AddInclude<TRef>(
 			new DEPath(field, false, EfCoreDataLayer.Default),
 			refAlias, refField != null ? new DEPath(refField, true, EfCoreDataLayer.Default) : null
 		);
 	}
-	private QBSelectBuilder<TDoc, TDto> AddInclude<TRef>(DEPath field, string? refAlias, DEPath? refField)
+	private SelectQBBuilder<TDoc, TSelect> AddInclude<TRef>(DEPath field, string? refAlias, DEPath? refField)
 	{
 		if (_isByOr != null || _parentheses > 0)
 		{
-			throw new InvalidOperationException($"Incorrect condition definition of select query builder '{typeof(TDto).ToPretty()}'.");
+			throw new InvalidOperationException($"Incorrect condition definition of select query builder '{typeof(TSelect).ToPretty()}'.");
 		}
 		if (field == null)
 		{
 			throw new ArgumentNullException(nameof(field));
 		}
-		if (field.Count == 0 || field.DocumentType != typeof(TDto))
+		if (field.Count == 0 || field.DocumentType != typeof(TSelect))
 		{
 			throw new ArgumentException(nameof(field));
 		}
@@ -550,7 +558,7 @@ internal sealed class QBSelectBuilder<TDoc, TDto> : QBBuilder<TDoc, TDto>, IQBEf
 		}
 		else if (!Containers.Any(x => x.Alias == refAlias && x.DocumentType == typeof(TRef)))
 		{
-			throw new InvalidOperationException($"Incorrect field definition of select query builder '{typeof(TDto).ToPretty()}': referenced container '{refAlias}' of  document '{typeof(TRef).ToPretty()}' has not been added yet.");
+			throw new InvalidOperationException($"Incorrect field definition of select query builder '{typeof(TSelect).ToPretty()}': referenced container '{refAlias}' of  document '{typeof(TRef).ToPretty()}' has not been added yet.");
 		}
 
 
@@ -561,7 +569,7 @@ internal sealed class QBSelectBuilder<TDoc, TDto> : QBBuilder<TDoc, TDto>, IQBEf
 
 		if (_fields.Any(x => x.Field.Path == field.Path))
 		{
-			throw new InvalidOperationException($"Incorrect field definition of select query builder '{typeof(TDto).ToPretty()}': field {field.Path} has already been included/excluded before.");
+			throw new InvalidOperationException($"Incorrect field definition of select query builder '{typeof(TSelect).ToPretty()}': field {field.Path} has already been included/excluded before.");
 		}
 
 		IsNormalized = false;
@@ -575,19 +583,19 @@ internal sealed class QBSelectBuilder<TDoc, TDto> : QBBuilder<TDoc, TDto>, IQBEf
 		return this;
 	}
 	
-	private QBSelectBuilder<TDoc, TDto> AddExclude(DEPathDefinition<TDto> field, bool optional)
+	private SelectQBBuilder<TDoc, TSelect> AddExclude(DEPathDefinition<TSelect> field, bool optional)
 	{
 		return AddExclude(field.ToDataEntryPath(EfCoreDataLayer.Default), optional);
 	}
-	private QBSelectBuilder<TDoc, TDto> AddExclude(Expression<Func<TDto, object?>> field, bool optional)
+	private SelectQBBuilder<TDoc, TSelect> AddExclude(Expression<Func<TSelect, object?>> field, bool optional)
 	{
 		return AddExclude(new DEPath(field, false, EfCoreDataLayer.Default), optional);
 	}
-	private QBSelectBuilder<TDoc, TDto> AddExclude(DEPath field, bool optional)
+	private SelectQBBuilder<TDoc, TSelect> AddExclude(DEPath field, bool optional)
 	{
 		if (_isByOr != null || _parentheses > 0)
 		{
-			throw new InvalidOperationException($"Incorrect condition definition of select query builder '{typeof(TDto).ToPretty()}'.");
+			throw new InvalidOperationException($"Incorrect condition definition of select query builder '{typeof(TSelect).ToPretty()}'.");
 		}
 		if (field == null)
 		{
@@ -601,7 +609,7 @@ internal sealed class QBSelectBuilder<TDoc, TDto> : QBBuilder<TDoc, TDto>, IQBEf
 
 		if (_fields.Any(x => x.Field.Path == field.Path))
 		{
-			throw new InvalidOperationException($"Incorrect field definition of select query builder '{typeof(TDto).ToPretty()}': field '{field.Path}' has already been included/excluded before.");
+			throw new InvalidOperationException($"Incorrect field definition of select query builder '{typeof(TSelect).ToPretty()}': field '{field.Path}' has already been included/excluded before.");
 		}
 
 		IsNormalized = false;
@@ -615,15 +623,15 @@ internal sealed class QBSelectBuilder<TDoc, TDto> : QBBuilder<TDoc, TDto>, IQBEf
 		return this;
 	}
 
-	private QBSelectBuilder<TDoc, TDto> AddSortBy<TLocal>(string? alias, DEPathDefinition<TLocal> field, SO sortOrder)
+	private SelectQBBuilder<TDoc, TSelect> AddSortBy<TLocal>(string? alias, DEPathDefinition<TLocal> field, SO sortOrder)
 	{
 		return AddSortBy<TLocal>(alias, field.ToDataEntryPath(EfCoreDataLayer.Default), sortOrder);
 	}
-	private QBSelectBuilder<TDoc, TDto> AddSortBy<TLocal>(string? alias, Expression<Func<TLocal, object?>> field, SO sortOrder)
+	private SelectQBBuilder<TDoc, TSelect> AddSortBy<TLocal>(string? alias, Expression<Func<TLocal, object?>> field, SO sortOrder)
 	{
 		return AddSortBy<TLocal>(alias, new DEPath(field, false, EfCoreDataLayer.Default), sortOrder);
 	}
-	private QBSelectBuilder<TDoc, TDto> AddSortBy<TLocal>(string? alias, DEPath field, SO sortOrder)
+	private SelectQBBuilder<TDoc, TSelect> AddSortBy<TLocal>(string? alias, DEPath field, SO sortOrder)
 	{
 		if (field == null)
 		{
@@ -631,7 +639,7 @@ internal sealed class QBSelectBuilder<TDoc, TDto> : QBBuilder<TDoc, TDto>, IQBEf
 		}
 		if (string.IsNullOrEmpty(alias))
 		{
-			if (typeof(TLocal) != typeof(TDto))
+			if (typeof(TLocal) != typeof(TSelect))
 			{
 				throw new ArgumentNullException(nameof(alias));
 			}
@@ -640,7 +648,7 @@ internal sealed class QBSelectBuilder<TDoc, TDto> : QBBuilder<TDoc, TDto>, IQBEf
 		}
 		else if (!Containers.Any(x => x.Alias == alias && x.DocumentType == typeof(TLocal)))
 		{
-			throw new InvalidOperationException($"Incorrect sort order definition of select query builder '{typeof(TDto).ToPretty()}': referenced container '{alias}' of  document '{typeof(TLocal).ToPretty()}' has not been added yet.");
+			throw new InvalidOperationException($"Incorrect sort order definition of select query builder '{typeof(TSelect).ToPretty()}': referenced container '{alias}' of  document '{typeof(TLocal).ToPretty()}' has not been added yet.");
 		}
 		
 		if (_sortOrders == null)
@@ -650,7 +658,7 @@ internal sealed class QBSelectBuilder<TDoc, TDto> : QBBuilder<TDoc, TDto>, IQBEf
 
 		if (_sortOrders.Any(x => x.Alias == alias && x.Field.Path == field.Path))
 		{
-			throw new InvalidOperationException($"Incorrect sort order definition of select query builder '{typeof(TDto).ToPretty()}': field '{field.Path}' already has a sort order.");
+			throw new InvalidOperationException($"Incorrect sort order definition of select query builder '{typeof(TSelect).ToPretty()}': field '{field.Path}' already has a sort order.");
 		}
 
 		IsNormalized = false;
@@ -659,118 +667,135 @@ internal sealed class QBSelectBuilder<TDoc, TDto> : QBBuilder<TDoc, TDto>, IQBEf
 		return this;
 	}
 
-	public override QBBuilder<TDoc, TDto> Select(string? tableName = null, string? alias = null)
-		=> AddContainer(typeof(TDoc), alias, tableName, ContainerTypes.Table, ContainerOperations.Select);
-	IQBEfCoreSelectBuilder<TDoc, TDto> IQBEfCoreSelectBuilder<TDoc, TDto>.Select(string? tableName, string? alias)
-		=> AddContainer(typeof(TDoc), alias, tableName, ContainerTypes.Table, ContainerOperations.Select);
-
-	public override QBBuilder<TDoc, TDto> LeftJoin<TRef>(string? tableName = null, string? alias = null)
-		=> AddContainer(typeof(TRef), alias, tableName, ContainerTypes.Table, ContainerOperations.LeftJoin);
-	IQBEfCoreSelectBuilder<TDoc, TDto> IQBEfCoreSelectBuilder<TDoc, TDto>.LeftJoin<TRef>(string? tableName, string? alias)
-		=> AddContainer(typeof(TRef), alias, tableName, ContainerTypes.Table, ContainerOperations.LeftJoin);
-
-	public override QBBuilder<TDoc, TDto> Join<TRef>(string? tableName = null, string? alias = null)
-		=> AddContainer(typeof(TRef), alias, tableName, ContainerTypes.Table, ContainerOperations.Join);
-	IQBEfCoreSelectBuilder<TDoc, TDto> IQBEfCoreSelectBuilder<TDoc, TDto>.Join<TRef>(string? tableName, string? alias)
-		=> AddContainer(typeof(TRef), alias, tableName, ContainerTypes.Table, ContainerOperations.Join);
-
-	public override QBBuilder<TDoc, TDto> CrossJoin<TRef>(string? tableName = null, string? alias = null)
-		=> AddContainer(typeof(TRef), alias, tableName, ContainerTypes.Table, ContainerOperations.CrossJoin);
-	IQBEfCoreSelectBuilder<TDoc, TDto> IQBEfCoreSelectBuilder<TDoc, TDto>.CrossJoin<TRef>(string? tableName, string? alias)
-		=> AddContainer(typeof(TRef), alias, tableName, ContainerTypes.Table, ContainerOperations.CrossJoin);
-
-	public override QBBuilder<TDoc, TDto> Connect<TLocal, TRef>(Expression<Func<TLocal, object?>> field, Expression<Func<TRef, object?>> refField, FO operation)
-		=> AddCondition<TLocal, TRef>(QBConditionFlags.IsConnect | QBConditionFlags.OnField, null, field, null, refField, null, null, operation);
-	public override QBBuilder<TDoc, TDto> Connect<TLocal, TRef>(DEPathDefinition<TLocal> field, DEPathDefinition<TRef> refField, FO operation)
-		=> AddCondition<TLocal, TRef>(QBConditionFlags.IsConnect | QBConditionFlags.OnField, null, field, null, refField, null, null, operation);
-	IQBEfCoreSelectBuilder<TDoc, TDto> IQBEfCoreSelectBuilder<TDoc, TDto>.Connect<TLocal, TRef>(Expression<Func<TLocal, object?>> field, Expression<Func<TRef, object?>> refField, FO operation)
-		=> AddCondition<TLocal, TRef>(QBConditionFlags.IsConnect | QBConditionFlags.OnField, null, field, null, refField, null, null, operation);
-	public override QBBuilder<TDoc, TDto> Connect<TLocal, TRef>(string alias, Expression<Func<TLocal, object?>> field, string refAlias, Expression<Func<TRef, object?>> refField, FO operation)
-		=> AddCondition<TLocal, TRef>(QBConditionFlags.IsConnect | QBConditionFlags.OnField, alias, field, refAlias, refField, null, null, operation);
-	public override QBBuilder<TDoc, TDto> Connect<TLocal, TRef>(string alias, DEPathDefinition<TLocal> field, string refAlias, DEPathDefinition<TRef> refField, FO operation)
-		=> AddCondition<TLocal, TRef>(QBConditionFlags.IsConnect | QBConditionFlags.OnField, alias, field, refAlias, refField, null, null, operation);
-	IQBEfCoreSelectBuilder<TDoc, TDto> IQBEfCoreSelectBuilder<TDoc, TDto>.Connect<TLocal, TRef>(string alias, Expression<Func<TLocal, object?>> field, string refAlias, Expression<Func<TRef, object?>> refField, FO operation)
-		=> AddCondition<TLocal, TRef>(QBConditionFlags.IsConnect | QBConditionFlags.OnField, alias, field, refAlias, refField, null, null, operation);
-	public override QBBuilder<TDoc, TDto> Connect<TLocal>(Expression<Func<TLocal, object?>> field, object? constValue, FO operation)
-		=> AddCondition<TLocal, NotSupported>(QBConditionFlags.IsConnect | QBConditionFlags.OnConst, null, field, null, null, constValue, null, operation);
-	public override QBBuilder<TDoc, TDto> Connect<TLocal>(DEPathDefinition<TLocal> field, object? constValue, FO operation)
-		=> AddCondition<TLocal, NotSupported>(QBConditionFlags.IsConnect | QBConditionFlags.OnConst, null, field, null, null, constValue, null, operation);
-	IQBEfCoreSelectBuilder<TDoc, TDto> IQBEfCoreSelectBuilder<TDoc, TDto>.Connect<TLocal>(Expression<Func<TLocal, object?>> field, object? constValue, FO operation)
-		=> AddCondition<TLocal, NotSupported>(QBConditionFlags.IsConnect | QBConditionFlags.OnConst, null, field, null, null, constValue, null, operation);
-	public override QBBuilder<TDoc, TDto> Connect<TLocal>(string alias, Expression<Func<TLocal, object?>> field, object? constValue, FO operation)
-		=> AddCondition<TLocal, NotSupported>(QBConditionFlags.IsConnect | QBConditionFlags.OnConst, alias, field, null, null, constValue, null, operation);
-	public override QBBuilder<TDoc, TDto> Connect<TLocal>(string alias, DEPathDefinition<TLocal> field, object? constValue, FO operation)
-		=> AddCondition<TLocal, NotSupported>(QBConditionFlags.IsConnect | QBConditionFlags.OnConst, alias, field, null, null, constValue, null, operation);
-	IQBEfCoreSelectBuilder<TDoc, TDto> IQBEfCoreSelectBuilder<TDoc, TDto>.Connect<TLocal>(string alias, Expression<Func<TLocal, object?>> field, object? constValue, FO operation)
-		=> AddCondition<TLocal, NotSupported>(QBConditionFlags.IsConnect | QBConditionFlags.OnConst, alias, field, null, null, constValue, null, operation);
-	public override QBBuilder<TDoc, TDto> Connect<TLocal>(Expression<Func<TLocal, object?>> field, FO operation, string paramName)
-		=> AddCondition<TLocal, NotSupported>(QBConditionFlags.IsConnect | QBConditionFlags.OnParam, null, field, null, null, null, paramName, operation);
-	public override QBBuilder<TDoc, TDto> Connect<TLocal>(DEPathDefinition<TLocal> field, FO operation, string paramName)
-		=> AddCondition<TLocal, NotSupported>(QBConditionFlags.IsConnect | QBConditionFlags.OnParam, null, field, null, null, null, paramName, operation);
-	IQBEfCoreSelectBuilder<TDoc, TDto> IQBEfCoreSelectBuilder<TDoc, TDto>.Connect<TLocal>(Expression<Func<TLocal, object?>> field, FO operation, string paramName)
-		=> AddCondition<TLocal, NotSupported>(QBConditionFlags.IsConnect | QBConditionFlags.OnParam, null, field, null, null, null, paramName, operation);
-	public override QBBuilder<TDoc, TDto> Connect<TLocal>(string alias, Expression<Func<TLocal, object?>> field, FO operation, string paramName)
-		=> AddCondition<TLocal, NotSupported>(QBConditionFlags.IsConnect | QBConditionFlags.OnParam, alias, field, null, null, null, paramName, operation);
-	public override QBBuilder<TDoc, TDto> Connect<TLocal>(string alias, DEPathDefinition<TLocal> field, FO operation, string paramName)
-		=> AddCondition<TLocal, NotSupported>(QBConditionFlags.IsConnect | QBConditionFlags.OnParam, alias, field, null, null, null, paramName, operation);
-	IQBEfCoreSelectBuilder<TDoc, TDto> IQBEfCoreSelectBuilder<TDoc, TDto>.Connect<TLocal>(string alias, Expression<Func<TLocal, object?>> field, FO operation, string paramName)
-		=> AddCondition<TLocal, NotSupported>(QBConditionFlags.IsConnect | QBConditionFlags.OnParam, alias, field, null, null, null, paramName, operation);
-
-	public override QBBuilder<TDoc, TDto> Condition<TLocal, TRef>(Expression<Func<TLocal, object?>> field, Expression<Func<TRef, object?>> refField, FO operation)
-		=> AddCondition<TLocal, TRef>(QBConditionFlags.OnField, null, field, null, refField, null, null, operation);
-	public override QBBuilder<TDoc, TDto> Condition<TLocal, TRef>(DEPathDefinition<TLocal> field, DEPathDefinition<TRef> refField, FO operation)
-		=> AddCondition<TLocal, TRef>(QBConditionFlags.OnField, null, field, null, refField, null, null, operation);
-	IQBEfCoreSelectBuilder<TDoc, TDto> IQBEfCoreSelectBuilder<TDoc, TDto>.Condition<TLocal, TRef>(Expression<Func<TLocal, object?>> field, Expression<Func<TRef, object?>> refField, FO operation)
-		=> AddCondition<TLocal, TRef>(QBConditionFlags.OnField, null, field, null, refField, null, null, operation);
-	public override QBBuilder<TDoc, TDto> Condition<TLocal, TRef>(string alias, Expression<Func<TLocal, object?>> field, string refAlias, Expression<Func<TRef, object?>> refField, FO operation)
-		=> AddCondition<TLocal, TRef>(QBConditionFlags.OnField, alias, field, refAlias, refField, null, null, operation);
-	public override QBBuilder<TDoc, TDto> Condition<TLocal, TRef>(string alias, DEPathDefinition<TLocal> field, string refAlias, DEPathDefinition<TRef> refField, FO operation)
-		=> AddCondition<TLocal, TRef>(QBConditionFlags.OnField, alias, field, refAlias, refField, null, null, operation);
-	IQBEfCoreSelectBuilder<TDoc, TDto> IQBEfCoreSelectBuilder<TDoc, TDto>.Condition<TLocal, TRef>(string alias, Expression<Func<TLocal, object?>> field, string refAlias, Expression<Func<TRef, object?>> refField, FO operation)
-		=> AddCondition<TLocal, TRef>(QBConditionFlags.OnField, alias, field, refAlias, refField, null, null, operation);
-	public override QBBuilder<TDoc, TDto> Condition<TLocal>(Expression<Func<TLocal, object?>> field, object? constValue, FO operation)
-		=> AddCondition<TLocal, NotSupported>(QBConditionFlags.OnConst, null, field, null, null, constValue, null, operation);
-	public override QBBuilder<TDoc, TDto> Condition<TLocal>(DEPathDefinition<TLocal> field, object? constValue, FO operation)
-		=> AddCondition<TLocal, NotSupported>(QBConditionFlags.OnConst, null, field, null, null, constValue, null, operation);
-	IQBEfCoreSelectBuilder<TDoc, TDto> IQBEfCoreSelectBuilder<TDoc, TDto>.Condition<TLocal>(Expression<Func<TLocal, object?>> field, object? constValue, FO operation)
-		=> AddCondition<TLocal, NotSupported>(QBConditionFlags.OnConst, null, field, null, null, constValue, null, operation);
-	public override QBBuilder<TDoc, TDto> Condition<TLocal>(string alias, Expression<Func<TLocal, object?>> field, object? constValue, FO operation)
-		=> AddCondition<TLocal, NotSupported>(QBConditionFlags.OnConst, alias, field, null, null, constValue, null, operation);
-	public override QBBuilder<TDoc, TDto> Condition<TLocal>(string alias, DEPathDefinition<TLocal> field, object? constValue, FO operation)
-		=> AddCondition<TLocal, NotSupported>(QBConditionFlags.OnConst, alias, field, null, null, constValue, null, operation);
-	IQBEfCoreSelectBuilder<TDoc, TDto> IQBEfCoreSelectBuilder<TDoc, TDto>.Condition<TLocal>(string alias, Expression<Func<TLocal, object?>> field, object? constValue, FO operation)
-		=> AddCondition<TLocal, NotSupported>(QBConditionFlags.OnConst, alias, field, null, null, constValue, null, operation);
-	public override QBBuilder<TDoc, TDto> Condition<TLocal>(Expression<Func<TLocal, object?>> field, FO operation, string paramName)
-		=> AddCondition<TLocal, NotSupported>(QBConditionFlags.OnParam, null, field, null, null, null, paramName, operation);
-	public override QBBuilder<TDoc, TDto> Condition<TLocal>(DEPathDefinition<TLocal> field, FO operation, string paramName)
-		=> AddCondition<TLocal, NotSupported>(QBConditionFlags.OnParam, null, field, null, null, null, paramName, operation);
-	IQBEfCoreSelectBuilder<TDoc, TDto> IQBEfCoreSelectBuilder<TDoc, TDto>.Condition<TLocal>(Expression<Func<TLocal, object?>> field, FO operation, string paramName)
-		=> AddCondition<TLocal, NotSupported>(QBConditionFlags.OnParam, null, field, null, null, null, paramName, operation);
-	public override QBBuilder<TDoc, TDto> Condition<TLocal>(string alias, Expression<Func<TLocal, object?>> field, FO operation, string paramName)
-		=> AddCondition<TLocal, NotSupported>(QBConditionFlags.OnParam, alias, field, null, null, null, paramName, operation);
-	public override QBBuilder<TDoc, TDto> Condition<TLocal>(string alias, DEPathDefinition<TLocal> field, FO operation, string paramName)
-		=> AddCondition<TLocal, NotSupported>(QBConditionFlags.OnParam, alias, field, null, null, null, paramName, operation);
-	IQBEfCoreSelectBuilder<TDoc, TDto> IQBEfCoreSelectBuilder<TDoc, TDto>.Condition<TLocal>(string alias, Expression<Func<TLocal, object?>> field, FO operation, string paramName)
-		=> AddCondition<TLocal, NotSupported>(QBConditionFlags.OnParam, alias, field, null, null, null, paramName, operation);
-	public override QBBuilder<TDoc, TDto> Condition(Expression<Func<TDoc, object?>> field, object? constValue, FO operation)
-		=> AddCondition<TDoc, NotSupported>(QBConditionFlags.OnConst, null, field, null, null, constValue, null, operation);
-	public override QBBuilder<TDoc, TDto> Condition(DEPathDefinition<TDoc> field, object? constValue, FO operation)
-		=> AddCondition<TDoc, NotSupported>(QBConditionFlags.OnConst, null, field, null, null, constValue, null, operation);
-	IQBEfCoreSelectBuilder<TDoc, TDto> IQBEfCoreSelectBuilder<TDoc, TDto>.Condition(Expression<Func<TDoc, object?>> field, object? constValue, FO operation)
-		=> AddCondition<TDoc, NotSupported>(QBConditionFlags.OnConst, null, field, null, null, constValue, null, operation);
-	public override QBBuilder<TDoc, TDto> Condition(Expression<Func<TDoc, object?>> field, FO operation, string paramName)
-		=> AddCondition<TDoc, NotSupported>(QBConditionFlags.OnParam, null, field, null, null, null, paramName, operation);
-	public override QBBuilder<TDoc, TDto> Condition(DEPathDefinition<TDoc> field, FO operation, string paramName)
-		=> AddCondition<TDoc, NotSupported>(QBConditionFlags.OnParam, null, field, null, null, null, paramName, operation);
-	IQBEfCoreSelectBuilder<TDoc, TDto> IQBEfCoreSelectBuilder<TDoc, TDto>.Condition(Expression<Func<TDoc, object?>> field, FO operation, string paramName)
-		=> AddCondition<TDoc, NotSupported>(QBConditionFlags.OnParam, null, field, null, null, null, paramName, operation);
-
-	public override QBBuilder<TDoc, TDto> Begin()
+	public override QBBuilder<TDoc, TSelect> AutoBuild(string? tableName = null)
 	{
-		((IQBEfCoreSelectBuilder<TDoc, TDto>)this).Begin();
+		if (Containers.Count > 0)
+		{
+			throw new InvalidOperationException($"Select query builder '{typeof(TSelect).ToPretty()}' has already been initialized.");
+		}
+
+		Select(tableName);
+
 		return this;
 	}
-	IQBEfCoreSelectBuilder<TDoc, TDto> IQBEfCoreSelectBuilder<TDoc, TDto>.Begin()
+	IEfCoreSelectQBBuilder<TDoc, TSelect> IEfCoreSelectQBBuilder<TDoc, TSelect>.AutoBuild(string? tableName)
+	{
+		AutoBuild(tableName);
+		return this;
+	}
+
+	public override QBBuilder<TDoc, TSelect> Select(string? tableName = null, string? alias = null)
+		=> AddContainer(typeof(TDoc), alias, tableName, ContainerTypes.Table, ContainerOperations.Select);
+	IEfCoreSelectQBBuilder<TDoc, TSelect> IEfCoreSelectQBBuilder<TDoc, TSelect>.Select(string? tableName, string? alias)
+		=> AddContainer(typeof(TDoc), alias, tableName, ContainerTypes.Table, ContainerOperations.Select);
+
+	public override QBBuilder<TDoc, TSelect> LeftJoin<TRef>(string? tableName = null, string? alias = null)
+		=> AddContainer(typeof(TRef), alias, tableName, ContainerTypes.Table, ContainerOperations.LeftJoin);
+	IEfCoreSelectQBBuilder<TDoc, TSelect> IEfCoreSelectQBBuilder<TDoc, TSelect>.LeftJoin<TRef>(string? tableName, string? alias)
+		=> AddContainer(typeof(TRef), alias, tableName, ContainerTypes.Table, ContainerOperations.LeftJoin);
+
+	public override QBBuilder<TDoc, TSelect> Join<TRef>(string? tableName = null, string? alias = null)
+		=> AddContainer(typeof(TRef), alias, tableName, ContainerTypes.Table, ContainerOperations.Join);
+	IEfCoreSelectQBBuilder<TDoc, TSelect> IEfCoreSelectQBBuilder<TDoc, TSelect>.Join<TRef>(string? tableName, string? alias)
+		=> AddContainer(typeof(TRef), alias, tableName, ContainerTypes.Table, ContainerOperations.Join);
+
+	public override QBBuilder<TDoc, TSelect> CrossJoin<TRef>(string? tableName = null, string? alias = null)
+		=> AddContainer(typeof(TRef), alias, tableName, ContainerTypes.Table, ContainerOperations.CrossJoin);
+	IEfCoreSelectQBBuilder<TDoc, TSelect> IEfCoreSelectQBBuilder<TDoc, TSelect>.CrossJoin<TRef>(string? tableName, string? alias)
+		=> AddContainer(typeof(TRef), alias, tableName, ContainerTypes.Table, ContainerOperations.CrossJoin);
+
+	public override QBBuilder<TDoc, TSelect> Connect<TLocal, TRef>(Expression<Func<TLocal, object?>> field, Expression<Func<TRef, object?>> refField, FO operation)
+		=> AddCondition<TLocal, TRef>(QBConditionFlags.IsConnect | QBConditionFlags.OnField, null, field, null, refField, null, null, operation);
+	public override QBBuilder<TDoc, TSelect> Connect<TLocal, TRef>(DEPathDefinition<TLocal> field, DEPathDefinition<TRef> refField, FO operation)
+		=> AddCondition<TLocal, TRef>(QBConditionFlags.IsConnect | QBConditionFlags.OnField, null, field, null, refField, null, null, operation);
+	IEfCoreSelectQBBuilder<TDoc, TSelect> IEfCoreSelectQBBuilder<TDoc, TSelect>.Connect<TLocal, TRef>(Expression<Func<TLocal, object?>> field, Expression<Func<TRef, object?>> refField, FO operation)
+		=> AddCondition<TLocal, TRef>(QBConditionFlags.IsConnect | QBConditionFlags.OnField, null, field, null, refField, null, null, operation);
+	public override QBBuilder<TDoc, TSelect> Connect<TLocal, TRef>(string alias, Expression<Func<TLocal, object?>> field, string refAlias, Expression<Func<TRef, object?>> refField, FO operation)
+		=> AddCondition<TLocal, TRef>(QBConditionFlags.IsConnect | QBConditionFlags.OnField, alias, field, refAlias, refField, null, null, operation);
+	public override QBBuilder<TDoc, TSelect> Connect<TLocal, TRef>(string alias, DEPathDefinition<TLocal> field, string refAlias, DEPathDefinition<TRef> refField, FO operation)
+		=> AddCondition<TLocal, TRef>(QBConditionFlags.IsConnect | QBConditionFlags.OnField, alias, field, refAlias, refField, null, null, operation);
+	IEfCoreSelectQBBuilder<TDoc, TSelect> IEfCoreSelectQBBuilder<TDoc, TSelect>.Connect<TLocal, TRef>(string alias, Expression<Func<TLocal, object?>> field, string refAlias, Expression<Func<TRef, object?>> refField, FO operation)
+		=> AddCondition<TLocal, TRef>(QBConditionFlags.IsConnect | QBConditionFlags.OnField, alias, field, refAlias, refField, null, null, operation);
+	public override QBBuilder<TDoc, TSelect> Connect<TLocal>(Expression<Func<TLocal, object?>> field, object? constValue, FO operation)
+		=> AddCondition<TLocal, NotSupported>(QBConditionFlags.IsConnect | QBConditionFlags.OnConst, null, field, null, null, constValue, null, operation);
+	public override QBBuilder<TDoc, TSelect> Connect<TLocal>(DEPathDefinition<TLocal> field, object? constValue, FO operation)
+		=> AddCondition<TLocal, NotSupported>(QBConditionFlags.IsConnect | QBConditionFlags.OnConst, null, field, null, null, constValue, null, operation);
+	IEfCoreSelectQBBuilder<TDoc, TSelect> IEfCoreSelectQBBuilder<TDoc, TSelect>.Connect<TLocal>(Expression<Func<TLocal, object?>> field, object? constValue, FO operation)
+		=> AddCondition<TLocal, NotSupported>(QBConditionFlags.IsConnect | QBConditionFlags.OnConst, null, field, null, null, constValue, null, operation);
+	public override QBBuilder<TDoc, TSelect> Connect<TLocal>(string alias, Expression<Func<TLocal, object?>> field, object? constValue, FO operation)
+		=> AddCondition<TLocal, NotSupported>(QBConditionFlags.IsConnect | QBConditionFlags.OnConst, alias, field, null, null, constValue, null, operation);
+	public override QBBuilder<TDoc, TSelect> Connect<TLocal>(string alias, DEPathDefinition<TLocal> field, object? constValue, FO operation)
+		=> AddCondition<TLocal, NotSupported>(QBConditionFlags.IsConnect | QBConditionFlags.OnConst, alias, field, null, null, constValue, null, operation);
+	IEfCoreSelectQBBuilder<TDoc, TSelect> IEfCoreSelectQBBuilder<TDoc, TSelect>.Connect<TLocal>(string alias, Expression<Func<TLocal, object?>> field, object? constValue, FO operation)
+		=> AddCondition<TLocal, NotSupported>(QBConditionFlags.IsConnect | QBConditionFlags.OnConst, alias, field, null, null, constValue, null, operation);
+	public override QBBuilder<TDoc, TSelect> Connect<TLocal>(Expression<Func<TLocal, object?>> field, FO operation, string paramName)
+		=> AddCondition<TLocal, NotSupported>(QBConditionFlags.IsConnect | QBConditionFlags.OnParam, null, field, null, null, null, paramName, operation);
+	public override QBBuilder<TDoc, TSelect> Connect<TLocal>(DEPathDefinition<TLocal> field, FO operation, string paramName)
+		=> AddCondition<TLocal, NotSupported>(QBConditionFlags.IsConnect | QBConditionFlags.OnParam, null, field, null, null, null, paramName, operation);
+	IEfCoreSelectQBBuilder<TDoc, TSelect> IEfCoreSelectQBBuilder<TDoc, TSelect>.Connect<TLocal>(Expression<Func<TLocal, object?>> field, FO operation, string paramName)
+		=> AddCondition<TLocal, NotSupported>(QBConditionFlags.IsConnect | QBConditionFlags.OnParam, null, field, null, null, null, paramName, operation);
+	public override QBBuilder<TDoc, TSelect> Connect<TLocal>(string alias, Expression<Func<TLocal, object?>> field, FO operation, string paramName)
+		=> AddCondition<TLocal, NotSupported>(QBConditionFlags.IsConnect | QBConditionFlags.OnParam, alias, field, null, null, null, paramName, operation);
+	public override QBBuilder<TDoc, TSelect> Connect<TLocal>(string alias, DEPathDefinition<TLocal> field, FO operation, string paramName)
+		=> AddCondition<TLocal, NotSupported>(QBConditionFlags.IsConnect | QBConditionFlags.OnParam, alias, field, null, null, null, paramName, operation);
+	IEfCoreSelectQBBuilder<TDoc, TSelect> IEfCoreSelectQBBuilder<TDoc, TSelect>.Connect<TLocal>(string alias, Expression<Func<TLocal, object?>> field, FO operation, string paramName)
+		=> AddCondition<TLocal, NotSupported>(QBConditionFlags.IsConnect | QBConditionFlags.OnParam, alias, field, null, null, null, paramName, operation);
+
+	public override QBBuilder<TDoc, TSelect> Condition<TLocal, TRef>(Expression<Func<TLocal, object?>> field, Expression<Func<TRef, object?>> refField, FO operation)
+		=> AddCondition<TLocal, TRef>(QBConditionFlags.OnField, null, field, null, refField, null, null, operation);
+	public override QBBuilder<TDoc, TSelect> Condition<TLocal, TRef>(DEPathDefinition<TLocal> field, DEPathDefinition<TRef> refField, FO operation)
+		=> AddCondition<TLocal, TRef>(QBConditionFlags.OnField, null, field, null, refField, null, null, operation);
+	IEfCoreSelectQBBuilder<TDoc, TSelect> IEfCoreSelectQBBuilder<TDoc, TSelect>.Condition<TLocal, TRef>(Expression<Func<TLocal, object?>> field, Expression<Func<TRef, object?>> refField, FO operation)
+		=> AddCondition<TLocal, TRef>(QBConditionFlags.OnField, null, field, null, refField, null, null, operation);
+	public override QBBuilder<TDoc, TSelect> Condition<TLocal, TRef>(string alias, Expression<Func<TLocal, object?>> field, string refAlias, Expression<Func<TRef, object?>> refField, FO operation)
+		=> AddCondition<TLocal, TRef>(QBConditionFlags.OnField, alias, field, refAlias, refField, null, null, operation);
+	public override QBBuilder<TDoc, TSelect> Condition<TLocal, TRef>(string alias, DEPathDefinition<TLocal> field, string refAlias, DEPathDefinition<TRef> refField, FO operation)
+		=> AddCondition<TLocal, TRef>(QBConditionFlags.OnField, alias, field, refAlias, refField, null, null, operation);
+	IEfCoreSelectQBBuilder<TDoc, TSelect> IEfCoreSelectQBBuilder<TDoc, TSelect>.Condition<TLocal, TRef>(string alias, Expression<Func<TLocal, object?>> field, string refAlias, Expression<Func<TRef, object?>> refField, FO operation)
+		=> AddCondition<TLocal, TRef>(QBConditionFlags.OnField, alias, field, refAlias, refField, null, null, operation);
+	public override QBBuilder<TDoc, TSelect> Condition<TLocal>(Expression<Func<TLocal, object?>> field, object? constValue, FO operation)
+		=> AddCondition<TLocal, NotSupported>(QBConditionFlags.OnConst, null, field, null, null, constValue, null, operation);
+	public override QBBuilder<TDoc, TSelect> Condition<TLocal>(DEPathDefinition<TLocal> field, object? constValue, FO operation)
+		=> AddCondition<TLocal, NotSupported>(QBConditionFlags.OnConst, null, field, null, null, constValue, null, operation);
+	IEfCoreSelectQBBuilder<TDoc, TSelect> IEfCoreSelectQBBuilder<TDoc, TSelect>.Condition<TLocal>(Expression<Func<TLocal, object?>> field, object? constValue, FO operation)
+		=> AddCondition<TLocal, NotSupported>(QBConditionFlags.OnConst, null, field, null, null, constValue, null, operation);
+	public override QBBuilder<TDoc, TSelect> Condition<TLocal>(string alias, Expression<Func<TLocal, object?>> field, object? constValue, FO operation)
+		=> AddCondition<TLocal, NotSupported>(QBConditionFlags.OnConst, alias, field, null, null, constValue, null, operation);
+	public override QBBuilder<TDoc, TSelect> Condition<TLocal>(string alias, DEPathDefinition<TLocal> field, object? constValue, FO operation)
+		=> AddCondition<TLocal, NotSupported>(QBConditionFlags.OnConst, alias, field, null, null, constValue, null, operation);
+	IEfCoreSelectQBBuilder<TDoc, TSelect> IEfCoreSelectQBBuilder<TDoc, TSelect>.Condition<TLocal>(string alias, Expression<Func<TLocal, object?>> field, object? constValue, FO operation)
+		=> AddCondition<TLocal, NotSupported>(QBConditionFlags.OnConst, alias, field, null, null, constValue, null, operation);
+	public override QBBuilder<TDoc, TSelect> Condition<TLocal>(Expression<Func<TLocal, object?>> field, FO operation, string paramName)
+		=> AddCondition<TLocal, NotSupported>(QBConditionFlags.OnParam, null, field, null, null, null, paramName, operation);
+	public override QBBuilder<TDoc, TSelect> Condition<TLocal>(DEPathDefinition<TLocal> field, FO operation, string paramName)
+		=> AddCondition<TLocal, NotSupported>(QBConditionFlags.OnParam, null, field, null, null, null, paramName, operation);
+	IEfCoreSelectQBBuilder<TDoc, TSelect> IEfCoreSelectQBBuilder<TDoc, TSelect>.Condition<TLocal>(Expression<Func<TLocal, object?>> field, FO operation, string paramName)
+		=> AddCondition<TLocal, NotSupported>(QBConditionFlags.OnParam, null, field, null, null, null, paramName, operation);
+	public override QBBuilder<TDoc, TSelect> Condition<TLocal>(string alias, Expression<Func<TLocal, object?>> field, FO operation, string paramName)
+		=> AddCondition<TLocal, NotSupported>(QBConditionFlags.OnParam, alias, field, null, null, null, paramName, operation);
+	public override QBBuilder<TDoc, TSelect> Condition<TLocal>(string alias, DEPathDefinition<TLocal> field, FO operation, string paramName)
+		=> AddCondition<TLocal, NotSupported>(QBConditionFlags.OnParam, alias, field, null, null, null, paramName, operation);
+	IEfCoreSelectQBBuilder<TDoc, TSelect> IEfCoreSelectQBBuilder<TDoc, TSelect>.Condition<TLocal>(string alias, Expression<Func<TLocal, object?>> field, FO operation, string paramName)
+		=> AddCondition<TLocal, NotSupported>(QBConditionFlags.OnParam, alias, field, null, null, null, paramName, operation);
+	public override QBBuilder<TDoc, TSelect> Condition(Expression<Func<TDoc, object?>> field, object? constValue, FO operation)
+		=> AddCondition<TDoc, NotSupported>(QBConditionFlags.OnConst, null, field, null, null, constValue, null, operation);
+	public override QBBuilder<TDoc, TSelect> Condition(DEPathDefinition<TDoc> field, object? constValue, FO operation)
+		=> AddCondition<TDoc, NotSupported>(QBConditionFlags.OnConst, null, field, null, null, constValue, null, operation);
+	IEfCoreSelectQBBuilder<TDoc, TSelect> IEfCoreSelectQBBuilder<TDoc, TSelect>.Condition(Expression<Func<TDoc, object?>> field, object? constValue, FO operation)
+		=> AddCondition<TDoc, NotSupported>(QBConditionFlags.OnConst, null, field, null, null, constValue, null, operation);
+	public override QBBuilder<TDoc, TSelect> Condition(Expression<Func<TDoc, object?>> field, FO operation, string paramName)
+		=> AddCondition<TDoc, NotSupported>(QBConditionFlags.OnParam, null, field, null, null, null, paramName, operation);
+	public override QBBuilder<TDoc, TSelect> Condition(DEPathDefinition<TDoc> field, FO operation, string paramName)
+		=> AddCondition<TDoc, NotSupported>(QBConditionFlags.OnParam, null, field, null, null, null, paramName, operation);
+	IEfCoreSelectQBBuilder<TDoc, TSelect> IEfCoreSelectQBBuilder<TDoc, TSelect>.Condition(Expression<Func<TDoc, object?>> field, FO operation, string paramName)
+		=> AddCondition<TDoc, NotSupported>(QBConditionFlags.OnParam, null, field, null, null, null, paramName, operation);
+
+	public override QBBuilder<TDoc, TSelect> Begin()
+	{
+		((IEfCoreSelectQBBuilder<TDoc, TSelect>)this).Begin();
+		return this;
+	}
+	IEfCoreSelectQBBuilder<TDoc, TSelect> IEfCoreSelectQBBuilder<TDoc, TSelect>.Begin()
 	{
 		IsNormalized = false;
 		_parentheses++;
@@ -778,29 +803,29 @@ internal sealed class QBSelectBuilder<TDoc, TDto> : QBBuilder<TDoc, TDto>, IQBEf
 		if (_autoOpenedParentheses > 0) _autoOpenedParentheses++;
 		return this;
 	}
-	public override QBBuilder<TDoc, TDto> End()
+	public override QBBuilder<TDoc, TSelect> End()
 	{
-		((IQBEfCoreSelectBuilder<TDoc, TDto>)this).End();
+		((IEfCoreSelectQBBuilder<TDoc, TSelect>)this).End();
 		return this;
 	}
-	IQBEfCoreSelectBuilder<TDoc, TDto> IQBEfCoreSelectBuilder<TDoc, TDto>.End()
+	IEfCoreSelectQBBuilder<TDoc, TSelect> IEfCoreSelectQBBuilder<TDoc, TSelect>.End()
 	{
 		if (_isByOr != null || _parentheses > 0 || _conditions == null || _conditions.Count == 0)
 		{
-			throw new InvalidOperationException($"Incorrect condition definition of select query builder '{typeof(TDto).ToPretty()}'.");
+			throw new InvalidOperationException($"Incorrect condition definition of select query builder '{typeof(TSelect).ToPretty()}'.");
 		}
 
 		var lastIndex = _conditions.Count - 1;
 		var lastCond = _conditions[lastIndex];
 		if (lastCond.Parentheses > 0)
 		{
-			throw new InvalidOperationException($"Incorrect condition definition of select query builder '{typeof(TDto).ToPretty()}'.");
+			throw new InvalidOperationException($"Incorrect condition definition of select query builder '{typeof(TSelect).ToPretty()}'.");
 		}
 
 		int decrement = _autoOpenedParentheses > 0 && --_autoOpenedParentheses == 0 ? 2 : 1;
 		if (_sumParentheses < decrement)
 		{
-			throw new InvalidOperationException($"Incorrect condition definition of select query builder '{typeof(TDto).ToPretty()}'.");
+			throw new InvalidOperationException($"Incorrect condition definition of select query builder '{typeof(TSelect).ToPretty()}'.");
 		}
 
 		IsNormalized = false;
@@ -810,16 +835,16 @@ internal sealed class QBSelectBuilder<TDoc, TDto> : QBBuilder<TDoc, TDto>, IQBEf
 		return this;
 	}
 
-	public override QBBuilder<TDoc, TDto> And()
+	public override QBBuilder<TDoc, TSelect> And()
 	{
-		((IQBEfCoreSelectBuilder<TDoc, TDto>)this).And();
+		((IEfCoreSelectQBBuilder<TDoc, TSelect>)this).And();
 		return this;
 	}
-	IQBEfCoreSelectBuilder<TDoc, TDto> IQBEfCoreSelectBuilder<TDoc, TDto>.And()
+	IEfCoreSelectQBBuilder<TDoc, TSelect> IEfCoreSelectQBBuilder<TDoc, TSelect>.And()
 	{
 		if (_isByOr != null || _parentheses > 0 || _conditions == null || _conditions.Count == 0)
 		{
-			throw new InvalidOperationException($"Incorrect condition definition of select query builder '{typeof(TDto).ToPretty()}'.");
+			throw new InvalidOperationException($"Incorrect condition definition of select query builder '{typeof(TSelect).ToPretty()}'.");
 		}
 
 		IsNormalized = false;
@@ -827,30 +852,30 @@ internal sealed class QBSelectBuilder<TDoc, TDto> : QBBuilder<TDoc, TDto>, IQBEf
 
 		return this;
 	}
-	public override QBBuilder<TDoc, TDto> Or()
+	public override QBBuilder<TDoc, TSelect> Or()
 	{
-		((IQBEfCoreSelectBuilder<TDoc, TDto>)this).Or();
+		((IEfCoreSelectQBBuilder<TDoc, TSelect>)this).Or();
 		return this;
 	}
-	IQBEfCoreSelectBuilder<TDoc, TDto> IQBEfCoreSelectBuilder<TDoc, TDto>.Or()
+	IEfCoreSelectQBBuilder<TDoc, TSelect> IEfCoreSelectQBBuilder<TDoc, TSelect>.Or()
 	{
 		if (_isByOr != null || _parentheses > 0 || _conditions == null || _conditions.Count == 0)
 		{
-			throw new InvalidOperationException($"Incorrect condition definition of select query builder '{typeof(TDto).ToPretty()}'.");
+			throw new InvalidOperationException($"Incorrect condition definition of select query builder '{typeof(TSelect).ToPretty()}'.");
 		}
 
 		if (_autoOpenedParentheses == 1)
 		{
 			if (_sumParentheses < 1)
 			{
-				throw new InvalidOperationException($"Incorrect condition definition of select query builder '{typeof(TDto).ToPretty()}'.");
+				throw new InvalidOperationException($"Incorrect condition definition of select query builder '{typeof(TSelect).ToPretty()}'.");
 			}
 
 			var lastIndex = _conditions.Count - 1;
 			var lastCond = _conditions[lastIndex];
 			if (lastCond.Parentheses > 0)
 			{
-				throw new InvalidOperationException($"Incorrect condition definition of select query builder '{typeof(TDto).ToPretty()}': messed up with automatically opening parentheses.");
+				throw new InvalidOperationException($"Incorrect condition definition of select query builder '{typeof(TSelect).ToPretty()}': messed up with automatically opening parentheses.");
 			}
 
 			IsNormalized = false;
@@ -868,44 +893,44 @@ internal sealed class QBSelectBuilder<TDoc, TDto> : QBBuilder<TDoc, TDto>, IQBEf
 		return this;
 	}
 
-	public override QBBuilder<TDoc, TDto> Include<TRef>(Expression<Func<TDto, object?>> field, Expression<Func<TRef, object?>> refField)
+	public override QBBuilder<TDoc, TSelect> Include<TRef>(Expression<Func<TSelect, object?>> field, Expression<Func<TRef, object?>> refField)
 		=> AddInclude<TRef>(field, null, refField);
-	public override QBBuilder<TDoc, TDto> Include<TRef>(DEPathDefinition<TDto> field, DEPathDefinition<TRef> refField)
+	public override QBBuilder<TDoc, TSelect> Include<TRef>(DEPathDefinition<TSelect> field, DEPathDefinition<TRef> refField)
 		=> AddInclude<TRef>(field, null, refField);
-	IQBEfCoreSelectBuilder<TDoc, TDto> IQBEfCoreSelectBuilder<TDoc, TDto>.Include<TRef>(Expression<Func<TDto, object?>> field, Expression<Func<TRef, object?>> refField)
+	IEfCoreSelectQBBuilder<TDoc, TSelect> IEfCoreSelectQBBuilder<TDoc, TSelect>.Include<TRef>(Expression<Func<TSelect, object?>> field, Expression<Func<TRef, object?>> refField)
 		=> AddInclude<TRef>(field, null, refField);
-	public override QBBuilder<TDoc, TDto> Include<TRef>(Expression<Func<TDto, object?>> field, string refAlias, Expression<Func<TRef, object?>> refField)
+	public override QBBuilder<TDoc, TSelect> Include<TRef>(Expression<Func<TSelect, object?>> field, string refAlias, Expression<Func<TRef, object?>> refField)
 		=> AddInclude<TRef>(field, refAlias, refField);
-	public override QBBuilder<TDoc, TDto> Include<TRef>(DEPathDefinition<TDto> field, string refAlias, DEPathDefinition<TRef> refField)
+	public override QBBuilder<TDoc, TSelect> Include<TRef>(DEPathDefinition<TSelect> field, string refAlias, DEPathDefinition<TRef> refField)
 		=> AddInclude<TRef>(field, refAlias, refField);
-	IQBEfCoreSelectBuilder<TDoc, TDto> IQBEfCoreSelectBuilder<TDoc, TDto>.Include<TRef>(Expression<Func<TDto, object?>> field, string refAlias, Expression<Func<TRef, object?>> refField)
+	IEfCoreSelectQBBuilder<TDoc, TSelect> IEfCoreSelectQBBuilder<TDoc, TSelect>.Include<TRef>(Expression<Func<TSelect, object?>> field, string refAlias, Expression<Func<TRef, object?>> refField)
 		=> AddInclude<TRef>(field, refAlias, refField);
 
-	public override QBBuilder<TDoc, TDto> Exclude(Expression<Func<TDto, object?>> field)
+	public override QBBuilder<TDoc, TSelect> Exclude(Expression<Func<TSelect, object?>> field)
 		=> AddExclude(field, false);
-	public override QBBuilder<TDoc, TDto> Exclude(DEPathDefinition<TDto> field)
+	public override QBBuilder<TDoc, TSelect> Exclude(DEPathDefinition<TSelect> field)
 		=> AddExclude(field, false);
-	IQBEfCoreSelectBuilder<TDoc, TDto> IQBEfCoreSelectBuilder<TDoc, TDto>.Exclude(Expression<Func<TDto, object?>> field)
+	IEfCoreSelectQBBuilder<TDoc, TSelect> IEfCoreSelectQBBuilder<TDoc, TSelect>.Exclude(Expression<Func<TSelect, object?>> field)
 		=> AddExclude(field, false);
 
-	public override QBBuilder<TDoc, TDto> Optional(Expression<Func<TDto, object?>> field)
+	public override QBBuilder<TDoc, TSelect> Optional(Expression<Func<TSelect, object?>> field)
 		=> AddExclude(field, true);
-	public override QBBuilder<TDoc, TDto> Optional(DEPathDefinition<TDto> field)
+	public override QBBuilder<TDoc, TSelect> Optional(DEPathDefinition<TSelect> field)
 		=> AddExclude(field, true);
-	IQBEfCoreSelectBuilder<TDoc, TDto> IQBEfCoreSelectBuilder<TDoc, TDto>.Optional(Expression<Func<TDto, object?>> field)
+	IEfCoreSelectQBBuilder<TDoc, TSelect> IEfCoreSelectQBBuilder<TDoc, TSelect>.Optional(Expression<Func<TSelect, object?>> field)
 		=> AddExclude(field, true);
 
-	public override QBBuilder<TDoc, TDto> SortBy(Expression<Func<TDto, object?>> field, SO sortOrder = SO.Ascending)
+	public override QBBuilder<TDoc, TSelect> SortBy(Expression<Func<TSelect, object?>> field, SO sortOrder = SO.Ascending)
 		=> AddSortBy(null, field, sortOrder);
-	public override QBBuilder<TDoc, TDto> SortBy(DEPathDefinition<TDto> field, SO sortOrder = SO.Ascending)
+	public override QBBuilder<TDoc, TSelect> SortBy(DEPathDefinition<TSelect> field, SO sortOrder = SO.Ascending)
 		=> AddSortBy(null, field, sortOrder);
-	IQBEfCoreSelectBuilder<TDoc, TDto> IQBEfCoreSelectBuilder<TDoc, TDto>.SortBy(Expression<Func<TDto, object?>> field, SO sortOrder)
+	IEfCoreSelectQBBuilder<TDoc, TSelect> IEfCoreSelectQBBuilder<TDoc, TSelect>.SortBy(Expression<Func<TSelect, object?>> field, SO sortOrder)
 		=> AddSortBy(null, field, sortOrder);
-	public override QBBuilder<TDoc, TDto> SortBy<TLocal>(string alias, Expression<Func<TLocal, object?>> field, SO sortOrder = SO.Ascending)
+	public override QBBuilder<TDoc, TSelect> SortBy<TLocal>(string alias, Expression<Func<TLocal, object?>> field, SO sortOrder = SO.Ascending)
 		=> AddSortBy(alias, field, sortOrder);
-	public override QBBuilder<TDoc, TDto> SortBy<TLocal>(string alias, DEPathDefinition<TLocal> field, SO sortOrder = SO.Ascending)
+	public override QBBuilder<TDoc, TSelect> SortBy<TLocal>(string alias, DEPathDefinition<TLocal> field, SO sortOrder = SO.Ascending)
 		=> AddSortBy(alias, field, sortOrder);
-	IQBEfCoreSelectBuilder<TDoc, TDto> IQBEfCoreSelectBuilder<TDoc, TDto>.SortBy<TLocal>(string alias, Expression<Func<TLocal, object?>> field, SO sortOrder)
+	IEfCoreSelectQBBuilder<TDoc, TSelect> IEfCoreSelectQBBuilder<TDoc, TSelect>.SortBy<TLocal>(string alias, Expression<Func<TLocal, object?>> field, SO sortOrder)
 		=> AddSortBy(alias, field, sortOrder);
 
 
@@ -915,14 +940,14 @@ internal sealed class QBSelectBuilder<TDoc, TDto> : QBBuilder<TDoc, TDto>, IQBEf
 		{
 			if (_sumParentheses < 1 || _autoOpenedParentheses > 1 || _conditions == null || _conditions.Count == 0)
 			{
-				throw new InvalidOperationException($"Incorrect condition definition of select query builder '{typeof(TDto).ToPretty()}'.");
+				throw new InvalidOperationException($"Incorrect condition definition of select query builder '{typeof(TSelect).ToPretty()}'.");
 			}
 			
 			var lastIndex = _conditions.Count - 1;
 			var lastCond = _conditions[lastIndex];
 			if (lastCond.Parentheses > 0)
 			{
-				throw new InvalidOperationException($"Incorrect condition definition of select query builder '{typeof(TDto).ToPretty()}': messed up with automatically opening parentheses.");
+				throw new InvalidOperationException($"Incorrect condition definition of select query builder '{typeof(TSelect).ToPretty()}': messed up with automatically opening parentheses.");
 			}
 
 			_conditions[lastIndex] = lastCond with { Parentheses = lastCond.Parentheses - 1 };

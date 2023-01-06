@@ -10,7 +10,7 @@ public class OrderPositionCreateDto
 	[DeForeignId] public int? ProductId { get; set; }
 	public decimal? Quantity { get; set; }
 
-	static void Builder(IQBMongoInsertBuilder<OrderPosition, OrderPositionCreateDto> builder)
+	static void Builder(IMongoInsertQBBuilder<OrderPosition, OrderPositionCreateDto> builder)
 	{
 		builder.Insert("order_positions");
 	}

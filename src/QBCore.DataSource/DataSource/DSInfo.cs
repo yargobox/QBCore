@@ -220,7 +220,7 @@ internal sealed class DSInfo : IDSInfo
 			{
 				DataSourceServiceType = DSTypeInfo.Concrete;
 			}
-			else if (building.ServiceInterface.GetInterfaces().Contains(DSTypeInfo.Interface))
+			else if (building.ServiceInterface.GetInterfaces().Any(x => x == DSTypeInfo.Public || x == DSTypeInfo.Interface))
 			{
 				DataSourceServiceType = building.ServiceInterface;
 			}
@@ -251,7 +251,7 @@ internal sealed class DSInfo : IDSInfo
 
 		// Register DataSource's document types, including nested ones.
 		//
-		DocumentInfo = StaticFactory.Internals.GetOrRegisterDocument(DSTypeInfo.TDocument, dataLayer);
+		DocumentInfo = StaticFactory.Internals.GetOrRegisterDocument(DSTypeInfo.TDoc, dataLayer);
 		CreateInfo = DSTypeInfo.TCreate != typeof(NotSupported) ? StaticFactory.Internals.GetOrRegisterDocument(DSTypeInfo.TCreate, dataLayer) : null;
 		SelectInfo = DSTypeInfo.TSelect != typeof(NotSupported) ? StaticFactory.Internals.GetOrRegisterDocument(DSTypeInfo.TSelect, dataLayer) : null;
 		UpdateInfo = DSTypeInfo.TUpdate != typeof(NotSupported) ? StaticFactory.Internals.GetOrRegisterDocument(DSTypeInfo.TUpdate, dataLayer) : null;
@@ -302,8 +302,7 @@ internal sealed class DSInfo : IDSInfo
 	{
 		return DSTypeInfo.Concrete
 			.GetInterfaces()
-			.Where(x => x.GetInterfaces().Contains(DSTypeInfo.Interface))
-			.FirstOrDefault();
+			.FirstOrDefault(x => !x.IsGenericType && x.GetInterfaces().Any(x => x == DSTypeInfo.Public || x == DSTypeInfo.Interface));
 	}
 
 	private Func<IServiceProvider, IDataSourceListener> MakeListenerFactoryMethod(Type listenerType)
@@ -330,7 +329,7 @@ internal sealed class DSInfo : IDSInfo
 
 			listenerType = listenerType.MakeGenericType(
 				DSTypeInfo.TKey,
-				DSTypeInfo.TDocument,
+				DSTypeInfo.TDoc,
 				DSTypeInfo.TCreate,
 				DSTypeInfo.TSelect,
 				DSTypeInfo.TUpdate,
@@ -341,7 +340,7 @@ internal sealed class DSInfo : IDSInfo
 		else
 		{
 			if (DSTypeInfo.TKey != genericArgs[0]
-				|| DSTypeInfo.TDocument != genericArgs[1]
+				|| DSTypeInfo.TDoc != genericArgs[1]
 				|| DSTypeInfo.TCreate != genericArgs[2]
 				|| DSTypeInfo.TSelect != genericArgs[3]
 				|| DSTypeInfo.TUpdate != genericArgs[4]

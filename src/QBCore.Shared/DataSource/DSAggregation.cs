@@ -5,18 +5,18 @@ namespace QBCore.DataSource;
 
 public interface IDSAggregation
 {
-	Type ProjectionType { get; }
+	Type DtoType { get; }
 	string FieldName { get; }
 	AggregationOperations Operation { get; }
 }
 
-public class DSAggregation<TProjection> : IDSAggregation
+public class DSAggregation<TDto> : IDSAggregation
 {
-	public Type ProjectionType => typeof(TProjection);
+	public Type DtoType => typeof(TDto);
 	public string FieldName { get; }
 	public AggregationOperations Operation { get; }
 
-	public DSAggregation(Expression<Func<TProjection, object?>> field, AggregationOperations operation)
+	public DSAggregation(Expression<Func<TDto, object?>> field, AggregationOperations operation)
 	{
 		FieldName = null!;//!!!GetMemberName(field);
 		Operation = operation;

@@ -213,14 +213,15 @@ public class SelectQueryBuilder_Tests
 		stub.AggregatePipelineArg.Should().BeEquivalentTo("[{ \"$match\" : { \"$or\" : [{ \"$or\" : [{ \"_id\" : 0 }, { \"_id\" : 1, \"$or\" : [{ \"$and\" : [{ \"_id\" : 2 }, { \"_id\" : 3 }] }, { \"_id\" : 4 }] }, { \"_id\" : 5 }], \"$and\" : [{ \"_id\" : 6 }, { \"_id\" : 7 }] }, { \"_id\" : 8 }] } }]");
 	}
 
-	static IQueryBuilderFactory CreateQBFactory<TKey, TDocument, TSelect>(Action<IQBMongoSelectBuilder<Document, DocumentSelectDto>> selectBuilderMethod)
+	static IQueryBuilderFactory CreateQBFactory<TKey, TDoc, TSelect>(Action<IMongoSelectQBBuilder<Document, DocumentSelectDto>> selectBuilderMethod)
 	{
 		var dsTypeInfo = new DSTypeInfo
 		(
 			Concrete: typeof(NotSupported),
 			Interface: typeof(NotSupported),
+			Public: typeof(NotSupported),
 			TKey: typeof(TKey),
-			TDocument: typeof(TDocument),
+			TDoc: typeof(TDoc),
 			TCreate: typeof(NotSupported),
 			TSelect: typeof(TSelect),
 			TUpdate: typeof(NotSupported),
@@ -242,7 +243,7 @@ public class SelectQueryBuilder_Tests
 		[DeId] public int Id { get; set; }
 		[DeDeleted] public DateTimeOffset Deleted { get; set; }
 
-		public static void SelectBuilder_1(IQBMongoSelectBuilder<Document, DocumentSelectDto> builder)
+		public static void SelectBuilder_1(IMongoSelectQBBuilder<Document, DocumentSelectDto> builder)
 		{
 			builder
 				.Select("document")
@@ -258,7 +259,7 @@ public class SelectQueryBuilder_Tests
 			;
 		}
 
-		public static void SelectBuilder_2(IQBMongoSelectBuilder<Document, DocumentSelectDto> builder)
+		public static void SelectBuilder_2(IMongoSelectQBBuilder<Document, DocumentSelectDto> builder)
 		{
 			builder
 				.Select("document")
@@ -275,7 +276,7 @@ public class SelectQueryBuilder_Tests
 			;
 		}
 
-		public static void SelectBuilder_3(IQBMongoSelectBuilder<Document, DocumentSelectDto> builder)
+		public static void SelectBuilder_3(IMongoSelectQBBuilder<Document, DocumentSelectDto> builder)
 		{
 			builder
 				.Select("document")
@@ -296,7 +297,7 @@ public class SelectQueryBuilder_Tests
 			;
 		}
 
-		public static void SelectBuilder_4(IQBMongoSelectBuilder<Document, DocumentSelectDto> builder)
+		public static void SelectBuilder_4(IMongoSelectQBBuilder<Document, DocumentSelectDto> builder)
 		{
 			builder
 				.Select("document")
@@ -313,7 +314,7 @@ public class SelectQueryBuilder_Tests
 			;
 		}
 
-		public static void SelectBuilder_5(IQBMongoSelectBuilder<Document, DocumentSelectDto> builder)
+		public static void SelectBuilder_5(IMongoSelectQBBuilder<Document, DocumentSelectDto> builder)
 		{
 			builder
 				.Select("document")
@@ -332,7 +333,7 @@ public class SelectQueryBuilder_Tests
 			;
 		}
 
-		public static void SelectBuilder_6(IQBMongoSelectBuilder<Document, DocumentSelectDto> builder)
+		public static void SelectBuilder_6(IMongoSelectQBBuilder<Document, DocumentSelectDto> builder)
 		{
 			builder
 				.Select("document")
@@ -350,7 +351,7 @@ public class SelectQueryBuilder_Tests
 			;
 		}
 
-		public static void SelectBuilder_7(IQBMongoSelectBuilder<Document, DocumentSelectDto> builder)
+		public static void SelectBuilder_7(IMongoSelectQBBuilder<Document, DocumentSelectDto> builder)
 		{
 			builder
 				.Select("document")
@@ -371,7 +372,7 @@ public class SelectQueryBuilder_Tests
 			;
 		}
 
-		public static void SelectBuilder_8(IQBMongoSelectBuilder<Document, DocumentSelectDto> builder)
+		public static void SelectBuilder_8(IMongoSelectQBBuilder<Document, DocumentSelectDto> builder)
 		{
 			builder
 				.Select("document")
@@ -390,7 +391,7 @@ public class SelectQueryBuilder_Tests
 			;
 		}
 
-		public static void SelectBuilder_9(IQBMongoSelectBuilder<Document, DocumentSelectDto> builder)
+		public static void SelectBuilder_9(IMongoSelectQBBuilder<Document, DocumentSelectDto> builder)
 		{
 			builder
 				.Select("document")
@@ -409,7 +410,7 @@ public class SelectQueryBuilder_Tests
 			;
 		}
 
-		public static void SelectBuilder_10(IQBMongoSelectBuilder<Document, DocumentSelectDto> builder)
+		public static void SelectBuilder_10(IMongoSelectQBBuilder<Document, DocumentSelectDto> builder)
 		{
 			builder
 				.Select("document")
@@ -482,11 +483,11 @@ public class SelectQueryBuilder_Tests
 			builder.RestoreBuilder = RestoreBuilder;
 		}
 
-		static void InsertBuilder(IQBMongoInsertBuilder<Document, EmptyDto> qb) => qb.Insert("document");
-		static void SelectBuilder(IQBMongoSelectBuilder<Document, DocumentSelectDto> qb) => qb.Select("document");
-		static void UpdateBuilder(IQBMongoUpdateBuilder<Document, EmptyDto> qb) => qb.Update("document");
-		static void SoftDelBuilder(IQBMongoSoftDelBuilder<Document, EmptyDto> qb) => qb.Update("document");
-		static void RestoreBuilder(IQBMongoRestoreBuilder<Document, EmptyDto> qb) => qb.Update("document");
+		static void InsertBuilder(IMongoInsertQBBuilder<Document, EmptyDto> qb) => qb.Insert("document");
+		static void SelectBuilder(IMongoSelectQBBuilder<Document, DocumentSelectDto> qb) => qb.Select("document");
+		static void UpdateBuilder(IMongoUpdateQBBuilder<Document, EmptyDto> qb) => qb.Update("document");
+		static void SoftDelBuilder(IMongoSoftDelQBBuilder<Document, EmptyDto> qb) => qb.Update("document");
+		static void RestoreBuilder(IMongoRestoreQBBuilder<Document, EmptyDto> qb) => qb.Update("document");
 	}
 
 
@@ -497,10 +498,10 @@ public class SelectQueryBuilder_Tests
 	{
 		public TestDSInfo2(IServiceProvider serviceProvider) : base(serviceProvider) { }
 
-		static void InsertBuilder(IQBMongoInsertBuilder<Document, EmptyDto> qb) => qb.Insert("document");
-		static void SelectBuilder(IQBMongoSelectBuilder<Document, DocumentSelectDto> qb) => qb.Select("document");
-		static void UpdateBuilder(IQBMongoUpdateBuilder<Document, EmptyDto> qb) => qb.Update("document");
-		static void SoftDelBuilder(IQBMongoSoftDelBuilder<Document, EmptyDto> qb) => qb.Update("document");
-		static void RestoreBuilder(IQBMongoRestoreBuilder<Document, EmptyDto> qb) => qb.Update("document");
+		static void InsertBuilder(IMongoInsertQBBuilder<Document, EmptyDto> qb) => qb.Insert("document");
+		static void SelectBuilder(IMongoSelectQBBuilder<Document, DocumentSelectDto> qb) => qb.Select("document");
+		static void UpdateBuilder(IMongoUpdateQBBuilder<Document, EmptyDto> qb) => qb.Update("document");
+		static void SoftDelBuilder(IMongoSoftDelQBBuilder<Document, EmptyDto> qb) => qb.Update("document");
+		static void RestoreBuilder(IMongoRestoreQBBuilder<Document, EmptyDto> qb) => qb.Update("document");
 	}
 }

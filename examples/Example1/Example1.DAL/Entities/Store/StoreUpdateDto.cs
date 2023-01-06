@@ -7,7 +7,7 @@ public class StoreUpdateDto
 {
 	[DeViewName] public string? Name { get; set; }
 
-	static void Builder(IQBMongoUpdateBuilder<Store, StoreUpdateDto> builder)
+	static void Builder(IMongoUpdateQBBuilder<Store, StoreUpdateDto> builder)
 	{
 		builder.Update("stores");
 	}

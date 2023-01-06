@@ -1,10 +1,10 @@
 using System.Linq.Expressions;
 
-namespace QBCore.DataSource.QueryBuilder.Mongo;
+namespace QBCore.DataSource.QueryBuilder.EfCore;
 
-internal abstract class QBCommonBuilder<TDoc, TDto> : QBBuilder<TDoc, TDto>
+internal abstract class CommonQBBuilder<TDoc, TDto> : QBBuilder<TDoc, TDto>
 {
-	public override IDataLayerInfo DataLayer => MongoDataLayer.Default;
+	public override IDataLayerInfo DataLayer => EfCoreDataLayer.Default;
 	public override IReadOnlyList<QBContainer> Containers => _containers ?? EmptyLists.Containers;
 	public override IReadOnlyList<QBCondition> Conditions => _conditions ?? EmptyLists.Conditions;
 	public override IReadOnlyList<QBParameter> Parameters => _parameters ?? EmptyLists.Parameters;
@@ -18,8 +18,8 @@ internal abstract class QBCommonBuilder<TDoc, TDto> : QBBuilder<TDoc, TDto>
 	private bool? _isByOr;
 	private int _autoOpenedParentheses;
 
-	public QBCommonBuilder() { }
-	public QBCommonBuilder(QBCommonBuilder<TDoc, TDto> other) : base(other)
+	public CommonQBBuilder() { }
+	public CommonQBBuilder(CommonQBBuilder<TDoc, TDto> other) : base(other)
 	{
 		if (other._containers != null) _containers = new List<QBContainer>(1) { other._containers.First() };
 		if (other._conditions != null) _conditions = new List<QBCondition>(other._conditions);
@@ -40,14 +40,14 @@ internal abstract class QBCommonBuilder<TDoc, TDto> : QBBuilder<TDoc, TDto>
 		}
 	}
 
-	protected QBCommonBuilder<TDoc, TDto> AddContainer(string? dbSideName, ContainerTypes containerType, ContainerOperations containerOperation)
+	protected CommonQBBuilder<TDoc, TDto> AddContainer(string? dbSideName, ContainerTypes containerType, ContainerOperations containerOperation)
 	{
 		if (Containers.Count > 0)
 		{
 			throw new InvalidOperationException($"Incorrect definition of query builder '{typeof(TDto).ToPretty()}': initial container has already been added before.");
 		}
 
-		dbSideName ??= MongoDataLayer.Default.GetDefaultDBSideContainerName(typeof(TDoc));
+		dbSideName ??= EfCoreDataLayer.Default.GetDefaultDBSideContainerName(typeof(TDoc));
 		if (string.IsNullOrEmpty(dbSideName))
 		{
 			throw new ArgumentException(nameof(dbSideName));
@@ -70,7 +70,7 @@ internal abstract class QBCommonBuilder<TDoc, TDto> : QBBuilder<TDoc, TDto>
 		return this;
 	}
 
-	protected QBCommonBuilder<TDoc, TDto> AddCondition(
+	protected CommonQBBuilder<TDoc, TDto> AddCondition(
 		QBConditionFlags flags,
 		DEPathDefinition<TDoc> field,
 		object? constValue,
@@ -79,13 +79,13 @@ internal abstract class QBCommonBuilder<TDoc, TDto> : QBBuilder<TDoc, TDto>
 	{
 		return AddCondition(
 			flags,
-			field.ToDataEntryPath(MongoDataLayer.Default),
+			field.ToDataEntryPath(EfCoreDataLayer.Default),
 			constValue,
 			paramName,
 			operation
 		);
 	}
-	protected QBCommonBuilder<TDoc, TDto> AddCondition(
+	protected CommonQBBuilder<TDoc, TDto> AddCondition(
 		QBConditionFlags flags,
 		Expression<Func<TDoc, object?>> field,
 		object? constValue,
@@ -94,13 +94,13 @@ internal abstract class QBCommonBuilder<TDoc, TDto> : QBBuilder<TDoc, TDto>
 	{
 		return AddCondition(
 			flags,
-			new DEPath(field, false, MongoDataLayer.Default),
+			new DEPath(field, false, EfCoreDataLayer.Default),
 			constValue,
 			paramName,
 			operation
 		);
 	}
-	protected QBCommonBuilder<TDoc, TDto> AddCondition(
+	protected CommonQBBuilder<TDoc, TDto> AddCondition(
 		QBConditionFlags flags,
 		DEPath field,
 		object? constValue,

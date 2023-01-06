@@ -6,16 +6,16 @@ using QBCore.Extensions.Internals;
 
 namespace QBCore.DataSource.QueryBuilder.Mongo;
 
-internal sealed class InsertQueryBuilder<TDocument, TCreate> : QueryBuilder<TDocument, TCreate>, IInsertQueryBuilder<TDocument, TCreate>
+internal sealed class InsertQueryBuilder<TDoc, TCreate> : QueryBuilder<TDoc, TCreate>, IInsertQueryBuilder<TDoc, TCreate>
 {
 	public override QueryBuilderTypes QueryBuilderType => QueryBuilderTypes.Insert;
 
-	public InsertQueryBuilder(QBInsertBuilder<TDocument, TCreate> building, IDataContext dataContext) : base(building, dataContext)
+	public InsertQueryBuilder(InsertQBBuilder<TDoc, TCreate> building, IDataContext dataContext) : base(building, dataContext)
 	{
 		building.Normalize();
 	}
 
-	public async Task<TDocument> InsertAsync(TDocument document, DataSourceInsertOptions? options = null, CancellationToken cancellationToken = default(CancellationToken))
+	public async Task<TDoc> InsertAsync(TDoc document, DataSourceInsertOptions? options = null, CancellationToken cancellationToken = default(CancellationToken))
 	{
 		var top = Builder.Containers.First();
 		if (top.ContainerOperation != ContainerOperations.Insert)
@@ -35,14 +35,14 @@ internal sealed class InsertQueryBuilder<TDocument, TCreate> : QueryBuilder<TDoc
 			}
 		}
 
-		var collection = _mongoDbContext.AsMongoDatabase().GetCollection<TDocument>(top.DBSideName);
+		var collection = _mongoDbContext.AsMongoDatabase().GetCollection<TDoc>(top.DBSideName);
 
 		var insertOneOptions = (InsertOneOptions?)options?.NativeOptions;
 		var clientSessionHandle = (IClientSessionHandle?)options?.NativeClientSession;
 
-		var deId = (MongoDEInfo?)Builder.DocumentInfo.IdField;
-		var deCreated = (MongoDEInfo?)Builder.DocumentInfo.DateCreatedField;
-		var deModified = (MongoDEInfo?)Builder.DocumentInfo.DateModifiedField;
+		var deId = (MongoDEInfo?)Builder.DocInfo.IdField;
+		var deCreated = (MongoDEInfo?)Builder.DocInfo.DateCreatedField;
+		var deModified = (MongoDEInfo?)Builder.DocInfo.DateModifiedField;
 
 		var customIdGenerator = Builder.IdGenerator != null ? Builder.IdGenerator() : null;
 		var generateId = customIdGenerator != null && deId?.Setter != null && customIdGenerator.IsEmpty(deId.Getter(document!));

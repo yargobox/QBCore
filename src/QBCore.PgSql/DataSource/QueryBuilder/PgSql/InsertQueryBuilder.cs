@@ -48,42 +48,41 @@ internal sealed class InsertQueryBuilder<TDoc, TCreate> : QueryBuilder<TDoc, TCr
 
 		if (top.ContainerOperation == ContainerOperations.Insert)
 		{
-			var deId = (SqlDEInfo?)Builder.DocumentInfo.IdField;
-			var deCreated = (SqlDEInfo?)Builder.DocumentInfo.DateCreatedField;
-			var deModified = (SqlDEInfo?)Builder.DocumentInfo.DateModifiedField;
+			var deId = (SqlDEInfo?)Builder.DocInfo.IdField;
+			var deCreated = (SqlDEInfo?)Builder.DocInfo.DateCreatedField;
+			var deModified = (SqlDEInfo?)Builder.DocInfo.DateModifiedField;
 
-			var dbo = ParseDbObjectName(top.DBSideName);
 			var sb = new StringBuilder();
 
-			sb.Append("INSERT INTO ");
-			if (dbo.Schema.Length > 0)
-			{
-				sb.Append(dbo.Schema).Append('.');
-			}
-			sb.Append('"').Append(dbo.Object).Append('"').Append('(');
+			sb.Append("INSERT INTO ").AppendContainer(top);
 
 			var command = new NpgsqlCommand();
 			bool isSetValue, isCreatedSet = false, isModifiedSet = false, next = false;
 			object? value;
 			QBParameter? param;
 
-			foreach (var de in Builder.DocumentInfo.DataEntries.Values.Cast<SqlDEInfo>())
+			foreach (var de in Builder.DocInfo.DataEntries.Values.Cast<SqlDEInfo>())
 			{
+				if (de.Flags.HasAnyFlag(DataEntryFlags.ReadOnly | DataEntryFlags.NoStorage))
+				{
+					continue;
+				}
+
 				isSetValue = true;
 				value = de.Getter(document);
 
 				if (de == deCreated)
 				{
-					isCreatedSet = isSetValue = value is not null && value != de.UnderlyingType.GetDefaultValue();
+					isCreatedSet = isSetValue = value is not null && !value.Equals(de.UnderlyingType.GetDefaultValue());
 				}
 				else if (de == deModified)
 				{
-					isModifiedSet = isSetValue = value is not null && value != de.UnderlyingType.GetDefaultValue();
+					isModifiedSet = isSetValue = value is not null && !value.Equals(de.UnderlyingType.GetDefaultValue());
 				}
 
 				if (isSetValue)
 				{
-					if (next) sb.Append(", "); else next = true;
+					if (next) sb.Append(", "); else { next = true; sb.Append('('); }
 
 					sb.Append('"').Append(de.DBSideName!).Append('"');
 
@@ -92,46 +91,65 @@ internal sealed class InsertQueryBuilder<TDoc, TCreate> : QueryBuilder<TDoc, TCr
 				}
 			}
 
-			if (deCreated != null && !isCreatedSet)
+			if (deCreated != null && !isCreatedSet && !deCreated.Flags.HasAnyFlag(DataEntryFlags.ReadOnly))
 			{
-				if (next) sb.Append(", "); else next = true;
+				if (next) sb.Append(", "); else { next = true; sb.Append('('); }
 
 				sb.Append('"').Append(deCreated.DBSideName!).Append('"');
 			}
-			if (deModified != null && !isModifiedSet)
+			if (deModified != null && !isModifiedSet && !deModified.Flags.HasAnyFlag(DataEntryFlags.ReadOnly))
 			{
-				if (next) sb.Append(", "); else next = true;
+				if (next) sb.Append(", "); else { next = true; sb.Append('('); }
 
 				sb.Append('"').Append(deModified.DBSideName!).Append('"');
 			}
 
-			sb.AppendLine(")").Append("VALUES (");
-			int i;
-			for (i = 1; i <= command.Parameters.Count; i++)
+			if (next)
 			{
-				if (i > 1) sb.Append(", ");
+				sb.AppendLine(")").Append("VALUES (");
 
-				sb.Append("$").Append(i);
+				int i;
+				for (i = 1; i <= command.Parameters.Count; i++)
+				{
+					if (i > 1) sb.Append(", ");
+
+					sb.Append("$").Append(i);
+				}
+
+				if (deCreated != null && !isCreatedSet && !deCreated.Flags.HasAnyFlag(DataEntryFlags.ReadOnly))
+				{
+					if (i++ > 1) sb.Append(", ");
+
+					sb.Append("NOW()");
+				}
+				if (deModified != null && !isModifiedSet && !deModified.Flags.HasAnyFlag(DataEntryFlags.ReadOnly))
+				{
+					if (i++ > 1) sb.Append(", ");
+
+					sb.Append("NOW()");
+				}
+
+				sb.Append(')');
 			}
 
-			if (deCreated != null && !isCreatedSet)
+			if (deId?.Flags.HasAnyFlag(DataEntryFlags.ReadOnly | DataEntryFlags.NoStorage) == true)
 			{
-				if (i++ > 1) sb.Append(", ");
+				if (deId.DependsOn != null)
+				{
+					sb.AppendLine().Append("RETURNING ");
 
-				sb.Append("NOW()");
-			}
-			if (deModified != null && !isModifiedSet)
-			{
-				if (i++ > 1) sb.Append(", ");
+					next = false;
+					foreach (var de in deId.DependsOn.Select(x => Builder.DocInfo.DataEntries[x]).Cast<SqlDEInfo>())
+					{
+						if (next) sb.Append(", "); else next = true;
 
-				sb.Append("NOW()");
-			}
-
-			sb.Append(')');
-
-			if (deId?.Setter != null)
-			{
-				sb.Append(" RETURNING \"").Append(deId.DBSideName).Append('"');
+						sb.Append('"').Append(de.DBSideName).Append('"');
+					}
+				}
+				else if (deId.Setter != null)
+				{
+					sb.AppendLine().Append("RETURNING \"").Append(deId.DBSideName).Append('"');
+				}
 			}
 
 			var queryString = sb.ToString();
@@ -156,10 +174,33 @@ internal sealed class InsertQueryBuilder<TDoc, TCreate> : QueryBuilder<TDoc, TCr
 				command.Connection = connection;
 				command.Transaction = transaction;
 
-				if (deId?.Setter != null)
+				if (deId?.Flags.HasAnyFlag(DataEntryFlags.ReadOnly | DataEntryFlags.NoStorage) == true)
 				{
-					value = await command.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false);
-					deId.Setter(document, value);
+					if (deId.DependsOn != null)
+					{
+						await using var dataReader = await command.ExecuteReaderAsync(CommandBehavior.SingleRow, cancellationToken).ConfigureAwait(false);
+						if (!await dataReader.NextResultAsync(cancellationToken).ConfigureAwait(false))
+						{
+							throw new InvalidOperationException();
+						}
+
+						foreach (var de in deId.DependsOn.Select(x => Builder.DocInfo.DataEntries[x]).Cast<SqlDEInfo>())
+						{
+							if (de.Setter != null)
+							{
+								de.Setter(document, dataReader[de.DBSideName!]);
+							}
+						}
+					}
+					else if (deId.Setter != null)
+					{
+						value = await command.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false);
+						deId.Setter(document, value);
+					}
+					else
+					{
+						await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+					}
 				}
 				else
 				{

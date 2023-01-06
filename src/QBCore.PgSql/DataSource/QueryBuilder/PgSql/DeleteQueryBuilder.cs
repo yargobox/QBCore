@@ -56,7 +56,6 @@ internal sealed class DeleteQueryBuilder<TDoc, TDelete> : QueryBuilder<TDoc, TDe
 
 			string queryString;
 			var sb = new StringBuilder();
-			var dbo = ParseDbObjectName(top.DBSideName);
 			var command = new NpgsqlCommand();
 
 			if (document is not null)
@@ -71,7 +70,7 @@ internal sealed class DeleteQueryBuilder<TDoc, TDelete> : QueryBuilder<TDoc, TDe
 						{
 							p.Value = id;
 						}
-						else if (Builder.ProjectionInfo!.DataEntries.TryGetValue(p.ParameterName, out de))
+						else if (Builder.DtoInfo!.DataEntries.TryGetValue(p.ParameterName, out de))
 						{
 							p.Value = de.Getter(document);
 						}
@@ -79,14 +78,9 @@ internal sealed class DeleteQueryBuilder<TDoc, TDelete> : QueryBuilder<TDoc, TDe
 				}
 			}
 
-			//sb.Append("WITH deleted AS (");
-			sb.Append("DELETE FROM ");
-			if (dbo.Schema.Length > 0)
-			{
-				sb.Append(dbo.Schema).Append('.');
-			}
-			sb.Append('"').Append(dbo.Object).Append("\" WHERE ");
-			BuildConditionTree(sb, Builder.Conditions, GetDBSideName, Builder.Parameters, command.Parameters);
+            //sb.Append("WITH deleted AS (");
+            sb.Append("DELETE FROM ").AppendContainer(top).AppendLine().Append("WHERE ");
+			BuildConditionTree(sb, Builder.Conditions, GetQuotedDBSideNameWithoutAlias, Builder.Parameters, command.Parameters);
 			//sb.Append(" RETURNING *) SELECT count(*) FROM deleted");
 
 			queryString = sb.ToString();
@@ -115,7 +109,7 @@ internal sealed class DeleteQueryBuilder<TDoc, TDelete> : QueryBuilder<TDoc, TDe
 				var rowsAffected = await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
 				if (rowsAffected == 0)
 				{
-					throw EX.QueryBuilder.Make.OperationFailedNoSuchRecord(QueryBuilderType.ToString(), id.ToString(), Builder.DocumentInfo.DocumentType.ToPretty());
+					throw EX.QueryBuilder.Make.OperationFailedNoSuchRecord(QueryBuilderType.ToString(), id.ToString(), Builder.DocInfo.DocumentType.ToPretty());
 				}
 			}
 			finally

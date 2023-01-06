@@ -9,12 +9,12 @@ using QBCore.DataSource.Options;
 /// If an identifier with such a value plus a step already exists (insertion fails with the DuplicateKey status),
 /// then the generator will request the database to obtain the last known identifier value from the collection.
 /// </summary>
-/// <typeparam name="TDocument">IMongoCollection document type</typeparam>
+/// <typeparam name="TDoc">IMongoCollection document type</typeparam>
 /// <remarks>
-/// If TDocument serves more than one collection, you must use the
-/// OptimisticSequentialIdGenerator<TDocument, TIdNamespace> class.
+/// If <typeparamref name="TDoc"/> serves more than one collection, you must use the
+/// <see cref="OptimisticSequentialIdGenerator{TDoc, TIdNamespace}"/> class.
 /// </remarks>
-public class OptimisticSequentialIdGenerator<TDocument> : OptimisticSequentialIdGenerator<TDocument, TDocument>
+public class OptimisticSequentialIdGenerator<TDoc> : OptimisticSequentialIdGenerator<TDoc, TDoc>
 {
 	public OptimisticSequentialIdGenerator(int startAt = 1, int step = 1, int maxAttempts = 10)
 		: base(startAt, step, maxAttempts) { }
@@ -25,17 +25,17 @@ public class OptimisticSequentialIdGenerator<TDocument> : OptimisticSequentialId
 /// If an identifier with such a value plus a step already exists (insertion fails with the DuplicateKey status),
 /// then the generator will request the database to obtain the last known identifier value from the collection.
 /// </summary>
-/// <typeparam name="TDocument">IMongoCollection document type</typeparam>
-/// <typeparam name="TIdNamespace">Use this type to make different generic generator types with the same TDocument but for different collections.
-/// Otherwise, the internal static variable containing the last known Id value will be the same for different collections of TDocument, resulting in a collision.
+/// <typeparam name="TDoc">IMongoCollection document type</typeparam>
+/// <typeparam name="TIdNamespace">Use this type to make different generic generator types with the same <typeparamref name="TDoc"/> but for different collections.
+/// Otherwise, the internal static variable containing the last known Id value will be the same for different collections of <typeparamref name="TDoc"/>, resulting in a collision.
 /// </typeparam>
-public class OptimisticSequentialIdGenerator<TDocument, TIdNamespace> : IDSIdGenerator
+public class OptimisticSequentialIdGenerator<TDoc, TIdNamespace> : IDSIdGenerator
 {
 	public int MaxAttempts { get; }
 	public readonly int StartAt;
 	public readonly int Step;
 	
-	private static readonly Func<object, object>? _getDocumentId = BsonClassMap.LookupClassMap(typeof(TDocument)).IdMemberMap?.Getter;
+	private static readonly Func<object, object>? _getDocumentId = BsonClassMap.LookupClassMap(typeof(TDoc)).IdMemberMap?.Getter;
 
 	private static int _lastKnownId = int.MinValue;
 
@@ -58,7 +58,7 @@ public class OptimisticSequentialIdGenerator<TDocument, TIdNamespace> : IDSIdGen
 		{
 			throw new ArgumentNullException(nameof(container));
 		}
-		if (container is not IMongoCollection<TDocument> collection)
+		if (container is not IMongoCollection<TDoc> collection)
 		{
 			throw new ArgumentException(nameof(container));
 		}
@@ -66,7 +66,7 @@ public class OptimisticSequentialIdGenerator<TDocument, TIdNamespace> : IDSIdGen
 		{
 			throw new ArgumentNullException(nameof(document));
 		}
-		if (document is not TDocument typedDocument)
+		if (document is not TDoc typedDocument)
 		{
 			throw new ArgumentException(nameof(document));
 		}
@@ -140,7 +140,7 @@ public class OptimisticSequentialIdGenerator<TDocument, TIdNamespace> : IDSIdGen
 		{
 			throw new ArgumentNullException(nameof(container));
 		}
-		if (container is not IMongoCollection<TDocument> collection)
+		if (container is not IMongoCollection<TDoc> collection)
 		{
 			throw new ArgumentException(nameof(container));
 		}
@@ -148,7 +148,7 @@ public class OptimisticSequentialIdGenerator<TDocument, TIdNamespace> : IDSIdGen
 		{
 			throw new ArgumentNullException(nameof(document));
 		}
-		if (document is not TDocument typedDocument)
+		if (document is not TDoc typedDocument)
 		{
 			throw new ArgumentException(nameof(document));
 		}

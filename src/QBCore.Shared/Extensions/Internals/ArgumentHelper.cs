@@ -201,7 +201,7 @@ public static class ArgumentHelper
 
 		if (value is null)
 		{
-			if (expected.IsValueType) throw ArgumentNullExceptionExpectedValueTypeCannotBeNull(expected);
+			//if (!expected.IsNullableValueType()) throw ArgumentNullExceptionExpectedValueTypeCannotBeNull(expected);
 
 			return false;
 		}

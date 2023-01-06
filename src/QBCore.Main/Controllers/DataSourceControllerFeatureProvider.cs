@@ -1,7 +1,6 @@
 using System.Reflection;
 using Microsoft.AspNetCore.Mvc.ApplicationParts;
 using Microsoft.AspNetCore.Mvc.Controllers;
-using QBCore.DataSource;
 using QBCore.ObjectFactory;
 
 namespace QBCore.Controllers;
@@ -20,9 +19,8 @@ public class DataSourceControllerFeatureProvider : IApplicationFeatureProvider<C
 
 		foreach (var info in StaticFactory.DataSources.Values.Where(x => x.BuildAutoController))
 		{
-			var dataSourceControllerType = typeof(DataSourceController<,,,,,,,>).MakeGenericType(
+			var dataSourceControllerType = typeof(DataSourceController<,,,,,,>).MakeGenericType(
 				info.DSTypeInfo.TKey,
-				info.DSTypeInfo.TDocument,
 				info.DSTypeInfo.TCreate,
 				info.DSTypeInfo.TSelect,
 				info.DSTypeInfo.TUpdate,

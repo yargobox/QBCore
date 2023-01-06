@@ -38,6 +38,16 @@ public abstract class DSDocumentInfo
 			dataEntries.Add(dataEntryInfo.Name, dataEntryInfo);
 		}
 
+		var notFoundDependancyName = dataEntries
+			.Values
+			.Where(x => x.DependsOn != null)
+			.SelectMany(x => x.DependsOn!)
+			.FirstOrDefault(x => !dataEntries.ContainsKey(x));
+		if (notFoundDependancyName != null)
+		{
+			throw new InvalidOperationException($"Data entry '{notFoundDependancyName}' not found in document {DocumentType.ToPretty()} specified in one of its attributes {nameof(DeDependsOnAttribute)}.");
+		}
+
 		DataEntries = dataEntries;
 
 		foreach (var de in DataEntries)
@@ -122,6 +132,18 @@ public abstract class DSDocumentInfo
 			{
 				flags |= DataEntryFlags.ForeignId;
 			}
+			if (propertyInfo.IsDefined(typeof(DeNoStorageAttribute), true))
+			{
+				flags |= DataEntryFlags.NoStorage;
+			}
+			if (propertyInfo.IsDefined(typeof(DeViewNameAttribute), true))
+			{
+				flags |= DataEntryFlags.DocumentName;
+			}
+			if (propertyInfo.IsDefined(typeof(DeDependsOnAttribute), true))
+			{
+				flags |= DataEntryFlags.Dependent;
+			}
 
 			if (flags == DataEntryFlags.None)
 			{
@@ -169,6 +191,18 @@ public abstract class DSDocumentInfo
 			if (fieldInfo.IsDefined(typeof(DeForeignIdAttribute), true))
 			{
 				flags |= DataEntryFlags.ForeignId;
+			}
+			if (fieldInfo.IsDefined(typeof(DeNoStorageAttribute), true))
+			{
+				flags |= DataEntryFlags.NoStorage;
+			}
+			if (fieldInfo.IsDefined(typeof(DeViewNameAttribute), true))
+			{
+				flags |= DataEntryFlags.DocumentName;
+			}
+			if (fieldInfo.IsDefined(typeof(DeDependsOnAttribute), true))
+			{
+				flags |= DataEntryFlags.Dependent;
 			}
 
 			if (flags == DataEntryFlags.None && !fieldInfo.IsDefined(typeof(DeDataEntryAttribute), true))

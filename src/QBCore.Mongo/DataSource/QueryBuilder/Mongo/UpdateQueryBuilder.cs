@@ -6,16 +6,16 @@ using QBCore.Extensions.Internals;
 
 namespace QBCore.DataSource.QueryBuilder.Mongo;
 
-internal sealed class UpdateQueryBuilder<TDocument, TUpdate> : QueryBuilder<TDocument, TUpdate>, IUpdateQueryBuilder<TDocument, TUpdate>
+internal sealed class UpdateQueryBuilder<TDoc, TUpdate> : QueryBuilder<TDoc, TUpdate>, IUpdateQueryBuilder<TDoc, TUpdate>
 {
 	public override QueryBuilderTypes QueryBuilderType => QueryBuilderTypes.Update;
 
-	public UpdateQueryBuilder(QBUpdateBuilder<TDocument, TUpdate> building, IDataContext dataContext) : base(building, dataContext)
+	public UpdateQueryBuilder(UpdateQBBuilder<TDoc, TUpdate> building, IDataContext dataContext) : base(building, dataContext)
 	{
 		building.Normalize();
 	}
 
-	public async Task<TDocument?> UpdateAsync(object id, TUpdate document, IReadOnlySet<string>? validFieldNames = null, DataSourceUpdateOptions? options = null, CancellationToken cancellationToken = default(CancellationToken))
+	public async Task<TDoc?> UpdateAsync(object id, TUpdate document, IReadOnlySet<string>? validFieldNames = null, DataSourceUpdateOptions? options = null, CancellationToken cancellationToken = default(CancellationToken))
 	{
 		if (id is null) throw EX.QueryBuilder.Make.IdentifierValueNotSpecified(nameof(id));
 		if (document is null) throw EX.QueryBuilder.Make.DocumentNotSpecified(nameof(document));
@@ -38,22 +38,22 @@ internal sealed class UpdateQueryBuilder<TDocument, TUpdate> : QueryBuilder<TDoc
 			}
 		}
 
-		var collection = _mongoDbContext.AsMongoDatabase().GetCollection<TDocument>(top.DBSideName);
+		var collection = _mongoDbContext.AsMongoDatabase().GetCollection<TDoc>(top.DBSideName);
 
 		var updateOptions = (UpdateOptions?)options?.NativeOptions ?? new UpdateOptions();
 		var clientSessionHandle = (IClientSessionHandle?)options?.NativeClientSession;
 
-		var deId = (MongoDEInfo?)Builder.DocumentInfo.IdField
-			?? throw EX.QueryBuilder.Make.DocumentDoesNotHaveIdDataEntry(Builder.DocumentInfo.DocumentType.ToPretty());
-		var deUpdated = (MongoDEInfo?)Builder.DocumentInfo.DateUpdatedField;
-		var deModified = (MongoDEInfo?)Builder.DocumentInfo.DateModifiedField;
+		var deId = (MongoDEInfo?)Builder.DocInfo.IdField
+			?? throw EX.QueryBuilder.Make.DocumentDoesNotHaveIdDataEntry(Builder.DocInfo.DocumentType.ToPretty());
+		var deUpdated = (MongoDEInfo?)Builder.DocInfo.DateUpdatedField;
+		var deModified = (MongoDEInfo?)Builder.DocInfo.DateModifiedField;
 
 		var filter = BuildConditionTree(false, Builder.Conditions, GetDBSideName, Builder.Parameters)?.BsonDocument ?? _noneFilter;
 
-		UpdateDefinition<TDocument>? update = null;
+		UpdateDefinition<TDoc>? update = null;
 		object? value;
 		bool isSetValue, isUpdatedSet = false, isModifiedSet = false;
-		var dataEntries = (Builder.ProjectionInfo?.DataEntries ?? Builder.DocumentInfo.DataEntries).Values.Cast<MongoDEInfo>();
+		var dataEntries = (Builder.DtoInfo?.DataEntries ?? Builder.DocInfo.DataEntries).Values.Cast<MongoDEInfo>();
 
 		foreach (var deInfo in dataEntries.Where(x => x.MemberMap != null && x.Name != deId.Name && (validFieldNames == null || validFieldNames.Contains(x.Name))))
 		{
@@ -71,7 +71,7 @@ internal sealed class UpdateQueryBuilder<TDocument, TUpdate> : QueryBuilder<TDoc
 
 			if (isSetValue)
 			{
-				update = update?.Set(deInfo.Name, value) ?? Builders<TDocument>.Update.Set(deInfo.Name, value);
+				update = update?.Set(deInfo.Name, value) ?? Builders<TDoc>.Update.Set(deInfo.Name, value);
 			}
 		}
 
@@ -81,46 +81,46 @@ internal sealed class UpdateQueryBuilder<TDocument, TUpdate> : QueryBuilder<TDoc
 			{
 				await CallQueryStringCallback(options, collection, "Find", filter);
 
-				TDocument? foundDocument;
+				TDoc? foundDocument;
 				if (clientSessionHandle == null)
 				{
-					foundDocument = await (await collection.FindAsync(filter, new FindOptions<TDocument> { Limit = 1 }, cancellationToken).ConfigureAwait(false))
+					foundDocument = await (await collection.FindAsync(filter, new FindOptions<TDoc> { Limit = 1 }, cancellationToken).ConfigureAwait(false))
 						.FirstOrDefaultAsync().ConfigureAwait(false);
 				}
 				else
 				{
-					foundDocument = await (await collection.FindAsync(clientSessionHandle, filter, new FindOptions<TDocument> { Limit = 1 }, cancellationToken).ConfigureAwait(false))
+					foundDocument = await (await collection.FindAsync(clientSessionHandle, filter, new FindOptions<TDoc> { Limit = 1 }, cancellationToken).ConfigureAwait(false))
 						.FirstOrDefaultAsync().ConfigureAwait(false);
 				}
 
 				return foundDocument
-					?? throw EX.QueryBuilder.Make.OperationFailedNoSuchRecord(QueryBuilderType.ToString(), id.ToString(), Builder.DocumentInfo.DocumentType.ToPretty());
+					?? throw EX.QueryBuilder.Make.OperationFailedNoSuchRecord(QueryBuilderType.ToString(), id.ToString(), Builder.DocInfo.DocumentType.ToPretty());
 			}
 			else
 			{
-				return default(TDocument?);
+				return default(TDoc?);
 			}
 		}
 		
 		if (deUpdated != null && !isUpdatedSet)
 		{
-			update = update?.CurrentDate(deUpdated.Name) ?? Builders<TDocument>.Update.CurrentDate(deUpdated.Name);
+			update = update?.CurrentDate(deUpdated.Name) ?? Builders<TDoc>.Update.CurrentDate(deUpdated.Name);
 		}
 		if (deModified != null && !isModifiedSet)
 		{
-			update = update?.CurrentDate(deModified.Name) ?? Builders<TDocument>.Update.CurrentDate(deModified.Name);
+			update = update?.CurrentDate(deModified.Name) ?? Builders<TDoc>.Update.CurrentDate(deModified.Name);
 		}
 
 		if (options?.FetchResultDocument == true)
 		{
 			await CallQueryStringCallback(options, collection, "FindOneAndUpdate", filter, update).ConfigureAwait(false);
 
-			var findOneAndUpdateOptions = new FindOneAndUpdateOptions<TDocument>
+			var findOneAndUpdateOptions = new FindOneAndUpdateOptions<TDoc>
 			{
 				IsUpsert = false,
 				ReturnDocument = ReturnDocument.After
 			};
-			TDocument? foundDocument;
+			TDoc? foundDocument;
 			if (clientSessionHandle == null)
 			{
 				foundDocument = await collection.FindOneAndUpdateAsync(filter, update, findOneAndUpdateOptions, cancellationToken).ConfigureAwait(false);
@@ -131,7 +131,7 @@ internal sealed class UpdateQueryBuilder<TDocument, TUpdate> : QueryBuilder<TDoc
 			}
 
 			return foundDocument
-				?? throw EX.QueryBuilder.Make.OperationFailedNoSuchRecord(QueryBuilderType.ToString(), id.ToString(), Builder.DocumentInfo.DocumentType.ToPretty());
+				?? throw EX.QueryBuilder.Make.OperationFailedNoSuchRecord(QueryBuilderType.ToString(), id.ToString(), Builder.DocInfo.DocumentType.ToPretty());
 		}
 		else
 		{
@@ -152,26 +152,26 @@ internal sealed class UpdateQueryBuilder<TDocument, TUpdate> : QueryBuilder<TDoc
 			{
 				if (result.ModifiedCount <= 0)
 				{
-					throw EX.QueryBuilder.Make.OperationFailedNoSuchRecord(QueryBuilderType.ToString(), id.ToString(), Builder.DocumentInfo.DocumentType.ToPretty());
+					throw EX.QueryBuilder.Make.OperationFailedNoSuchRecord(QueryBuilderType.ToString(), id.ToString(), Builder.DocInfo.DocumentType.ToPretty());
 				}
 			}
 			else
 			{
-				throw EX.QueryBuilder.Make.OperationFailedNoAcknowledgment(QueryBuilderType.ToString(), id.ToString(), Builder.DocumentInfo.DocumentType.ToPretty());
+				throw EX.QueryBuilder.Make.OperationFailedNoAcknowledgment(QueryBuilderType.ToString(), id.ToString(), Builder.DocInfo.DocumentType.ToPretty());
 			}
 
-			return default(TDocument?);
+			return default(TDoc?);
 		}
 	}
 
-	private async ValueTask CallQueryStringCallback(DataSourceOperationOptions? options, IMongoCollection<TDocument> collection, string funcName, FilterDefinition<TDocument> filter, UpdateDefinition<TDocument> update)
+	private async ValueTask CallQueryStringCallback(DataSourceOperationOptions? options, IMongoCollection<TDoc> collection, string funcName, FilterDefinition<TDoc> filter, UpdateDefinition<TDoc> update)
 	{
 		if (options?.QueryStringCallbackAsync != null)
 		{
 			var queryString = string.Concat(
 				"db.", collection.CollectionNamespace.FullName, ".", funcName, "(", Environment.NewLine,
 					"\t", filter.ToString(), ",", Environment.NewLine,
-					"\t", update.Render(BsonSerializer.SerializerRegistry.GetSerializer<TDocument>(), BsonSerializer.SerializerRegistry).ToString(), ",", Environment.NewLine,
+					"\t", update.Render(BsonSerializer.SerializerRegistry.GetSerializer<TDoc>(), BsonSerializer.SerializerRegistry).ToString(), ",", Environment.NewLine,
 					"\t{\"upsert\": false}", Environment.NewLine,
 				");"
 			);
@@ -182,7 +182,7 @@ internal sealed class UpdateQueryBuilder<TDocument, TUpdate> : QueryBuilder<TDoc
 			var queryString = string.Concat(
 				"db.", collection.CollectionNamespace.FullName, ".", funcName, "(", Environment.NewLine,
 					"\t", filter.ToString(), ",", Environment.NewLine,
-					"\t", update.Render(BsonSerializer.SerializerRegistry.GetSerializer<TDocument>(), BsonSerializer.SerializerRegistry).ToString(), ",", Environment.NewLine,
+					"\t", update.Render(BsonSerializer.SerializerRegistry.GetSerializer<TDoc>(), BsonSerializer.SerializerRegistry).ToString(), ",", Environment.NewLine,
 					"\t{\"upsert\": false}", Environment.NewLine,
 				");"
 			);
@@ -190,7 +190,7 @@ internal sealed class UpdateQueryBuilder<TDocument, TUpdate> : QueryBuilder<TDoc
 		}
 	}
 
-	private async ValueTask CallQueryStringCallback(DataSourceOperationOptions? options, IMongoCollection<TDocument> collection, string funcName, FilterDefinition<TDocument> filter)
+	private async ValueTask CallQueryStringCallback(DataSourceOperationOptions? options, IMongoCollection<TDoc> collection, string funcName, FilterDefinition<TDoc> filter)
 	{
 		if (options?.QueryStringCallbackAsync != null)
 		{

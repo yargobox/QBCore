@@ -3,7 +3,7 @@ using QBCore.ObjectFactory;
 
 namespace QBCore.DataSource;
 
-public abstract class DataSourceListener<TKey, TDocument, TCreate, TSelect, TUpdate, TDelete, TRestore> : IDataSourceListener
+public abstract class DataSourceListener<TKey, TDoc, TCreate, TSelect, TUpdate, TDelete, TRestore> : IDataSourceListener
 {
 	public abstract OKeyName KeyName { get; }
 

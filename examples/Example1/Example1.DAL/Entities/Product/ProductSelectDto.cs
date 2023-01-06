@@ -16,7 +16,7 @@ public class ProductSelectDto
 	[DeUpdated] public DateTimeOffset? Updated { get; set; }
 	[DeDeleted] public DateTimeOffset? Deleted { get; set; }
 
-	static void Builder(IQBMongoSelectBuilder<Product, ProductSelectDto> builder)
+	static void Builder(IMongoSelectQBBuilder<Product, ProductSelectDto> builder)
 	{
 		builder.Select("products");
 	}

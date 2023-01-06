@@ -9,11 +9,11 @@ public interface IQBBuilder
 	QueryBuilderTypes QueryBuilderType { get; }
 	IDataLayerInfo DataLayer { get; }
 
-	Type DocumentType { get; }
-	Type ProjectionType { get; }
+	Type DocType { get; }
+	Type DtoType { get; }
 
-	DSDocumentInfo DocumentInfo { get; }
-	DSDocumentInfo? ProjectionInfo { get; }
+	DSDocumentInfo DocInfo { get; }
+	DSDocumentInfo? DtoInfo { get; }
 
 	IReadOnlyList<QBContainer> Containers { get; }
 	IReadOnlyList<QBCondition> Connects { get; }
@@ -24,15 +24,18 @@ public interface IQBBuilder
 	IReadOnlyList<QBAggregation> Aggregations { get; }
 
 	bool IsNormalized { get; }
-	object SyncRoot { get; }
+	bool IsPrepared { get; }
 
 	void Normalize();
+	void Prepare();
 }
 
 public abstract class QBBuilder<TDoc, TDto> : IQBBuilder
 {
 	protected static class EmptyLists
 	{
+		static EmptyLists() { }
+
 		public static readonly List<QBContainer> Containers = new List<QBContainer>(0);
 		public static readonly List<QBCondition> Conditions = new List<QBCondition>(0);
 		public static readonly List<QBField> Fields = new List<QBField>(0);
@@ -43,11 +46,12 @@ public abstract class QBBuilder<TDoc, TDto> : IQBBuilder
 
 	public abstract QueryBuilderTypes QueryBuilderType { get; }
 	public abstract IDataLayerInfo DataLayer { get; }
-	public Type DocumentType => typeof(TDoc);
-	public Type ProjectionType => typeof(TDto);
-	public DSDocumentInfo DocumentInfo => _documentInfo;
-	public DSDocumentInfo? ProjectionInfo => _projectionInfo;
-	public bool IsNormalized { get; protected set; }
+	public Type DocType => typeof(TDoc);
+	public Type DtoType => typeof(TDto);
+	public DSDocumentInfo DocInfo => _docInfo;
+	public DSDocumentInfo? DtoInfo => _dtoInfo;
+	public bool IsNormalized { get => (_state & 1) == 1; protected set => _state = value ? (_state | 1) : (_state & ~3); }
+	public bool IsPrepared { get => (_state & 3) == 3; protected set => _state = value ? (_state | 2) : (_state & ~2); }
 
 	public virtual IReadOnlyList<QBContainer> Containers => EmptyLists.Containers;
 	public virtual IReadOnlyList<QBCondition> Connects => EmptyLists.Conditions;
@@ -57,40 +61,46 @@ public abstract class QBBuilder<TDoc, TDto> : IQBBuilder
 	public virtual IReadOnlyList<QBSortOrder> SortOrders => EmptyLists.SortOrders;
 	public virtual IReadOnlyList<QBAggregation> Aggregations => EmptyLists.Aggregations;
 
-	public object SyncRoot => _syncRoot ?? Interlocked.CompareExchange(ref _syncRoot, new object(), null) ?? _syncRoot;
-
-	private object? _syncRoot;
-	private readonly DSDocumentInfo _documentInfo;
-	private readonly DSDocumentInfo? _projectionInfo;
+	private readonly DSDocumentInfo _docInfo;
+	private readonly DSDocumentInfo? _dtoInfo;
+	private int _state;
 
 	public QBBuilder()
 	{
-		_documentInfo = StaticFactory.Documents[typeof(TDoc)].Value;
-		_projectionInfo = StaticFactory.Documents.GetValueOrDefault(typeof(TDto))?.Value;
+		_docInfo = StaticFactory.Documents[typeof(TDoc)].Value;
+		_dtoInfo = StaticFactory.Documents.GetValueOrDefault(typeof(TDto))?.Value;
 	}
 	public QBBuilder(QBBuilder<TDoc, TDto> other)
 	{
 		other.Normalize();
 		IsNormalized = other.IsNormalized;
 
-		_documentInfo = other._documentInfo;
-		_projectionInfo = other._projectionInfo;
+		_docInfo = other._docInfo;
+		_dtoInfo = other._dtoInfo;
 	}
 
-	public virtual QBBuilder<TDoc, TDto> AutoBuild() => throw new NotSupportedException();
+	public virtual QBBuilder<TDoc, TDto> AutoBuild(string? tableName = null) => throw new NotSupportedException();
 
 	public void Normalize()
 	{
-		if (IsNormalized)
+		if (!IsNormalized)
 		{
-			return;
+			OnNormalize();
+			IsNormalized = true;
 		}
-
-		OnNormalize();
-
-		IsNormalized = true;
 	}
+	public void Prepare()
+	{
+		if (!IsPrepared)
+		{
+			Normalize();
+			OnPrepare();
+			IsPrepared = true;
+		}
+	}
+
 	protected virtual void OnNormalize() { }
+	protected virtual void OnPrepare() { }
 
 	public virtual Func<IDSIdGenerator>? IdGenerator { get => throw new NotSupportedException(); set => throw new NotSupportedException(); }
 

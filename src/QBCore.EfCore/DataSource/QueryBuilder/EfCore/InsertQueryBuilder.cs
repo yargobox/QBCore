@@ -5,17 +5,16 @@ using QBCore.Extensions.Internals;
 
 namespace QBCore.DataSource.QueryBuilder.EfCore;
 
-internal sealed class InsertQueryBuilder<TDocument, TCreate> : QueryBuilder<TDocument, TCreate>, IInsertQueryBuilder<TDocument, TCreate>
-	where TDocument : class
+internal sealed class InsertQueryBuilder<TDoc, TCreate> : QueryBuilder<TDoc, TCreate>, IInsertQueryBuilder<TDoc, TCreate> where TDoc : class
 {
 	public override QueryBuilderTypes QueryBuilderType => QueryBuilderTypes.Insert;
 
-	public InsertQueryBuilder(QBInsertBuilder<TDocument, TCreate> building, IDataContext dataContext) : base(building, dataContext)
+	public InsertQueryBuilder(InsertQBBuilder<TDoc, TCreate> building, IDataContext dataContext) : base(building, dataContext)
 	{
 		building.Normalize();
 	}
 
-	public async Task<TDocument> InsertAsync(TDocument document, DataSourceInsertOptions? options = null, CancellationToken cancellationToken = default(CancellationToken))
+	public async Task<TDoc> InsertAsync(TDoc document, DataSourceInsertOptions? options = null, CancellationToken cancellationToken = default(CancellationToken))
 	{
 		var top = Builder.Containers.First();
 		if (top.ContainerOperation != ContainerOperations.Insert)
@@ -26,8 +25,8 @@ internal sealed class InsertQueryBuilder<TDocument, TCreate> : QueryBuilder<TDoc
 		var dbContext = _dataContext.AsDbContext();
 		var logger = dbContext as IEfCoreDbContextLogger;
 
-		var deCreated = (EfCoreDEInfo?)Builder.DocumentInfo.DateCreatedField;
-		var deModified = (EfCoreDEInfo?)Builder.DocumentInfo.DateModifiedField;
+		var deCreated = (EfCoreDEInfo?)Builder.DocInfo.DateCreatedField;
+		var deModified = (EfCoreDEInfo?)Builder.DocInfo.DateModifiedField;
 
 		if (deCreated?.Flags.HasFlag(DataEntryFlags.ReadOnly) == false && deCreated.Setter != null)
 		{
@@ -55,14 +54,14 @@ internal sealed class InsertQueryBuilder<TDocument, TCreate> : QueryBuilder<TDoc
 
 		try
 		{
-			await dbContext.AddAsync<TDocument>(document, cancellationToken);
+			await dbContext.AddAsync<TDoc>(document, cancellationToken);
 			await dbContext.SaveChangesAsync(cancellationToken);
 
 			return document;
 		}
 		finally
 		{
-			dbContext.Entry<TDocument>(document).State = EntityState.Detached;
+			dbContext.Entry<TDoc>(document).State = EntityState.Detached;
 
 			DetachQueryStringCallback(options, dbContext);
 		}

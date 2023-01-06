@@ -197,7 +197,7 @@ public sealed class DEPath : IEquatable<DEPath>, IReadOnlyList<DEInfo>
 
 
 [DebuggerDisplay("{ToString()}")]
-public readonly struct DEPathDefinition<TDocument> : IEquatable<DEPathDefinition<TDocument>>
+public readonly struct DEPathDefinition<TDoc> : IEquatable<DEPathDefinition<TDoc>>
 {
 	public readonly string? Path;
 	public readonly DEPath? DataEntryPath;
@@ -232,9 +232,9 @@ public readonly struct DEPathDefinition<TDocument> : IEquatable<DEPathDefinition
 		{
 			throw new ArgumentNullException(nameof(dataEntryInfo));
 		}
-		if (dataEntryInfo.Document.DocumentType != typeof(TDocument))
+		if (dataEntryInfo.Document.DocumentType != typeof(TDoc))
 		{
-			throw new ArgumentException($"DataEntry '{dataEntryInfo.ToString(true)}' does not match the expected document type '{typeof(TDocument).ToPretty()}'.", nameof(dataEntryInfo));
+			throw new ArgumentException($"DataEntry '{dataEntryInfo.ToString(true)}' does not match the expected document type '{typeof(TDoc).ToPretty()}'.", nameof(dataEntryInfo));
 		}
 
 		Path = null;
@@ -248,7 +248,7 @@ public readonly struct DEPathDefinition<TDocument> : IEquatable<DEPathDefinition
 			return DataEntryPath;
 		}
 		
-		return new DEPath(typeof(TDocument), Path!, true, dataLayer);
+		return new DEPath(typeof(TDoc), Path!, true, dataLayer);
 	}
 
 	public readonly override string ToString()
@@ -260,17 +260,17 @@ public readonly struct DEPathDefinition<TDocument> : IEquatable<DEPathDefinition
 	{
 		if (shortDocumentName)
 		{
-			return string.Concat(typeof(TDocument).Name, ".", (Path ?? DataEntryPath!.Path));
+			return string.Concat(typeof(TDoc).Name, ".", (Path ?? DataEntryPath!.Path));
 		}
 		else
 		{
-			return string.Concat(typeof(TDocument).FullName, ".", (Path ?? DataEntryPath!.Path));
+			return string.Concat(typeof(TDoc).FullName, ".", (Path ?? DataEntryPath!.Path));
 		}
 	}
 
 	public readonly override int GetHashCode()
 	{
-		return typeof(TDocument).GetHashCode() ^ (Path ?? DataEntryPath!.Path).GetHashCode();
+		return typeof(TDoc).GetHashCode() ^ (Path ?? DataEntryPath!.Path).GetHashCode();
 	}
 
 	public readonly override bool Equals(object? obj)
@@ -279,35 +279,35 @@ public readonly struct DEPathDefinition<TDocument> : IEquatable<DEPathDefinition
 		{
 			return false;
 		}
-		if (obj is DEPathDefinition<TDocument> value2)
+		if (obj is DEPathDefinition<TDoc> value2)
 		{
 			return Equals(value2);
 		}
 		return false;
 	}
 
-	public readonly bool Equals(DEPathDefinition<TDocument> other)
+	public readonly bool Equals(DEPathDefinition<TDoc> other)
 		=> (Path ?? DataEntryPath!.Path) == (other.Path ?? other.DataEntryPath!.Path);
 
-	public static bool operator ==(DEPathDefinition<TDocument> a, DEPathDefinition<TDocument> b)
+	public static bool operator ==(DEPathDefinition<TDoc> a, DEPathDefinition<TDoc> b)
 		=> a.Equals(b);
 
-	public static bool operator !=(DEPathDefinition<TDocument> a, DEPathDefinition<TDocument> b)
+	public static bool operator !=(DEPathDefinition<TDoc> a, DEPathDefinition<TDoc> b)
 		=> !a.Equals(b);
 
-	public static implicit operator DEPathDefinition<TDocument>(string path)
-		=> new DEPathDefinition<TDocument>(path);
+	public static implicit operator DEPathDefinition<TDoc>(string path)
+		=> new DEPathDefinition<TDoc>(path);
 
-	public static implicit operator DEPathDefinition<TDocument>(DEInfo dataEntryInfo)
-		=> new DEPathDefinition<TDocument>(dataEntryInfo);
+	public static implicit operator DEPathDefinition<TDoc>(DEInfo dataEntryInfo)
+		=> new DEPathDefinition<TDoc>(dataEntryInfo);
 
-	public static implicit operator DEPathDefinition<TDocument>(DEPath path)
-		=> new DEPathDefinition<TDocument>(path);
+	public static implicit operator DEPathDefinition<TDoc>(DEPath path)
+		=> new DEPathDefinition<TDoc>(path);
 }
 
 
 [DebuggerDisplay("{ToString()}")]
-public readonly struct DEPathDefinition<TDocument, TField> : IEquatable<DEPathDefinition<TDocument, TField>>, IEquatable<DEPathDefinition<TDocument>>
+public readonly struct DEPathDefinition<TDoc, TField> : IEquatable<DEPathDefinition<TDoc, TField>>, IEquatable<DEPathDefinition<TDoc>>
 {
 	public readonly string? Path;
 	public readonly DEPath? DataEntryPath;
@@ -346,11 +346,11 @@ public readonly struct DEPathDefinition<TDocument, TField> : IEquatable<DEPathDe
 		{
 			throw new ArgumentNullException(nameof(dataEntryInfo));
 		}
-		if (dataEntryInfo.Document.DocumentType != typeof(TDocument))
+		if (dataEntryInfo.Document.DocumentType != typeof(TDoc))
 		{
-			throw new ArgumentException($"DataEntry '{dataEntryInfo.ToString(true)}' does not match the expected document type '{typeof(TDocument).ToPretty()}'.", nameof(dataEntryInfo));
+			throw new ArgumentException($"DataEntry '{dataEntryInfo.ToString(true)}' does not match the expected document type '{typeof(TDoc).ToPretty()}'.", nameof(dataEntryInfo));
 		}
-		if (dataEntryInfo.Document.DocumentType != typeof(TDocument) || dataEntryInfo.DataEntryType != typeof(TField))
+		if (dataEntryInfo.Document.DocumentType != typeof(TDoc) || dataEntryInfo.DataEntryType != typeof(TField))
 		{
 			throw new ArgumentException($"DataEntry '{dataEntryInfo.ToString(true)}' is of type '{dataEntryInfo.DataEntryType.ToPretty()}' which does not match the expected '{typeof(TField).ToPretty()}'.", nameof(dataEntryInfo));
 		}
@@ -366,7 +366,7 @@ public readonly struct DEPathDefinition<TDocument, TField> : IEquatable<DEPathDe
 			return DataEntryPath;
 		}
 		
-		var dataEntryPath = new DEPath(typeof(TDocument), Path!, true, dataLayer);
+		var dataEntryPath = new DEPath(typeof(TDoc), Path!, true, dataLayer);
 		if (dataEntryPath.DataEntryType != typeof(TField))
 		{
 			throw new ArgumentException($"DataEntry '{dataEntryPath.ToString(true)}' is of type '{dataEntryPath.DataEntryType.ToPretty()}' which does not match the expected '{typeof(TField).ToPretty()}'.", nameof(dataEntryPath));
@@ -378,7 +378,7 @@ public readonly struct DEPathDefinition<TDocument, TField> : IEquatable<DEPathDe
 	{
 		if (Path != null)
 		{
-			return string.Concat(typeof(TDocument).ToPretty(), ".", Path);
+			return string.Concat(typeof(TDoc).ToPretty(), ".", Path);
 		}
 		else
 		{
@@ -390,7 +390,7 @@ public readonly struct DEPathDefinition<TDocument, TField> : IEquatable<DEPathDe
 	{
 		if (Path != null)
 		{
-			return typeof(TDocument).GetHashCode() ^ Path.GetHashCode();
+			return typeof(TDoc).GetHashCode() ^ Path.GetHashCode();
 		}
 		else
 		{
@@ -404,39 +404,39 @@ public readonly struct DEPathDefinition<TDocument, TField> : IEquatable<DEPathDe
 		{
 			return false;
 		}
-		if (obj is DEPathDefinition<TDocument, TField> value1)
+		if (obj is DEPathDefinition<TDoc, TField> value1)
 		{
 			return Equals(value1);
 		}
-		if (obj is DEPathDefinition<TDocument> value2)
+		if (obj is DEPathDefinition<TDoc> value2)
 		{
 			return Equals(value2);
 		}
 		return false;
 	}
 
-	public bool Equals(DEPathDefinition<TDocument> other)
+	public bool Equals(DEPathDefinition<TDoc> other)
 		=> (Path ?? DataEntryPath!.Path) == (other.Path ?? other.DataEntryPath!.Path);
 
-	public bool Equals(DEPathDefinition<TDocument, TField> other)
+	public bool Equals(DEPathDefinition<TDoc, TField> other)
 		=> (Path ?? DataEntryPath!.Path) == (other.Path ?? other.DataEntryPath!.Path);
 
-	public static bool operator ==(DEPathDefinition<TDocument, TField> a, DEPathDefinition<TDocument, TField> b)
+	public static bool operator ==(DEPathDefinition<TDoc, TField> a, DEPathDefinition<TDoc, TField> b)
 		=> a.Equals(b);
 
-	public static bool operator !=(DEPathDefinition<TDocument, TField> a, DEPathDefinition<TDocument, TField> b)
+	public static bool operator !=(DEPathDefinition<TDoc, TField> a, DEPathDefinition<TDoc, TField> b)
 		=> !a.Equals(b);
 
-	public static implicit operator DEPathDefinition<TDocument, TField>(DEPathDefinition<TDocument> def)
+	public static implicit operator DEPathDefinition<TDoc, TField>(DEPathDefinition<TDoc> def)
 		=> def.Path != null
-			? new DEPathDefinition<TDocument, TField>(def.Path)
-			: new DEPathDefinition<TDocument, TField>(def.DataEntryPath!);
+			? new DEPathDefinition<TDoc, TField>(def.Path)
+			: new DEPathDefinition<TDoc, TField>(def.DataEntryPath!);
 
-	public static implicit operator DEPathDefinition<TDocument, TField>(string path)
-		=> new DEPathDefinition<TDocument, TField>(path);
+	public static implicit operator DEPathDefinition<TDoc, TField>(string path)
+		=> new DEPathDefinition<TDoc, TField>(path);
 
-	public static implicit operator DEPathDefinition<TDocument, TField>(DEInfo dataEntryInfo)
-		=> new DEPathDefinition<TDocument, TField>(dataEntryInfo);
-	public static implicit operator DEPathDefinition<TDocument, TField>(DEPath dataEntryPath)
-		=> new DEPathDefinition<TDocument, TField>(dataEntryPath);
+	public static implicit operator DEPathDefinition<TDoc, TField>(DEInfo dataEntryInfo)
+		=> new DEPathDefinition<TDoc, TField>(dataEntryInfo);
+	public static implicit operator DEPathDefinition<TDoc, TField>(DEPath dataEntryPath)
+		=> new DEPathDefinition<TDoc, TField>(dataEntryPath);
 }

@@ -6,42 +6,42 @@ namespace QBCore.DataSource.QueryBuilder;
 public interface IQueryBuilder
 {
 	QueryBuilderTypes QueryBuilderType { get; }
-	Type DocumentType { get; }
-	DSDocumentInfo DocumentInfo { get; }
-	Type ProjectionType { get; }
-	DSDocumentInfo? ProjectionInfo { get; }
+	Type DocType { get; }
+	DSDocumentInfo DocInfo { get; }
+	Type DtoType { get; }
+	DSDocumentInfo? DtoInfo { get; }
 	Type DataContextInterfaceType { get; }
 	IDataContext DataContext { get; }
 }
 
-public interface IQueryBuilder<TDocument, TProjection> : IQueryBuilder
+public interface IQueryBuilder<TDoc, TDto> : IQueryBuilder
 {
-	QBBuilder<TDocument, TProjection> Builder { get; }
+	QBBuilder<TDoc, TDto> Builder { get; }
 }
 
-public interface IInsertQueryBuilder<TDocument, TCreate> : IQueryBuilder<TDocument, TCreate>
+public interface IInsertQueryBuilder<TDoc, TCreate> : IQueryBuilder<TDoc, TCreate>
 {
-	Task<TDocument> InsertAsync(TDocument document, DataSourceInsertOptions? options = null, CancellationToken cancellationToken = default(CancellationToken));
+	Task<TDoc> InsertAsync(TDoc document, DataSourceInsertOptions? options = null, CancellationToken cancellationToken = default(CancellationToken));
 }
 
-public interface ISelectQueryBuilder<TDocument, TSelect> : IQueryBuilder<TDocument, TSelect>
+public interface ISelectQueryBuilder<TDoc, TSelect> : IQueryBuilder<TDoc, TSelect>
 {
-	IQueryable<TDocument> AsQueryable(DataSourceQueryableOptions? options = null);
+	IQueryable<TDoc> AsQueryable(DataSourceQueryableOptions? options = null);
 	Task<long> CountAsync(DataSourceCountOptions? options = null, CancellationToken cancellationToken = default(CancellationToken));
 	Task<IDSAsyncCursor<TSelect>> SelectAsync(long skip = 0L, int take = -1, DataSourceSelectOptions? options = null, CancellationToken cancellationToken = default(CancellationToken));
 }
 
-public interface IUpdateQueryBuilder<TDocument, TUpdate> : IQueryBuilder<TDocument, TUpdate>
+public interface IUpdateQueryBuilder<TDoc, TUpdate> : IQueryBuilder<TDoc, TUpdate>
 {
-	Task<TDocument?> UpdateAsync(object id, TUpdate document, IReadOnlySet<string>? validFieldNames = null, DataSourceUpdateOptions? options = null, CancellationToken cancellationToken = default(CancellationToken));
+	Task<TDoc?> UpdateAsync(object id, TUpdate document, IReadOnlySet<string>? validFieldNames = null, DataSourceUpdateOptions? options = null, CancellationToken cancellationToken = default(CancellationToken));
 }
 
-public interface IDeleteQueryBuilder<TDocument, TDelete> : IQueryBuilder<TDocument, TDelete>
+public interface IDeleteQueryBuilder<TDoc, TDelete> : IQueryBuilder<TDoc, TDelete>
 {
 	Task DeleteAsync(object id, TDelete? document, DataSourceDeleteOptions? options = null, CancellationToken cancellationToken = default(CancellationToken));
 }
 
-public interface IRestoreQueryBuilder<TDocument, TRestore> : IQueryBuilder<TDocument, TRestore>
+public interface IRestoreQueryBuilder<TDoc, TRestore> : IQueryBuilder<TDoc, TRestore>
 {
 	Task RestoreAsync(object id, TRestore? document, DataSourceRestoreOptions? options = null, CancellationToken cancellationToken = default(CancellationToken));
 }

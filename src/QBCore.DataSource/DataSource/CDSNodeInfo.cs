@@ -81,41 +81,41 @@ internal sealed class CDSNodeInfo : ICDSNodeInfo
 
 		return node;
 	}
-	public ICDSNodeInfo AddCondition<TDocument, TParentDocument>(Expression<Func<TDocument, object?>> field, Expression<Func<TParentDocument, object?>> parentField, FO operation = FO.Equal, object? defaultValue = null)
+	public ICDSNodeInfo AddCondition<TDoc, TParentDoc>(Expression<Func<TDoc, object?>> field, Expression<Func<TParentDoc, object?>> parentField, FO operation = FO.Equal, object? defaultValue = null)
 	{
 		var parentNodes = Parents
 			.Where(x =>
-				x.Value.DataSourceType.GetDataSourceTDocument() == typeof(TParentDocument) ||
-				x.Value.DataSourceType.GetDataSourceTSelect() == typeof(TParentDocument))
+				x.Value.DataSourceType.GetDataSourceTDoc() == typeof(TParentDoc) ||
+				x.Value.DataSourceType.GetDataSourceTSelect() == typeof(TParentDoc))
 			.ToArray();
 
 		if (parentNodes.Length > 1)
 		{
-			throw new InvalidOperationException($"There is more than one datasource with document type '{typeof(TDocument).ToPretty()}' in parent CDS nodes. Specify the parent node.");
+			throw new InvalidOperationException($"There is more than one datasource with document type '{typeof(TDoc).ToPretty()}' in parent CDS nodes. Specify the parent node.");
 		}
 		else if (parentNodes.Length < 1)
 		{
-			throw new InvalidOperationException($"There is no datasource with document type '{typeof(TDocument).ToPretty()}' in parent CDS nodes.");
+			throw new InvalidOperationException($"There is no datasource with document type '{typeof(TDoc).ToPretty()}' in parent CDS nodes.");
 		}
 
-		return AddCondition<TDocument, TParentDocument>(field, parentNodes[0].Value, parentField, operation, null);
+		return AddCondition<TDoc, TParentDoc>(field, parentNodes[0].Value, parentField, operation, null);
 	}
-	public ICDSNodeInfo AddCondition<TDocument, TParentDocument>(Expression<Func<TDocument, object?>> field, ICDSNodeInfo parentNode, Expression<Func<TParentDocument, object?>> parentField, FO operation = FO.Equal, object? defaultValue = null)
+	public ICDSNodeInfo AddCondition<TDoc, TParentDoc>(Expression<Func<TDoc, object?>> field, ICDSNodeInfo parentNode, Expression<Func<TParentDoc, object?>> parentField, FO operation = FO.Equal, object? defaultValue = null)
 	{
-		if (DataSourceType.GetDataSourceTDocument() != typeof(TDocument) && DataSourceType.GetDataSourceTSelect() != typeof(TDocument))
+		if (DataSourceType.GetDataSourceTDoc() != typeof(TDoc) && DataSourceType.GetDataSourceTSelect() != typeof(TDoc))
 		{
-			throw new InvalidOperationException($"Specified document type '{typeof(TDocument).ToPretty()}' does not match the datasource document types of node '{Name}'.");
+			throw new InvalidOperationException($"Specified document type '{typeof(TDoc).ToPretty()}' does not match the datasource document types of node '{Name}'.");
 		}
-		if (parentNode.DataSourceType.GetDataSourceTDocument() != typeof(TParentDocument) && parentNode.DataSourceType.GetDataSourceTSelect() != typeof(TParentDocument))
+		if (parentNode.DataSourceType.GetDataSourceTDoc() != typeof(TParentDoc) && parentNode.DataSourceType.GetDataSourceTSelect() != typeof(TParentDoc))
 		{
-			throw new InvalidOperationException($"Specified document type '{typeof(TParentDocument).ToPretty()}' does not match the datasource document types of parent node '{parentNode.Name}'.");
+			throw new InvalidOperationException($"Specified document type '{typeof(TParentDoc).ToPretty()}' does not match the datasource document types of parent node '{parentNode.Name}'.");
 		}
 
-		var cond = new CDSCondition(this.Name, typeof(TDocument), field.GetMemberName())
+		var cond = new CDSCondition(this.Name, typeof(TDoc), field.GetMemberName())
 		{
 			Operation = operation,
 			OperandSourceType = OperandSourceType.Document,
-			ParentDocumentType = typeof(TParentDocument),
+			ParentDocType = typeof(TParentDoc),
 			ParentNodeName = parentNode.Name,
 			ParentFieldName = parentField.GetMemberName(),
 			DefaultValue = defaultValue
@@ -125,14 +125,14 @@ internal sealed class CDSNodeInfo : ICDSNodeInfo
 
 		return this;
 	}
-	public ICDSNodeInfo AddCondition<TDocument>(Expression<Func<TDocument, object?>> field, object? constValue, FO operation = FO.Equal, object? defaultValue = null)
+	public ICDSNodeInfo AddCondition<TDoc>(Expression<Func<TDoc, object?>> field, object? constValue, FO operation = FO.Equal, object? defaultValue = null)
 	{
-		if (DataSourceType.GetDataSourceTDocument() != typeof(TDocument) || DataSourceType.GetDataSourceTSelect() != typeof(TDocument))
+		if (DataSourceType.GetDataSourceTDoc() != typeof(TDoc) || DataSourceType.GetDataSourceTSelect() != typeof(TDoc))
 		{
-			throw new InvalidOperationException($"Specified document type '{typeof(TDocument).ToPretty()}' does not match the datasource document types of node '{Name}'.");
+			throw new InvalidOperationException($"Specified document type '{typeof(TDoc).ToPretty()}' does not match the datasource document types of node '{Name}'.");
 		}
 
-		var cond = new CDSCondition(this.Name, typeof(TDocument), field.GetMemberName())
+		var cond = new CDSCondition(this.Name, typeof(TDoc), field.GetMemberName())
 		{
 			Operation = operation,
 			OperandSourceType = OperandSourceType.ConstValue,

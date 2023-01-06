@@ -48,7 +48,7 @@ public class DSWebRequest : DSRequest
 				}
 				else
 				{
-					_ds = (IDataSource)serviceProvider.GetRequiredService(pDSInfo.ConcreteType);
+					_ds = (IDataSource)serviceProvider.GetRequiredService(pDSInfo.DataSourceServiceType);
 				}
 			}
 			else if (routePart.Key == "id")
@@ -81,7 +81,7 @@ public class DSWebRequest : DSRequest
 				}
 
 				_command |= DSRequestCommands.FilterFlag;
-				_forDS = (IDataSource)serviceProvider.GetRequiredService(pDSInfo.ConcreteType);
+				_forDS = (IDataSource)serviceProvider.GetRequiredService(pDSInfo.DataSourceServiceType);
 				_forDE = new DEPath(pDSInfo.DSTypeInfo.TSelect, stringValue!, true, false) ?? throw new KeyNotFoundException($"Unknown field name '{stringValue}'.");
 			}
 			else if (routePart.Key == "cell_field")
@@ -92,7 +92,7 @@ public class DSWebRequest : DSRequest
 				}
 
 				_command |= DSRequestCommands.CellFlag;
-				_forDS = (IDataSource)serviceProvider.GetRequiredService(pDSInfo.ConcreteType);
+				_forDS = (IDataSource)serviceProvider.GetRequiredService(pDSInfo.DataSourceServiceType);
 				_forDE = new DEPath(pDSInfo.DSTypeInfo.TSelect, stringValue!, true, false) ?? throw new KeyNotFoundException($"Unknown field name '{stringValue}'.");
 			}
 			else if (routePart.Key.Length > 1)

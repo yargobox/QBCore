@@ -20,7 +20,7 @@ public class OrderCreateDto
 		builder.AutoMap();
 	}
 
-	private static void QBBuilder(IQBMongoInsertBuilder<Order, OrderCreateDto> builder)
+	private static void QBBuilder(IMongoInsertQBBuilder<Order, OrderCreateDto> builder)
 	{
 		builder.Insert("orders");
 

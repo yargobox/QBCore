@@ -27,7 +27,7 @@ public class DataSourceControllerRouteConvention : IControllerModelConvention
 		}
 		ExtensionsForAddQBCore.IsDataSourceControllerRouteConventionCreated = true;
 
-		var controllerSubclass = controller.ControllerType.GetSubclassOf(typeof(DataSourceController<,,,,,,,>));
+		var controllerSubclass = controller.ControllerType.GetSubclassOf(typeof(DataSourceController<,,,,,,>));
 
 		if (controllerSubclass != null)
 		{
@@ -35,16 +35,16 @@ public class DataSourceControllerRouteConvention : IControllerModelConvention
 			var dataSourceServiceType = controller.ControllerType.GetGenericArguments().Last();
 
 			// A service type may be not a concrete type. If it is not, we have to find it :(
-			var definition = StaticFactory.DataSources.GetValueOrDefault(dataSourceServiceType) ??
+			var info = StaticFactory.DataSources.GetValueOrDefault(dataSourceServiceType) ??
 				StaticFactory.DataSources.Values.First(x => x.DataSourceServiceType == dataSourceServiceType);
 
 			if (controllerSubclass == controller.ControllerType)
 			{
-				ApplyToAutoDataSourceController(controller, definition);
+				ApplyToAutoDataSourceController(controller, info);
 			}
 			else
 			{
-				ApplyToCustomDataSourceController(controller, definition);
+				ApplyToCustomDataSourceController(controller, info);
 			}
 		}
 		else
@@ -53,14 +53,14 @@ public class DataSourceControllerRouteConvention : IControllerModelConvention
 		}
 	}
 
-	public virtual void ApplyToAutoDataSourceController(ControllerModel controller, IDSInfo definition)
+	public virtual void ApplyToAutoDataSourceController(ControllerModel controller, IDSInfo info)
 	{
-		if (string.IsNullOrEmpty(definition.ControllerName))
+		if (string.IsNullOrEmpty(info.ControllerName))
 		{
-			throw new InvalidOperationException($"No controller name was specified for datasource '{definition.Name}'.");
+			throw new InvalidOperationException($"No controller name was specified for datasource '{info.Name}'.");
 		}
 
-		controller.ControllerName = definition.ControllerName;
+		controller.ControllerName = info.ControllerName;
 
 		var attributeRouteModel = new AttributeRouteModel(new RouteAttribute(RoutePrefix + "[controller]"));
 		var nullRouteSelector = controller.Selectors.FirstOrDefault(x => x.AttributeRouteModel == null);

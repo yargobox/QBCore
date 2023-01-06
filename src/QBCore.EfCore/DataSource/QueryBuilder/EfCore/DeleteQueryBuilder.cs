@@ -5,12 +5,11 @@ using QBCore.Extensions.Internals;
 
 namespace QBCore.DataSource.QueryBuilder.EfCore;
 
-internal sealed class DeleteQueryBuilder<TDocument, TDelete> : QueryBuilder<TDocument, TDelete>, IDeleteQueryBuilder<TDocument, TDelete>
-	where TDocument : class
+internal sealed class DeleteQueryBuilder<TDoc, TDelete> : QueryBuilder<TDoc, TDelete>, IDeleteQueryBuilder<TDoc, TDelete> where TDoc : class
 {
 	public override QueryBuilderTypes QueryBuilderType => QueryBuilderTypes.Delete;
 
-	public DeleteQueryBuilder(QBDeleteBuilder<TDocument, TDelete> building, IDataContext dataContext) : base(building, dataContext)
+	public DeleteQueryBuilder(DeleteQBBuilder<TDoc, TDelete> building, IDataContext dataContext) : base(building, dataContext)
 	{
 		building.Normalize();
 	}
@@ -29,10 +28,10 @@ internal sealed class DeleteQueryBuilder<TDocument, TDelete> : QueryBuilder<TDoc
 		var dbContext = _dataContext.AsDbContext();
 		var logger = dbContext as IEfCoreDbContextLogger;
 
-		var deId = (EfCoreDEInfo?)Builder.DocumentInfo.IdField
-			?? throw EX.QueryBuilder.Make.DocumentDoesNotHaveIdDataEntry(Builder.DocumentInfo.DocumentType.ToPretty());
+		var deId = (EfCoreDEInfo?)Builder.DocInfo.IdField
+			?? throw EX.QueryBuilder.Make.DocumentDoesNotHaveIdDataEntry(Builder.DocInfo.DocumentType.ToPretty());
 		if (deId.Setter == null)
-			throw EX.QueryBuilder.Make.DataEntryDoesNotHaveSetter(Builder.DocumentInfo.DocumentType.ToPretty(), deId.Name);
+			throw EX.QueryBuilder.Make.DataEntryDoesNotHaveSetter(Builder.DocInfo.DocumentType.ToPretty(), deId.Name);
 
 		if (Builder.Conditions.Count != 1)
 		{
@@ -81,7 +80,7 @@ internal sealed class DeleteQueryBuilder<TDocument, TDelete> : QueryBuilder<TDoc
 				
 				if ((deletedCount ?? 0) <= 0)
 				{
-					throw EX.QueryBuilder.Make.OperationFailedNoSuchRecord(QueryBuilderType.ToString(), id.ToString(), Builder.DocumentInfo.DocumentType.ToPretty());
+					throw EX.QueryBuilder.Make.OperationFailedNoSuchRecord(QueryBuilderType.ToString(), id.ToString(), Builder.DocInfo.DocumentType.ToPretty());
 				}
 			}
 		}

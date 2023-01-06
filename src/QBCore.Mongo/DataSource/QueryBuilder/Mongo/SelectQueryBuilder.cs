@@ -6,16 +6,16 @@ using QBCore.DataSource.Options;
 
 namespace QBCore.DataSource.QueryBuilder.Mongo;
 
-internal sealed partial class SelectQueryBuilder<TDocument, TSelect> : QueryBuilder<TDocument, TSelect>, ISelectQueryBuilder<TDocument, TSelect>
+internal sealed partial class SelectQueryBuilder<TDoc, TSelect> : QueryBuilder<TDoc, TSelect>, ISelectQueryBuilder<TDoc, TSelect>
 {
 	public override QueryBuilderTypes QueryBuilderType => QueryBuilderTypes.Select;
 
-	public SelectQueryBuilder(QBSelectBuilder<TDocument, TSelect> building, IDataContext dataContext) : base(building, dataContext)
+	public SelectQueryBuilder(SelectQBBuilder<TDoc, TSelect> building, IDataContext dataContext) : base(building, dataContext)
 	{
 		building.Normalize();
 	}
 
-	public IMongoCollection<TDocument> Collection
+	public IMongoCollection<TDoc> Collection
 	{
 		get
 		{
@@ -24,7 +24,7 @@ internal sealed partial class SelectQueryBuilder<TDocument, TSelect> : QueryBuil
 				var top = Builder.Containers.FirstOrDefault(x => x.ContainerOperation == ContainerOperations.Select);
 				if (top?.ContainerType == ContainerTypes.Table || top?.ContainerType == ContainerTypes.View)
 				{
-					_collection = _mongoDbContext.AsMongoDatabase().GetCollection<TDocument>(top!.DBSideName);
+					_collection = _mongoDbContext.AsMongoDatabase().GetCollection<TDoc>(top!.DBSideName);
 				}
 				else
 				{
@@ -34,9 +34,9 @@ internal sealed partial class SelectQueryBuilder<TDocument, TSelect> : QueryBuil
 			return _collection;
 		}
 	}
-	IMongoCollection<TDocument>? _collection;
+	IMongoCollection<TDoc>? _collection;
 
-	public IQueryable<TDocument> AsQueryable(DataSourceQueryableOptions? options = null)
+	public IQueryable<TDoc> AsQueryable(DataSourceQueryableOptions? options = null)
 	{
 		if (options?.NativeOptions != null && options.NativeOptions is not AggregateOptions)
 		{
@@ -638,9 +638,9 @@ internal sealed partial class SelectQueryBuilder<TDocument, TSelect> : QueryBuil
 		}
 
 		// Exclude Bson-elements missing in DTO compared to Document
-		if (stages[0].Container.DocumentType != typeof(TDocument))
+		if (stages[0].Container.DocumentType != typeof(TDoc))
 		{
-			var docMap = BsonClassMap.LookupClassMap(typeof(TDocument));
+			var docMap = BsonClassMap.LookupClassMap(typeof(TDoc));
 			var selMap = BsonClassMap.LookupClassMap(stages[0].Container.DocumentType);
 			var topAlias = stages[0].Container.Alias;
 			// 

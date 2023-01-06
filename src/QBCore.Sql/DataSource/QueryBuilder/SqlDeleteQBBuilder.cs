@@ -1,101 +1,107 @@
 using System.Linq.Expressions;
+using QBCore.Extensions.Internals;
 
 namespace QBCore.DataSource.QueryBuilder;
 
-internal abstract class SqlDeleteQBBuilder<TDoc, TRestore> : SqlCommonQBBuilder<TDoc, TRestore>, ISqlDeleteQBBuilder<TDoc, TRestore> where TDoc : class
+internal abstract class SqlDeleteQBBuilder<TDoc, TDelete> : SqlCommonQBBuilder<TDoc, TDelete>, ISqlDeleteQBBuilder<TDoc, TDelete> where TDoc : class
 {
 	public override QueryBuilderTypes QueryBuilderType => QueryBuilderTypes.Delete;
 
 	public SqlDeleteQBBuilder()
 	{
-		if (DocumentInfo.IdField == null)
-		{
-			throw new InvalidOperationException($"Document '{typeof(TDoc).ToPretty()}' does not have an id data entry.");
-		}
+		if (DocInfo.IdField == null) throw new InvalidOperationException($"Document '{typeof(TDoc).ToPretty()}' does not have an id data entry.");
 	}
-	public SqlDeleteQBBuilder(SqlDeleteQBBuilder<TDoc, TRestore> other) : base(other) { }
-	public SqlDeleteQBBuilder(IQBBuilder other)
+	public SqlDeleteQBBuilder(SqlDeleteQBBuilder<TDoc, TDelete> other) : base(other) { }
+	public SqlDeleteQBBuilder(IQBBuilder other) : this()
 	{
-		if (other.DocumentType != typeof(TDoc))
+		if (other is null) throw new ArgumentNullException(nameof(other));
+
+		if (other.DocType != typeof(TDoc))
 		{
-			throw new InvalidOperationException($"Could not make delete query builder '{typeof(TDoc).ToPretty()}, {typeof(TRestore).ToPretty()}' from '{other.DocumentType.ToPretty()}, {other.ProjectionType.ToPretty()}'.");
+			throw new InvalidOperationException($"Could not make delete query builder '{typeof(TDoc).ToPretty()}, {typeof(TDelete).ToPretty()}' from '{other.DocType.ToPretty()}, {other.DtoType.ToPretty()}'.");
 		}
 
-		var container = other.Containers.FirstOrDefault();
-		if (container?.DocumentType == null || container.DocumentType != typeof(TDoc) || container.ContainerType != ContainerTypes.Table)
+		other.Prepare();
+
+		var top = other.Containers.FirstOrDefault();
+		if (top?.DocumentType != typeof(TDoc) || (top.ContainerType != ContainerTypes.Table && top.ContainerType != ContainerTypes.View))
 		{
-			throw new InvalidOperationException($"Could not make delete query builder '{typeof(TDoc).ToPretty()}, {typeof(TRestore).ToPretty()}' from '{other.DocumentType.ToPretty()}, {other.ProjectionType.ToPretty()}'.");
+			throw new InvalidOperationException($"Could not make delete query builder '{typeof(TDoc).ToPretty()}, {typeof(TDelete).ToPretty()}' from '{other.DocType.ToPretty()}, {other.DtoType.ToPretty()}'.");
 		}
 
-		AutoBuildSetup(container.DBSideName);
+		AutoBuild(top.DBSideName);
 	}
 
-	public override QBBuilder<TDoc, TRestore> AutoBuild()
+	protected override void OnPrepare()
+	{
+		var top = Containers.FirstOrDefault();
+		if (top?.ContainerOperation != ContainerOperations.Delete)
+		{
+			throw new InvalidOperationException($"Incompatible configuration of delete query builder '{typeof(TDelete).ToPretty()}'.");
+		}
+
+		if (Conditions.Count == 0)
+		{
+			throw EX.QueryBuilder.Make.QueryBuilderMustHaveAtLeastOneCondition(DataLayer.Name, QueryBuilderType.ToString());
+		}
+	}
+
+	public override QBBuilder<TDoc, TDelete> AutoBuild(string? tableName = null)
 	{
 		if (Containers.Count > 0)
 		{
-			throw new InvalidOperationException($"Delete query builder '{typeof(TRestore).ToPretty()}' has already been initialized.");
+			throw new InvalidOperationException($"Delete query builder '{typeof(TDelete).ToPretty()}' has already been initialized.");
 		}
 
-		AutoBuildSetup(null);
+		Delete(tableName)
+			.Condition(DocInfo.IdField!, FO.Equal, "@id");
+
 		return this;
 	}
-	private void AutoBuildSetup(string? tableName)
+	ISqlDeleteQBBuilder<TDoc, TDelete> ISqlDeleteQBBuilder<TDoc, TDelete>.AutoBuild(string? tableName)
 	{
-		var deId = DocumentInfo.IdField
-			?? throw new InvalidOperationException($"Document '{typeof(TDoc).ToPretty()}' does not have an id data entry.");
-
-		Delete(tableName).Condition(deId, FO.Equal, "id");
+		AutoBuild(tableName);
+		return this;
 	}
 
-	protected override void OnNormalize()
-	{
-		base.OnNormalize();
-
-		if (Containers.First().ContainerOperation != ContainerOperations.Delete)
-		{
-			throw new InvalidOperationException($"Incompatible configuration of delete query builder '{typeof(TRestore).ToPretty()}'.");
-		}
-	}
-
-	public override QBBuilder<TDoc, TRestore> Delete(string? tableName = null)
+	public override QBBuilder<TDoc, TDelete> Delete(string? tableName = null)
 	{
 		return AddContainer(tableName, ContainerTypes.Table, ContainerOperations.Delete);
 	}
-	ISqlDeleteQBBuilder<TDoc, TRestore> ISqlDeleteQBBuilder<TDoc, TRestore>.Delete(string? tableName)
+	ISqlDeleteQBBuilder<TDoc, TDelete> ISqlDeleteQBBuilder<TDoc, TDelete>.Delete(string? tableName)
 	{
 		AddContainer(tableName, ContainerTypes.Table, ContainerOperations.Delete);
 		return this;
 	}
 
-	ISqlDeleteQBBuilder<TDoc, TRestore> ISqlDeleteQBBuilder<TDoc, TRestore>.Condition(Expression<Func<TDoc, object?>> field, object? constValue, FO operation)
+	ISqlDeleteQBBuilder<TDoc, TDelete> ISqlDeleteQBBuilder<TDoc, TDelete>.Condition(Expression<Func<TDoc, object?>> field, object? constValue, FO operation)
 	{
 		AddCondition(QBConditionFlags.OnConst, field, constValue, null, operation);
 		return this;
 	}
-	ISqlDeleteQBBuilder<TDoc, TRestore> ISqlDeleteQBBuilder<TDoc, TRestore>.Condition(Expression<Func<TDoc, object?>> field, FO operation, string paramName)
+	ISqlDeleteQBBuilder<TDoc, TDelete> ISqlDeleteQBBuilder<TDoc, TDelete>.Condition(Expression<Func<TDoc, object?>> field, FO operation, string paramName)
 	{
 		AddCondition(QBConditionFlags.OnParam, field, null, paramName, operation);
 		return this;
 	}
 
-	ISqlDeleteQBBuilder<TDoc, TRestore> ISqlDeleteQBBuilder<TDoc, TRestore>.Begin()
+	ISqlDeleteQBBuilder<TDoc, TDelete> ISqlDeleteQBBuilder<TDoc, TDelete>.Begin()
 	{
 		Begin();
 		return this;
 	}
-	ISqlDeleteQBBuilder<TDoc, TRestore> ISqlDeleteQBBuilder<TDoc, TRestore>.End()
+	ISqlDeleteQBBuilder<TDoc, TDelete> ISqlDeleteQBBuilder<TDoc, TDelete>.End()
 	{
 		End();
 		return this;
 	}
 
-	ISqlDeleteQBBuilder<TDoc, TRestore> ISqlDeleteQBBuilder<TDoc, TRestore>.And()
+	ISqlDeleteQBBuilder<TDoc, TDelete> ISqlDeleteQBBuilder<TDoc, TDelete>.And()
 	{
 		And();
 		return this;
 	}
-	ISqlDeleteQBBuilder<TDoc, TRestore> ISqlDeleteQBBuilder<TDoc, TRestore>.Or()
+	ISqlDeleteQBBuilder<TDoc, TDelete> ISqlDeleteQBBuilder<TDoc, TDelete>.Or()
 	{
 		Or();
 		return this;

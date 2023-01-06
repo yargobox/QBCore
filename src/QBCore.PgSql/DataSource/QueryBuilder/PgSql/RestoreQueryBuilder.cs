@@ -54,15 +54,14 @@ internal sealed class RestoreQueryBuilder<TDoc, TRestore> : QueryBuilder<TDoc, T
 				throw EX.QueryBuilder.Make.QueryBuilderMustHaveAtLeastOneCondition(Builder.DataLayer.Name, QueryBuilderType.ToString());
 			}
 
-			var deId = (SqlDEInfo?)Builder.DocumentInfo.IdField
-				?? throw EX.QueryBuilder.Make.DocumentDoesNotHaveIdDataEntry(Builder.DocumentInfo.DocumentType.ToPretty());
-			var deDeleted = (SqlDEInfo?)Builder.DocumentInfo.DateDeletedField
-				?? throw EX.QueryBuilder.Make.DocumentDoesNotHaveDeletedDataEntry(Builder.DocumentInfo.DocumentType.ToPretty());
-			var deProjDeleted = Builder.ProjectionInfo?.DateDeletedField;
+			var deId = (SqlDEInfo?)Builder.DocInfo.IdField
+				?? throw EX.QueryBuilder.Make.DocumentDoesNotHaveIdDataEntry(Builder.DocInfo.DocumentType.ToPretty());
+			var deDeleted = (SqlDEInfo?)Builder.DocInfo.DateDeletedField
+				?? throw EX.QueryBuilder.Make.DocumentDoesNotHaveDeletedDataEntry(Builder.DocInfo.DocumentType.ToPretty());
+			var deProjDeleted = Builder.DtoInfo?.DateDeletedField;
 
 			string queryString;
 			var sb = new StringBuilder();
-			var dbo = ParseDbObjectName(top.DBSideName);
 			var command = new NpgsqlCommand();
 			bool isDeletedSet = false;
 			object? deleted = null;
@@ -79,7 +78,7 @@ internal sealed class RestoreQueryBuilder<TDoc, TRestore> : QueryBuilder<TDoc, T
 						{
 							p.Value = id;
 						}
-						else if (Builder.ProjectionInfo!.DataEntries.TryGetValue(p.ParameterName, out de))
+						else if (Builder.DtoInfo!.DataEntries.TryGetValue(p.ParameterName, out de))
 						{
 							p.Value = de.Getter(document);
 						}
@@ -93,14 +92,9 @@ internal sealed class RestoreQueryBuilder<TDoc, TRestore> : QueryBuilder<TDoc, T
 				}
 			}
 
-			sb.Append("UPDATE ");
-			if (dbo.Schema.Length > 0)
-			{
-				sb.Append(dbo.Schema).Append('.');
-			}
-			sb.Append('"').Append(dbo.Object).AppendLine("\" SET");
+			sb.Append("UPDATE ").AppendContainer(top).Append(" SET").AppendLine();
 			sb.Append("\t\"").Append(deDeleted.DBSideName).Append("\" = ");
-			
+
 			if (isDeletedSet)
 			{
 				var param = Builder.Parameters.FirstOrDefault(x => x.ParameterName == deProjDeleted!.Name);
@@ -114,7 +108,7 @@ internal sealed class RestoreQueryBuilder<TDoc, TRestore> : QueryBuilder<TDoc, T
 			}
 
 			sb.AppendLine().Append("WHERE ");
-			BuildConditionTree(sb, Builder.Conditions, GetDBSideName, Builder.Parameters, command.Parameters);
+			BuildConditionTree(sb, Builder.Conditions, GetQuotedDBSideNameWithoutAlias, Builder.Parameters, command.Parameters);
 
 			queryString = sb.ToString();
 
@@ -142,7 +136,7 @@ internal sealed class RestoreQueryBuilder<TDoc, TRestore> : QueryBuilder<TDoc, T
 				var rowsAffected = await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
 				if (rowsAffected == 0)
 				{
-					throw EX.QueryBuilder.Make.OperationFailedNoSuchRecord(QueryBuilderType.ToString(), id.ToString(), Builder.DocumentInfo.DocumentType.ToPretty());
+					throw EX.QueryBuilder.Make.OperationFailedNoSuchRecord(QueryBuilderType.ToString(), id.ToString(), Builder.DocInfo.DocumentType.ToPretty());
 				}
 			}
 			finally

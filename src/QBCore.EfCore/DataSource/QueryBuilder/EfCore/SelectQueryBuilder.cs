@@ -6,19 +6,18 @@ using QBCore.DataSource.Options;
 
 namespace QBCore.DataSource.QueryBuilder.EfCore;
 
-internal sealed partial class SelectQueryBuilder<TDocument, TSelect> : QueryBuilder<TDocument, TSelect>, ISelectQueryBuilder<TDocument, TSelect>
-	where TDocument : class
+internal sealed partial class SelectQueryBuilder<TDoc, TSelect> : QueryBuilder<TDoc, TSelect>, ISelectQueryBuilder<TDoc, TSelect> where TDoc : class
 {
 	public override QueryBuilderTypes QueryBuilderType => QueryBuilderTypes.Select;
 
-	public SelectQueryBuilder(QBSelectBuilder<TDocument, TSelect> building, IDataContext dataContext) : base(building, dataContext)
+	public SelectQueryBuilder(SelectQBBuilder<TDoc, TSelect> building, IDataContext dataContext) : base(building, dataContext)
 	{
 		building.Normalize();
 	}
 
-	public IQueryable<TDocument> AsQueryable(DataSourceQueryableOptions? options = null)
+	public IQueryable<TDoc> AsQueryable(DataSourceQueryableOptions? options = null)
 	{
-		return _dataContext.AsDbContext().Set<TDocument>();
+		return _dataContext.AsDbContext().Set<TDoc>();
 	}
 
 	public async Task<long> CountAsync(DataSourceCountOptions? options = null, CancellationToken cancellationToken = default(CancellationToken))
@@ -57,7 +56,7 @@ internal sealed partial class SelectQueryBuilder<TDocument, TSelect> : QueryBuil
 
 		try
 		{
-			return await dbContext.Set<TDocument>().LongCountAsync();
+			return await dbContext.Set<TDoc>().LongCountAsync();
 		}
 		finally
 		{
@@ -83,8 +82,8 @@ internal sealed partial class SelectQueryBuilder<TDocument, TSelect> : QueryBuil
 
 		sb.Append("SELECT").AppendLine().Append("\t");
 
-		var docInfo = (EfCoreDocumentInfo)Builder.DocumentInfo;
-		var selInfo = (EfCoreDocumentInfo?)Builder.ProjectionInfo;
+		var docInfo = (EfCoreDocumentInfo)Builder.DocInfo;
+		var selInfo = (EfCoreDocumentInfo?)Builder.DtoInfo;
 		var next = false;
 		foreach (var de in docInfo.DataEntries.Values.Cast<EfCoreDEInfo>()
 			.Where(de => de.Property != null && selInfo?.DataEntries.ContainsKey(de.Name) == true))

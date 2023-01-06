@@ -9,7 +9,7 @@ public static class ExtensionsForDataSource
 			throw new InvalidOperationException($"Invalid datasource type {dataSourceType.ToPretty()}.");
 	public static Type GetDataSourceTKey(this Type dataSourceType)
 		=> dataSourceType.GetDataSourceInterface().GetGenericArguments()[0];
-	public static Type GetDataSourceTDocument(this Type dataSourceType)
+	public static Type GetDataSourceTDoc(this Type dataSourceType)
 		=> dataSourceType.GetDataSourceInterface().GetGenericArguments()[1];
 	public static Type GetDataSourceTCreate(this Type dataSourceType)
 		=> dataSourceType.GetDataSourceInterface().GetGenericArguments()[2];

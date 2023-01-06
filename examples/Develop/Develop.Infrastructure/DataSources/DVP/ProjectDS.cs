@@ -4,16 +4,17 @@ using QBCore.DataSource;
 using QBCore.DataSource.QueryBuilder;
 using Develop.DTOs;
 using Develop.Services;
+using QBCore.ObjectFactory;
 
-namespace Develop.DataSources;
+namespace Develop.DataSources.DVP;
 
 [DsApiController]
 [DataSource("project", typeof(PgSqlDataLayer), DataSourceOptions.SoftDelete)]
-public sealed class ProjectDS : DataSource<int, Project, ProjectCreateDto, ProjectSelectDto, ProjectUpdateDto, SoftDelDto, SoftDelDto, ProjectDS>, IProjectService
+public sealed class ProjectDS : DataSource<int, Project, ProjectCreateDto, ProjectSelectDto, ProjectUpdateDto, SoftDelDto, SoftDelDto, ProjectDS>, IProjectService, ITransient<IProjectService>
 {
-	public ProjectDS(IServiceProvider serviceProvider) : base(serviceProvider) { }
+	public ProjectDS(IServiceProvider sp) : base(sp) { }
 
-	static void DefinitionBuilder(IDSBuilder builder)
+	static void Builder(IDSBuilder builder)
 	{
 		//builder.Name = "[DS]";
 		//builder.Options |= DataSourceOptions.SoftDelete | DataSourceOptions.CanInsert | DataSourceOptions.CanSelect;
@@ -33,42 +34,22 @@ public sealed class ProjectDS : DataSource<int, Project, ProjectCreateDto, Proje
 	
 	static void Builder(ISqlInsertQBBuilder<Project, ProjectCreateDto> builder)
 	{
-		builder.Insert("projects");
+		builder.AutoBuild("dvp.Projects");
 	}
 	static void Builder(ISqlSelectQBBuilder<Project, ProjectSelectDto> builder)
 	{
-		builder.Select("projects");
+		builder.AutoBuild("dvp.Projects");
 	}
 	static void Builder(ISqlUpdateQBBuilder<Project, ProjectUpdateDto> builder)
 	{
-		builder.Update("projects");
+		builder.AutoBuild("dvp.Projects");
 	}
 	static void Builder(ISqlSoftDelQBBuilder<Project, SoftDelDto> builder)
 	{
-		builder.Update("projects");
+		builder.AutoBuild("dvp.Projects");
 	}
 	static void Builder(ISqlRestoreQBBuilder<Project, SoftDelDto> builder)
 	{
-		builder.Update("projects");
+		builder.AutoBuild("dvp.Projects");
 	}
-
-/* 	static void SoftDelBuilder(IQbEfSoftDelBuilder<Project, SoftDelDto> qb)
-	{
-		qb.Update("projects")
-			.Condition(doc => doc.Id, FO.Equal, "id")
-			.Condition(doc => doc.Deleted, null, FO.IsNull)
-		;
-	}
-	static void RestoreBuilder(IQbEfRestoreBuilder<Project, SoftDelDto> qb)
-	{
-		qb.Update("projects")
-			.Condition(doc => doc.Id, FO.Equal, "id")
-			.Condition(doc => doc.Deleted, null, FO.IsNotNull)
-		;
-	}
-	static void DeleteBuilder(IQbEfDeleteBuilder<Project, SoftDelDto> qb)
-	{
-		qb.Delete("projects")
-			.Condition(doc => doc.Id, FO.Equal, "id");
-	} */
 }

@@ -14,8 +14,8 @@ using QBCore.ObjectFactory;
 namespace QBCore.Controllers;
 
 [Produces("application/json")]
-public class DataSourceController<TKey, TDocument, TCreate, TSelect, TUpdate, TDelete, TRestore, TDataSource> : ControllerBase
-	where TDataSource : IDataSource<TKey, TDocument, TCreate, TSelect, TUpdate, TDelete, TRestore>
+public class DataSourceController<TKey, TCreate, TSelect, TUpdate, TDelete, TRestore, TDataSource> : ControllerBase
+	where TDataSource : IDataSource<TKey, TCreate, TSelect, TUpdate, TDelete, TRestore>
 {
 	protected readonly IServiceProvider _serviceProvider;
 	protected readonly IDSRequestContext _requestContext;
@@ -71,7 +71,7 @@ public class DataSourceController<TKey, TDocument, TCreate, TSelect, TUpdate, TD
 		};
 
 		dataSourceResponse.Data =
-			await ( await _ds.SelectAsync(softDelMode, filterConditions, sortOrders, null, skip, pnum ?? -1, options) )
+			await ( await _ds.SelectAsync(softDelMode, filterConditions, sortOrders, null, skip, psize ?? -1, options) )
 				.ToListAsync((bool x) => dataSourceResponse.IsLastPage = x ? 1 : 0);
 
 		return Ok(dataSourceResponse);

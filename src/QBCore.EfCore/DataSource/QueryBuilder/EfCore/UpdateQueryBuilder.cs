@@ -6,16 +6,16 @@ using QBCore.Extensions.Internals;
 
 namespace QBCore.DataSource.QueryBuilder.EfCore;
 
-internal sealed class UpdateQueryBuilder<TDocument, TUpdate> : QueryBuilder<TDocument, TUpdate>, IUpdateQueryBuilder<TDocument, TUpdate> where TDocument : class
+internal sealed class UpdateQueryBuilder<TDoc, TUpdate> : QueryBuilder<TDoc, TUpdate>, IUpdateQueryBuilder<TDoc, TUpdate> where TDoc : class
 {
 	public override QueryBuilderTypes QueryBuilderType => QueryBuilderTypes.Update;
 
-	public UpdateQueryBuilder(QBUpdateBuilder<TDocument, TUpdate> building, IDataContext dataContext) : base(building, dataContext)
+	public UpdateQueryBuilder(UpdateQBBuilder<TDoc, TUpdate> building, IDataContext dataContext) : base(building, dataContext)
 	{
 		building.Normalize();
 	}
 
-	public async Task<TDocument?> UpdateAsync(object id, TUpdate document, IReadOnlySet<string>? validFieldNames = null, DataSourceUpdateOptions? options = null, CancellationToken cancellationToken = default(CancellationToken))
+	public async Task<TDoc?> UpdateAsync(object id, TUpdate document, IReadOnlySet<string>? validFieldNames = null, DataSourceUpdateOptions? options = null, CancellationToken cancellationToken = default(CancellationToken))
 	{
 		if (id is null) throw EX.QueryBuilder.Make.IdentifierValueNotSpecified(nameof(id));
 		if (document is null) throw EX.QueryBuilder.Make.DocumentNotSpecified(nameof(document));
@@ -29,12 +29,12 @@ internal sealed class UpdateQueryBuilder<TDocument, TUpdate> : QueryBuilder<TDoc
 
 		var dbContext = _dataContext.AsDbContext();
 
-		var deId = (EfCoreDEInfo?)Builder.DocumentInfo.IdField
-			?? throw EX.QueryBuilder.Make.DocumentDoesNotHaveIdDataEntry(Builder.DocumentInfo.DocumentType.ToPretty());
+		var deId = (EfCoreDEInfo?)Builder.DocInfo.IdField
+			?? throw EX.QueryBuilder.Make.DocumentDoesNotHaveIdDataEntry(Builder.DocInfo.DocumentType.ToPretty());
 		if (deId.Setter == null)
-			throw EX.QueryBuilder.Make.DataEntryDoesNotHaveSetter(Builder.DocumentInfo.DocumentType.ToPretty(), deId.Name);
-		var deUpdated = (EfCoreDEInfo?)Builder.DocumentInfo.DateUpdatedField;
-		var deModified = (EfCoreDEInfo?)Builder.DocumentInfo.DateModifiedField;
+			throw EX.QueryBuilder.Make.DataEntryDoesNotHaveSetter(Builder.DocInfo.DocumentType.ToPretty(), deId.Name);
+		var deUpdated = (EfCoreDEInfo?)Builder.DocInfo.DateUpdatedField;
+		var deModified = (EfCoreDEInfo?)Builder.DocInfo.DateModifiedField;
 
 	/* 		if (Builder.Conditions.Count != 1)
 			{
@@ -46,20 +46,20 @@ internal sealed class UpdateQueryBuilder<TDocument, TUpdate> : QueryBuilder<TDoc
 				throw new NotSupportedException($"EF update query builder does not support custom conditions.");
 			} */
 
-		var update = Activator.CreateInstance<TDocument>();
+		var update = Activator.CreateInstance<TDoc>();
 		deId.Setter(update, id);
-		dbContext.Attach<TDocument>(update);
+		dbContext.Attach<TDoc>(update);
 
 		try
 		{
 			object? value;
 			bool isSetValue, isUpdatedSet = false, isModifiedSet = false, hasFieldToUpdate = false;
-			var dataEntries = Builder.DocumentInfo.DataEntries.Values.Cast<EfCoreDEInfo>();
+			var dataEntries = Builder.DocInfo.DataEntries.Values.Cast<EfCoreDEInfo>();
 			EfCoreDEInfo? deProjInfo;
 
 			foreach (var deDocInfo in dataEntries.Where(x => x.Property != null && x.Name != deId.Name && (validFieldNames == null || validFieldNames.Contains(x.Name))))
 			{
-				deProjInfo = (EfCoreDEInfo?)(Builder.ProjectionInfo?.DataEntries ?? Builder.DocumentInfo.DataEntries).GetValueOrDefault(deDocInfo.Name);
+				deProjInfo = (EfCoreDEInfo?)(Builder.DtoInfo?.DataEntries ?? Builder.DocInfo.DataEntries).GetValueOrDefault(deDocInfo.Name);
 				if (deProjInfo == null)
 				{
 					continue;
@@ -80,7 +80,7 @@ internal sealed class UpdateQueryBuilder<TDocument, TUpdate> : QueryBuilder<TDoc
 				if (isSetValue)
 				{
 					if (deDocInfo.Setter == null)
-						throw EX.QueryBuilder.Make.DataEntryDoesNotHaveSetter(Builder.DocumentInfo.DocumentType.ToPretty(), deDocInfo.Name);
+						throw EX.QueryBuilder.Make.DataEntryDoesNotHaveSetter(Builder.DocInfo.DocumentType.ToPretty(), deDocInfo.Name);
 
 					deDocInfo.Setter(update, value);
 					hasFieldToUpdate = true;
@@ -89,20 +89,20 @@ internal sealed class UpdateQueryBuilder<TDocument, TUpdate> : QueryBuilder<TDoc
 
 			if (!hasFieldToUpdate)
 			{
-				return default(TDocument?);
+				return default(TDoc?);
 			}
 
 			if (deUpdated != null && !isUpdatedSet)
 			{
 				if (deUpdated.Setter == null)
-					throw EX.QueryBuilder.Make.DataEntryDoesNotHaveSetter(Builder.DocumentInfo.DocumentType.ToPretty(), deUpdated.Name);
+					throw EX.QueryBuilder.Make.DataEntryDoesNotHaveSetter(Builder.DocInfo.DocumentType.ToPretty(), deUpdated.Name);
 
 				deUpdated.Setter(update, Convert.ChangeType(DateTime.UtcNow, deUpdated.UnderlyingType));
 			}
 			if (deModified != null && !isModifiedSet)
 			{
 				if (deModified.Setter == null)
-					throw EX.QueryBuilder.Make.DataEntryDoesNotHaveSetter(Builder.DocumentInfo.DocumentType.ToPretty(), deModified.Name);
+					throw EX.QueryBuilder.Make.DataEntryDoesNotHaveSetter(Builder.DocInfo.DocumentType.ToPretty(), deModified.Name);
 
 				deModified.Setter(update, Convert.ChangeType(DateTime.UtcNow, deModified.UnderlyingType));
 			}
@@ -113,11 +113,11 @@ internal sealed class UpdateQueryBuilder<TDocument, TUpdate> : QueryBuilder<TDoc
 			{
 				await dbContext.SaveChangesAsync(cancellationToken);
 
-				return default(TDocument?);
+				return default(TDoc?);
 			}
 			catch (DbUpdateException ex)
 			{
-				throw EX.QueryBuilder.Make.OperationFailedNoSuchRecord(QueryBuilderType.ToString(), id.ToString(), Builder.DocumentInfo.DocumentType.ToPretty(), ex);
+				throw EX.QueryBuilder.Make.OperationFailedNoSuchRecord(QueryBuilderType.ToString(), id.ToString(), Builder.DocInfo.DocumentType.ToPretty(), ex);
 			}
 			finally
 			{
@@ -126,7 +126,7 @@ internal sealed class UpdateQueryBuilder<TDocument, TUpdate> : QueryBuilder<TDoc
 		}
 		finally
 		{
-			dbContext.Entry<TDocument>(update).State = EntityState.Detached;
+			dbContext.Entry<TDoc>(update).State = EntityState.Detached;
 		}
 	}
 

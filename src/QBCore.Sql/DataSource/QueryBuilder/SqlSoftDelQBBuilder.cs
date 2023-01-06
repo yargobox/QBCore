@@ -1,4 +1,5 @@
 using System.Linq.Expressions;
+using QBCore.Extensions.Internals;
 
 namespace QBCore.DataSource.QueryBuilder;
 
@@ -8,60 +9,65 @@ internal abstract class SqlSoftDelQBBuilder<TDoc, TDelete> : SqlCommonQBBuilder<
 
 	public SqlSoftDelQBBuilder()
 	{
-		if (DocumentInfo.IdField == null)
+		if (DocInfo.IdField == null)
 			throw new InvalidOperationException($"Document '{typeof(TDoc).ToPretty()}' does not have an id data entry.");
-		var deDeleted = DocumentInfo.DateDeletedField
+		var deDeleted = DocInfo.DateDeletedField
 			?? throw new InvalidOperationException($"Document '{typeof(TDoc).ToPretty()}' does not have a date deletion field.");
 		if (deDeleted.Flags.HasFlag(DataEntryFlags.ReadOnly))
 			throw new InvalidOperationException($"Document '{typeof(TDoc).ToPretty()}' has a readonly date deletion field!");
 	}
 	public SqlSoftDelQBBuilder(SqlSoftDelQBBuilder<TDoc, TDelete> other) : base(other) { }
-	public SqlSoftDelQBBuilder(IQBBuilder other)
+	public SqlSoftDelQBBuilder(IQBBuilder other) : this()
 	{
-		if (other.DocumentType != typeof(TDoc))
+		if (other is null) throw new ArgumentNullException(nameof(other));
+
+		if (other.DocType != typeof(TDoc))
 		{
-			throw new InvalidOperationException($"Could not make soft delete query builder '{typeof(TDoc).ToPretty()}, {typeof(TDelete).ToPretty()}' from '{other.DocumentType.ToPretty()}, {other.ProjectionType.ToPretty()}'.");
+			throw new InvalidOperationException($"Could not make soft delete query builder '{typeof(TDoc).ToPretty()}, {typeof(TDelete).ToPretty()}' from '{other.DocType.ToPretty()}, {other.DtoType.ToPretty()}'.");
 		}
 
-		var container = other.Containers.FirstOrDefault();
-		if (container?.DocumentType == null || container.DocumentType != typeof(TDoc) || container.ContainerType != ContainerTypes.Table)
+		other.Prepare();
+
+		var top = other.Containers.FirstOrDefault();
+		if (top?.DocumentType != typeof(TDoc) || (top.ContainerType != ContainerTypes.Table && top.ContainerType != ContainerTypes.View))
 		{
-			throw new InvalidOperationException($"Could not make soft delete query builder '{typeof(TDoc).ToPretty()}, {typeof(TDelete).ToPretty()}' from '{other.DocumentType.ToPretty()}, {other.ProjectionType.ToPretty()}'.");
+			throw new InvalidOperationException($"Could not make soft delete query builder '{typeof(TDoc).ToPretty()}, {typeof(TDelete).ToPretty()}' from '{other.DocType.ToPretty()}, {other.DtoType.ToPretty()}'.");
 		}
 
-		AutoBuildSetup(container.DBSideName);
+		AutoBuild(top.DBSideName);
 	}
 
-	public override QBBuilder<TDoc, TDelete> AutoBuild()
+	protected override void OnPrepare()
+	{
+		var top = Containers.FirstOrDefault();
+		if (top?.ContainerOperation != ContainerOperations.Update)
+		{
+			throw new InvalidOperationException($"Incompatible configuration of soft delete query builder '{typeof(TDelete).ToPretty()}'.");
+		}
+
+		if (Conditions.Count == 0)
+		{
+			throw EX.QueryBuilder.Make.QueryBuilderMustHaveAtLeastOneCondition(DataLayer.Name, QueryBuilderType.ToString());
+		}
+	}
+
+	public override QBBuilder<TDoc, TDelete> AutoBuild(string? tableName = null)
 	{
 		if (Containers.Count > 0)
 		{
 			throw new InvalidOperationException($"Soft delete query builder '{typeof(TDelete).ToPretty()}' has already been initialized.");
 		}
 
-		AutoBuildSetup(null);
+		Update(tableName)
+			.Condition(DocInfo.IdField!, FO.Equal, "@id")
+			.Condition(DocInfo.DateDeletedField!, null, FO.IsNull);
+
 		return this;
 	}
-	private void AutoBuildSetup(string? tableName)
+	ISqlSoftDelQBBuilder<TDoc, TDelete> ISqlSoftDelQBBuilder<TDoc, TDelete>.AutoBuild(string? tableName)
 	{
-		var deId = DocumentInfo.IdField
-			?? throw new InvalidOperationException($"Document '{typeof(TDoc).ToPretty()}' does not have an id data entry.");
-		var deDeleted = DocumentInfo.DateDeletedField
-			?? throw new InvalidOperationException($"Document '{typeof(TDoc).ToPretty()}' does not have a date deletion field.");
-		if (deDeleted.Flags.HasFlag(DataEntryFlags.ReadOnly))
-			throw new InvalidOperationException($"Document '{typeof(TDoc).ToPretty()}' has a readonly date deletion field!");
-
-		Update(tableName).Condition(deId, FO.Equal, "id").Condition(deDeleted, null, FO.Equal);
-	}
-
-	protected override void OnNormalize()
-	{
-		base.OnNormalize();
-
-		if (Containers.First().ContainerOperation != ContainerOperations.Update)
-		{
-			throw new InvalidOperationException($"Incompatible configuration of soft delete query builder '{typeof(TDelete).ToPretty()}'.");
-		}
+		AutoBuild(tableName);
+		return this;
 	}
 
 	public override QBBuilder<TDoc, TDelete> Update(string? tableName = null)

@@ -35,19 +35,19 @@ internal sealed class CDSNodeBuilder : ICDSNodeBuilder
 
 		return new CDSNodeBuilder(_node.AddNode(typeof(TDataSource), nodeName));
 	}
-	public ICDSNodeBuilder AddCondition<TDocument, TParentDocument>(Expression<Func<TDocument, object?>> field, Expression<Func<TParentDocument, object?>> parentField, FO operation = FO.Equal, object? defaultValue = null)
+	public ICDSNodeBuilder AddCondition<TDoc, TParentDoc>(Expression<Func<TDoc, object?>> field, Expression<Func<TParentDoc, object?>> parentField, FO operation = FO.Equal, object? defaultValue = null)
 	{
-		_node.AddCondition<TDocument, TParentDocument>(field, parentField, operation, defaultValue);
+		_node.AddCondition<TDoc, TParentDoc>(field, parentField, operation, defaultValue);
 		return this;
 	}
-	public ICDSNodeBuilder AddCondition<TDocument, TParentDocument>(Expression<Func<TDocument, object?>> field, ICDSNodeBuilder parentNode, Expression<Func<TParentDocument, object?>> parentField, FO operation = FO.Equal, object? defaultValue = null)
+	public ICDSNodeBuilder AddCondition<TDoc, TParentDoc>(Expression<Func<TDoc, object?>> field, ICDSNodeBuilder parentNode, Expression<Func<TParentDoc, object?>> parentField, FO operation = FO.Equal, object? defaultValue = null)
 	{
-		_node.AddCondition<TDocument, TParentDocument>(field, ((CDSNodeBuilder)parentNode)._node, parentField, operation, defaultValue);
+		_node.AddCondition<TDoc, TParentDoc>(field, ((CDSNodeBuilder)parentNode)._node, parentField, operation, defaultValue);
 		return this;
 	}
-	public ICDSNodeBuilder AddCondition<TDocument>(Expression<Func<TDocument, object?>> field, object? constValue, FO operation = FO.Equal, object? defaultValue = null)
+	public ICDSNodeBuilder AddCondition<TDoc>(Expression<Func<TDoc, object?>> field, object? constValue, FO operation = FO.Equal, object? defaultValue = null)
 	{
-		_node.AddCondition<TDocument>(field, constValue, operation, defaultValue);
+		_node.AddCondition<TDoc>(field, constValue, operation, defaultValue);
 		return this;
 	}
 	public ICDSNodeBuilder SetHidden(bool hide = true)

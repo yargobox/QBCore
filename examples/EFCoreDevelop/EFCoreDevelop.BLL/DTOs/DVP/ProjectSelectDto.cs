@@ -13,7 +13,7 @@ public class ProjectSelectDto
 	[DeUpdated] public DateTime? Updated { get; set; }
 	[DeDeleted] public DateTime? Deleted { get; set; }
 
- 	static void Builder(IQBEfCoreSelectBuilder<Project, ProjectSelectDto> builder)
+ 	static void Builder(IEfCoreSelectQBBuilder<Project, ProjectSelectDto> builder)
 	{
 		builder.Select("projects");
 	}

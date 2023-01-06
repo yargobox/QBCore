@@ -73,7 +73,8 @@ public interface IDataSource<TKey, TCreate, TSelect, TUpdate, TDelete, TRestore>
 	);
 }
 
-public interface IDataSource<TKey, TDocument, TCreate, TSelect, TUpdate, TDelete, TRestore>
+public interface IDataSource<TKey, TDoc, TCreate, TSelect, TUpdate, TDelete, TRestore>
 	: IDataSource<TKey, TCreate, TSelect, TUpdate, TDelete, TRestore>
 {
+	IQueryable<TDoc> AsQueryable(DataSourceQueryableOptions? options = null);
 }

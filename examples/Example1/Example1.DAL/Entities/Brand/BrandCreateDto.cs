@@ -6,7 +6,7 @@ public class BrandCreateDto
 {
 	public string? Name { get; set; }
 
-	public static void Builder(IQBMongoInsertBuilder<Brand, BrandCreateDto> builder)
+	public static void Builder(IMongoInsertQBBuilder<Brand, BrandCreateDto> builder)
 	{
 		builder
 			.Insert("brands")

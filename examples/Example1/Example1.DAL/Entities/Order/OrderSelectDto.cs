@@ -31,7 +31,7 @@ public class OrderSelectDto
 	[DeUpdated] public DateTimeOffset? Updated { get; set; }
 	[DeDeleted] public DateTimeOffset? Deleted { get; set; }
 
-	static void Builder(IQBMongoSelectBuilder<Order, OrderSelectDto> builder)
+	static void Builder(IMongoSelectQBBuilder<Order, OrderSelectDto> builder)
 	{
 		/*
 		SELECT * FROM orders AS orders

@@ -4,11 +4,15 @@ namespace QBCore.DataSource.QueryBuilder;
 
 public interface ISqlInsertQBBuilder<TDoc, TCreate> : IQBBuilder where TDoc : class
 {
+	ISqlInsertQBBuilder<TDoc, TCreate> AutoBuild(string? tableName = null);
+
 	ISqlInsertQBBuilder<TDoc, TCreate> Insert(string? tableName = null);
 }
 
 public interface ISqlSelectQBBuilder<TDoc, TSelect> : IQBBuilder where TDoc : class
 {
+	ISqlSelectQBBuilder<TDoc, TSelect> AutoBuild(string? tableName = null);
+
 	ISqlSelectQBBuilder<TDoc, TSelect> Select(string? tableName = null, string? alias = null);
 	ISqlSelectQBBuilder<TDoc, TSelect> LeftJoin<TRef>(string? tableName = null, string? alias = null);
 	ISqlSelectQBBuilder<TDoc, TSelect> Join<TRef>(string? tableName = null, string? alias = null);
@@ -47,6 +51,8 @@ public interface ISqlSelectQBBuilder<TDoc, TSelect> : IQBBuilder where TDoc : cl
 
 public interface ISqlUpdateQBBuilder<TDoc, TUpdate> : IQBBuilder where TDoc : class
 {
+	ISqlUpdateQBBuilder<TDoc, TUpdate> AutoBuild(string? tableName = null);
+
 	ISqlUpdateQBBuilder<TDoc, TUpdate> Update(string? tableName = null);
 
 	ISqlUpdateQBBuilder<TDoc, TUpdate> Condition(Expression<Func<TDoc, object?>> field, object? constValue, FO operation);
@@ -61,6 +67,8 @@ public interface ISqlUpdateQBBuilder<TDoc, TUpdate> : IQBBuilder where TDoc : cl
 
 public interface ISqlSoftDelQBBuilder<TDoc, TDelete> : IQBBuilder where TDoc : class
 {
+	ISqlSoftDelQBBuilder<TDoc, TDelete> AutoBuild(string? tableName = null);
+
 	ISqlSoftDelQBBuilder<TDoc, TDelete> Update(string? tableName = null);
 
 	ISqlSoftDelQBBuilder<TDoc, TDelete> Condition(Expression<Func<TDoc, object?>> field, object? constValue, FO operation);
@@ -75,6 +83,8 @@ public interface ISqlSoftDelQBBuilder<TDoc, TDelete> : IQBBuilder where TDoc : c
 
 public interface ISqlDeleteQBBuilder<TDoc, TDelete> : IQBBuilder where TDoc : class
 {
+	ISqlDeleteQBBuilder<TDoc, TDelete> AutoBuild(string? tableName = null);
+
 	ISqlDeleteQBBuilder<TDoc, TDelete> Delete(string? tableName = null);
 
 	ISqlDeleteQBBuilder<TDoc, TDelete> Condition(Expression<Func<TDoc, object?>> field, object? constValue, FO operation);
@@ -89,6 +99,8 @@ public interface ISqlDeleteQBBuilder<TDoc, TDelete> : IQBBuilder where TDoc : cl
 
 public interface ISqlRestoreQBBuilder<TDoc, TRestore> : IQBBuilder where TDoc : class
 {
+	ISqlRestoreQBBuilder<TDoc, TRestore> AutoBuild(string? tableName = null);
+
 	ISqlRestoreQBBuilder<TDoc, TRestore> Update(string? tableName = null);
 
 	ISqlRestoreQBBuilder<TDoc, TRestore> Condition(Expression<Func<TDoc, object?>> field, object? constValue, FO operation);

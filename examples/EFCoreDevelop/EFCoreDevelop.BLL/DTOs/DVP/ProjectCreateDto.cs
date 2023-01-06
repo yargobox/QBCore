@@ -9,7 +9,7 @@ public class ProjectCreateDto
 	[DeViewName] public string Name { get; set; } = string.Empty;
 	public string Desc { get; set; } = string.Empty;
 
-	static void Builder(IQBEfCoreInsertBuilder<Project, ProjectCreateDto> builder)
+	static void Builder(IEfCoreInsertQBBuilder<Project, ProjectCreateDto> builder)
 	{
 		builder.Insert("projects");
 	}

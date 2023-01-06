@@ -4,12 +4,12 @@ using QBCore.Extensions.Linq.Expressions;
 
 namespace QBCore.DataSource;
 
-public record DSSortOrder<TDocument>
+public record DSSortOrder<TDoc>
 {
-	public readonly DEPathDefinition<TDocument> Field;
+	public readonly DEPathDefinition<TDoc> Field;
 	public readonly SO SortOrder;
 
-	public DSSortOrder(DEPathDefinition<TDocument> field, SO sortOrder = SO.Ascending)
+	public DSSortOrder(DEPathDefinition<TDoc> field, SO sortOrder = SO.Ascending)
 	{
 		if (field.Count == 0)
 		{
@@ -20,7 +20,7 @@ public record DSSortOrder<TDocument>
 		SortOrder = sortOrder;
 	}
 
-	public DSSortOrder(Expression<Func<TDocument, object?>> field, SO sortOrder = SO.Ascending)
+	public DSSortOrder(Expression<Func<TDoc, object?>> field, SO sortOrder = SO.Ascending)
 	{
 		if (field == null)
 		{

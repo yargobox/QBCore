@@ -11,13 +11,13 @@ using QBCore.ObjectFactory;
 
 namespace QBCore.DataSource;
 
-public abstract partial class DataSource<TKey, TDocument, TCreate, TSelect, TUpdate, TDelete, TRestore, TDataSource> :
-	IDataSource<TKey, TDocument, TCreate, TSelect, TUpdate, TDelete, TRestore>,
-	IDataSourceHost<TKey, TDocument, TCreate, TSelect, TUpdate, TDelete, TRestore>,
+public abstract partial class DataSource<TKey, TDoc, TCreate, TSelect, TUpdate, TDelete, TRestore, TDataSource> :
+	IDataSource<TKey, TDoc, TCreate, TSelect, TUpdate, TDelete, TRestore>,
+	IDataSourceHost<TKey, TDoc, TCreate, TSelect, TUpdate, TDelete, TRestore>,
 	ITransient<TDataSource>,
 	IAsyncDisposable,
 	IDisposable
-	where TDocument : class
+	where TDoc : class
 {
 	public DSKeyName OKeyName => _okeyName ?? throw new InvalidOperationException($"DataSource {DSInfo.Name} has not been initialized yet.");
 	public IDSInfo DSInfo { get; }
@@ -27,7 +27,7 @@ public abstract partial class DataSource<TKey, TDocument, TCreate, TSelect, TUpd
 	private readonly IMapper _mapper;
 	private readonly IDataContext _dataContext;
 	private DSKeyName? _okeyName;
-	protected List<DataSourceListener<TKey, TDocument, TCreate, TSelect, TUpdate, TDelete, TRestore>>? _listeners;
+	protected List<DataSourceListener<TKey, TDoc, TCreate, TSelect, TUpdate, TDelete, TRestore>>? _listeners;
 	private object? _syncRoot;
 	protected ConcurrentDictionary<OKeyName, object?>? _internalObjects;
 
@@ -42,7 +42,7 @@ public abstract partial class DataSource<TKey, TDocument, TCreate, TSelect, TUpd
 
 		_listeners = DSInfo.Listeners?
 			.Select(ctor => ctor(_serviceProvider))
-			.Cast<DataSourceListener<TKey, TDocument, TCreate, TSelect, TUpdate, TDelete, TRestore>>()
+			.Cast<DataSourceListener<TKey, TDoc, TCreate, TSelect, TUpdate, TDelete, TRestore>>()
 			.ToList();
 	}
 
@@ -60,7 +60,7 @@ public abstract partial class DataSource<TKey, TDocument, TCreate, TSelect, TUpd
 		var getId = DSInfo.DocumentInfo.Value.IdField?.Getter
 			?? throw new InvalidOperationException($"Document '{DSInfo.DocumentInfo.Value.DocumentType.ToPretty()}' does not have an id data entry.");
 
-		var qb = DSInfo.QBFactory.CreateQBInsert<TDocument, TCreate>(_dataContext);
+		var qb = DSInfo.QBFactory.CreateQBInsert<TDoc, TCreate>(_dataContext);
 		var builder = qb.Builder;
 
 		object? value;
@@ -74,7 +74,7 @@ public abstract partial class DataSource<TKey, TDocument, TCreate, TSelect, TUpd
 			}
 			else if (param.ParameterName.StartsWith('@') && document is not null)
 			{
-				deInfo = qb.Builder.ProjectionInfo?.DataEntries.GetValueOrDefault(param.ParameterName.Substring(1));
+				deInfo = qb.Builder.DtoInfo?.DataEntries.GetValueOrDefault(param.ParameterName.Substring(1));
 				if (deInfo != null)
 				{
 					param.Value = deInfo.Getter(document!);
@@ -82,21 +82,26 @@ public abstract partial class DataSource<TKey, TDocument, TCreate, TSelect, TUpd
 			}
 		}
 
-		TDocument result;
-		if (typeof(TDocument) != typeof(TCreate))
+		TDoc result;
+		if (typeof(TDoc) != typeof(TCreate))
 		{
-			result = _mapper.Map<TDocument>(document);
+			result = _mapper.Map<TDoc>(document);
 			result = await qb.InsertAsync(result, options, cancellationToken).ConfigureAwait(false);
 		}
 		else
 		{
-			result = (TDocument)(object)document!;
+			result = (TDoc)(object)document!;
 			result = await qb.InsertAsync(result, options, cancellationToken).ConfigureAwait(false);
 		}
 
 		UpdateOutputParameters(parameters, builder.Parameters);
 
 		return (TKey) getId(result!)!;
+	}
+
+	public IQueryable<TDoc> AsQueryable(DataSourceQueryableOptions? options = null)
+	{
+		throw new NotImplementedException();
 	}
 
 	public Task<IEnumerable<KeyValuePair<string, object?>>> AggregateAsync(
@@ -139,7 +144,7 @@ public abstract partial class DataSource<TKey, TDocument, TCreate, TSelect, TUpd
 		var idField = DSInfo.DocumentInfo.Value.IdField
 			?? throw new InvalidOperationException($"Document '{DSInfo.DocumentInfo.Value.DocumentType.ToPretty()}' does not have an id data entry.");
 
-		var qb = DSInfo.QBFactory.CreateQBSelect<TDocument, TSelect>(_dataContext);
+		var qb = DSInfo.QBFactory.CreateQBSelect<TDoc, TSelect>(_dataContext);
 		var builder = qb.Builder;
 
 		builder.Condition(idField, id, FO.Equal);
@@ -174,7 +179,7 @@ public abstract partial class DataSource<TKey, TDocument, TCreate, TSelect, TUpd
 			throw new InvalidOperationException($"DataSource {DSInfo.Name} does not support the select operation.");
 		}
 
-		var qb = DSInfo.QBFactory.CreateQBSelect<TDocument, TSelect>(_dataContext);
+		var qb = DSInfo.QBFactory.CreateQBSelect<TDoc, TSelect>(_dataContext);
 		var builder = qb.Builder;
 
 		if (DSInfo.Options.HasFlag(DataSourceOptions.SoftDelete))
@@ -258,7 +263,7 @@ public abstract partial class DataSource<TKey, TDocument, TCreate, TSelect, TUpd
 			throw new InvalidOperationException($"DataSource {DSInfo.Name} does not support the update operation.");
 		}
 
-		var qb = DSInfo.QBFactory.CreateQBUpdate<TDocument, TUpdate>(_dataContext);
+		var qb = DSInfo.QBFactory.CreateQBUpdate<TDoc, TUpdate>(_dataContext);
 		var builder = qb.Builder;
 
 		object? value;
@@ -270,13 +275,13 @@ public abstract partial class DataSource<TKey, TDocument, TCreate, TSelect, TUpd
 			{
 				param.Value = value;
 			}
-			else if (param.ParameterName == "id")
+			else if (param.ParameterName == "@id")
 			{
 				param.Value = id;
 			}
 			else if (param.ParameterName.StartsWith('@') && document is not null)
 			{
-				deInfo = qb.Builder.ProjectionInfo?.DataEntries.GetValueOrDefault(param.ParameterName.Substring(1));
+				deInfo = qb.Builder.DtoInfo?.DataEntries.GetValueOrDefault(param.ParameterName.Substring(1));
 				if (deInfo != null)
 				{
 					param.Value = deInfo.Getter(document!);
@@ -304,7 +309,7 @@ public abstract partial class DataSource<TKey, TDocument, TCreate, TSelect, TUpd
 
 		if (DSInfo.Options.HasFlag(DataSourceOptions.SoftDelete))
 		{
-			var qb = DSInfo.QBFactory.CreateQBSoftDel<TDocument, TDelete>(_dataContext);
+			var qb = DSInfo.QBFactory.CreateQBSoftDel<TDoc, TDelete>(_dataContext);
 			var builder = qb.Builder;
 
 			object? value;
@@ -316,13 +321,13 @@ public abstract partial class DataSource<TKey, TDocument, TCreate, TSelect, TUpd
 				{
 					param.Value = value;
 				}
-				else if (param.ParameterName == "id")
+				else if (param.ParameterName == "@id")
 				{
 					param.Value = id;
 				}
 				else if (param.ParameterName.StartsWith('@') && document is not null)
 				{
-					deInfo = qb.Builder.ProjectionInfo?.DataEntries.GetValueOrDefault(param.ParameterName.Substring(1));
+					deInfo = qb.Builder.DtoInfo?.DataEntries.GetValueOrDefault(param.ParameterName.Substring(1));
 					if (deInfo != null)
 					{
 						param.Value = deInfo.Getter(document!);
@@ -336,7 +341,7 @@ public abstract partial class DataSource<TKey, TDocument, TCreate, TSelect, TUpd
 		}
 		else
 		{
-			var qb = DSInfo.QBFactory.CreateQBDelete<TDocument, TDelete>(_dataContext);
+			var qb = DSInfo.QBFactory.CreateQBDelete<TDoc, TDelete>(_dataContext);
 			var builder = qb.Builder;
 
 			object? value;
@@ -348,13 +353,13 @@ public abstract partial class DataSource<TKey, TDocument, TCreate, TSelect, TUpd
 				{
 					param.Value = value;
 				}
-				else if (param.ParameterName == "id")
+				else if (param.ParameterName == "@id")
 				{
 					param.Value = id;
 				}
 				else if (param.ParameterName.StartsWith('@') && document is not null)
 				{
-					deInfo = qb.Builder.ProjectionInfo?.DataEntries.GetValueOrDefault(param.ParameterName.Substring(1));
+					deInfo = qb.Builder.DtoInfo?.DataEntries.GetValueOrDefault(param.ParameterName.Substring(1));
 					if (deInfo != null)
 					{
 						param.Value = deInfo.Getter(document!);
@@ -381,7 +386,7 @@ public abstract partial class DataSource<TKey, TDocument, TCreate, TSelect, TUpd
 			throw new InvalidOperationException($"DataSource {DSInfo.Name} does not support the restore operation.");
 		}
 
-		var qb = DSInfo.QBFactory.CreateQBRestore<TDocument, TRestore>(_dataContext);
+		var qb = DSInfo.QBFactory.CreateQBRestore<TDoc, TRestore>(_dataContext);
 		var builder = qb.Builder;
 
 		object? value;
@@ -393,13 +398,13 @@ public abstract partial class DataSource<TKey, TDocument, TCreate, TSelect, TUpd
 			{
 				param.Value = value;
 			}
-			else if (param.ParameterName == "id")
+			else if (param.ParameterName == "@id")
 			{
 				param.Value = id;
 			}
 			else if (param.ParameterName.StartsWith('@') && document is not null)
 			{
-				deInfo = qb.Builder.ProjectionInfo?.DataEntries.GetValueOrDefault(param.ParameterName.Substring(1));
+				deInfo = qb.Builder.DtoInfo?.DataEntries.GetValueOrDefault(param.ParameterName.Substring(1));
 				if (deInfo != null)
 				{
 					param.Value = deInfo.Getter(document!);

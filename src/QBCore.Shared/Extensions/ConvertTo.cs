@@ -4,6 +4,27 @@ using QBCore.Extensions.Internals;
 
 namespace QBCore.Extensions;
 
+public static class ExtensionsForConvertTo
+{
+	/// <summary>
+    /// Has any flags (bitwise OR)?
+    /// </summary>
+	public static bool HasAnyFlag<T>(this T value, T mask) where T : struct, Enum
+	{
+		return (ConvertTo<ulong>.FromUnchecked(value) & ConvertTo<ulong>.FromUnchecked(mask)) != 0UL;
+	}
+
+/* 	/// <summary>
+    /// Has all flags (bitwise AND)?
+    /// </summary>
+    /// <remarks>Four times slower than Enum.HasFlag() in the release mode.</remarks>
+	public static bool HasAll<T>(this T value, T mask) where T : struct, Enum
+	{
+		var ul = ConvertTo<ulong>.FromUnchecked(mask);
+		return (ConvertTo<ulong>.FromUnchecked(value) & ul) == ul;
+	} */
+}
+
 /// <summary>
 /// Class to convert to type <see cref="To"/>
 /// </summary>

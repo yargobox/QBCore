@@ -6,11 +6,11 @@ using QBCore.Extensions.Internals;
 
 namespace QBCore.DataSource.QueryBuilder.Mongo;
 
-internal sealed class SoftDelQueryBuilder<TDocument, TDelete> : QueryBuilder<TDocument, TDelete>, IDeleteQueryBuilder<TDocument, TDelete>
+internal sealed class SoftDelQueryBuilder<TDoc, TDelete> : QueryBuilder<TDoc, TDelete>, IDeleteQueryBuilder<TDoc, TDelete>
 {
 	public override QueryBuilderTypes QueryBuilderType => QueryBuilderTypes.SoftDel;
 
-	public SoftDelQueryBuilder(QBSoftDelBuilder<TDocument, TDelete> building, IDataContext dataContext) : base(building, dataContext)
+	public SoftDelQueryBuilder(SoftDelQBBuilder<TDoc, TDelete> building, IDataContext dataContext) : base(building, dataContext)
 	{
 		building.Normalize();
 	}
@@ -38,34 +38,34 @@ internal sealed class SoftDelQueryBuilder<TDocument, TDelete> : QueryBuilder<TDo
 			}
 		}
 
-		var collection = _mongoDbContext.AsMongoDatabase().GetCollection<TDocument>(top.DBSideName);
+		var collection = _mongoDbContext.AsMongoDatabase().GetCollection<TDoc>(top.DBSideName);
 
 		var updateOptions = (UpdateOptions?)options?.NativeOptions ?? new UpdateOptions();
 		var clientSessionHandle = (IClientSessionHandle?)options?.NativeClientSession;
 
-		var deId = (MongoDEInfo?)Builder.DocumentInfo.IdField
-			?? throw EX.QueryBuilder.Make.DocumentDoesNotHaveIdDataEntry(Builder.DocumentInfo.DocumentType.ToPretty());
-		var deDeleted = (MongoDEInfo?)Builder.DocumentInfo.DateDeletedField
-			?? throw EX.QueryBuilder.Make.DocumentDoesNotHaveDeletedDataEntry(Builder.DocumentInfo.DocumentType.ToPretty());
+		var deId = (MongoDEInfo?)Builder.DocInfo.IdField
+			?? throw EX.QueryBuilder.Make.DocumentDoesNotHaveIdDataEntry(Builder.DocInfo.DocumentType.ToPretty());
+		var deDeleted = (MongoDEInfo?)Builder.DocInfo.DateDeletedField
+			?? throw EX.QueryBuilder.Make.DocumentDoesNotHaveDeletedDataEntry(Builder.DocInfo.DocumentType.ToPretty());
 		if (deDeleted.Flags.HasFlag(DataEntryFlags.ReadOnly))
-			throw new InvalidOperationException($"Document '{Builder.DocumentInfo.DocumentType.ToPretty()}' has a readonly date deletion field!");
+			throw new InvalidOperationException($"Document '{Builder.DocInfo.DocumentType.ToPretty()}' has a readonly date deletion field!");
 
 		var filter = BuildConditionTree(false, Builder.Conditions, GetDBSideName, Builder.Parameters)?.BsonDocument ?? _noneFilter;
-		UpdateDefinition<TDocument>? update = null;
+		UpdateDefinition<TDoc>? update = null;
 
 		if (document is not null)
 		{
-			var getDateDelFromDto = Builder.ProjectionInfo?.DateDeletedField?.Getter ?? Builder.ProjectionInfo?.DataEntries.GetValueOrDefault(deDeleted.Name)?.Getter;
+			var getDateDelFromDto = Builder.DtoInfo?.DateDeletedField?.Getter ?? Builder.DtoInfo?.DataEntries.GetValueOrDefault(deDeleted.Name)?.Getter;
 			if (getDateDelFromDto != null)
 			{
 				var dateDel = getDateDelFromDto(document);
 				if (dateDel is not null && dateDel != deDeleted.UnderlyingType.GetDefaultValue())
 				{
-					update = Builders<TDocument>.Update.Set(deDeleted.Name, dateDel);
+					update = Builders<TDoc>.Update.Set(deDeleted.Name, dateDel);
 				}
 			}
 		}
-		update ??= Builders<TDocument>.Update.CurrentDate(deDeleted.Name);
+		update ??= Builders<TDoc>.Update.CurrentDate(deDeleted.Name);
 		
 		updateOptions.IsUpsert = false;
 
@@ -76,7 +76,7 @@ internal sealed class SoftDelQueryBuilder<TDocument, TDelete> : QueryBuilder<TDo
 				var queryString = string.Concat(
 					"db.", top.DBSideName, ".updateOne(", Environment.NewLine,
 					  "\t", filter.ToString(), ",", Environment.NewLine,
-					  "\t", update.Render(BsonSerializer.SerializerRegistry.GetSerializer<TDocument>(), BsonSerializer.SerializerRegistry).ToString(), ",", Environment.NewLine,
+					  "\t", update.Render(BsonSerializer.SerializerRegistry.GetSerializer<TDoc>(), BsonSerializer.SerializerRegistry).ToString(), ",", Environment.NewLine,
 					  "\t{\"upsert\": false}", Environment.NewLine,
 					");"
 				);
@@ -87,7 +87,7 @@ internal sealed class SoftDelQueryBuilder<TDocument, TDelete> : QueryBuilder<TDo
 				var queryString = string.Concat(
 					"db.", top.DBSideName, ".updateOne(", Environment.NewLine,
 					  "\t", filter.ToString(), ",", Environment.NewLine,
-					  "\t", update.Render(BsonSerializer.SerializerRegistry.GetSerializer<TDocument>(), BsonSerializer.SerializerRegistry).ToString(), ",", Environment.NewLine,
+					  "\t", update.Render(BsonSerializer.SerializerRegistry.GetSerializer<TDoc>(), BsonSerializer.SerializerRegistry).ToString(), ",", Environment.NewLine,
 					  "\t{\"upsert\": false}", Environment.NewLine,
 					");"
 				);
@@ -109,12 +109,12 @@ internal sealed class SoftDelQueryBuilder<TDocument, TDelete> : QueryBuilder<TDo
 		{
 			if (result.ModifiedCount <= 0)
 			{
-				throw EX.QueryBuilder.Make.OperationFailedNoSuchRecord(QueryBuilderType.ToString(), id.ToString(), Builder.DocumentInfo.DocumentType.ToPretty());
+				throw EX.QueryBuilder.Make.OperationFailedNoSuchRecord(QueryBuilderType.ToString(), id.ToString(), Builder.DocInfo.DocumentType.ToPretty());
 			}
 		}
 		else
 		{
-			throw EX.QueryBuilder.Make.OperationFailedNoAcknowledgment(QueryBuilderType.ToString(), id.ToString(), Builder.DocumentInfo.DocumentType.ToPretty());
+			throw EX.QueryBuilder.Make.OperationFailedNoAcknowledgment(QueryBuilderType.ToString(), id.ToString(), Builder.DocInfo.DocumentType.ToPretty());
 		}
 	}
 }

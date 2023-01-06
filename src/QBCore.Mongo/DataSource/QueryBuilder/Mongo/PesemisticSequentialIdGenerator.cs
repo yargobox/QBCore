@@ -6,13 +6,13 @@ using MongoDB.Bson.Serialization.Attributes;
 using MongoDB.Driver;
 using QBCore.DataSource.Options;
 
-public class PesemisticSequentialIdGenerator<TDocument> : IDSIdGenerator
+public class PesemisticSequentialIdGenerator<TDoc> : IDSIdGenerator
 {
 	public int MaxAttempts { get; }
 	public readonly int StartAt;
 	public readonly int Step;
 
-	private static readonly Func<object, object>? _getDocumentId = BsonClassMap.LookupClassMap(typeof(TDocument)).IdMemberMap?.Getter;
+	private static readonly Func<object, object>? _getDocumentId = BsonClassMap.LookupClassMap(typeof(TDoc)).IdMemberMap?.Getter;
 
 	public PesemisticSequentialIdGenerator(int startAt = 1, int step = 1, int maxAttempts = 8)
 	{
@@ -32,7 +32,7 @@ public class PesemisticSequentialIdGenerator<TDocument> : IDSIdGenerator
 		{
 			throw new ArgumentNullException(nameof(container));
 		}
-		if (container is not IMongoCollection<TDocument> collection)
+		if (container is not IMongoCollection<TDoc> collection)
 		{
 			throw new ArgumentException(nameof(container));
 		}
@@ -40,7 +40,7 @@ public class PesemisticSequentialIdGenerator<TDocument> : IDSIdGenerator
 		{
 			throw new ArgumentNullException(nameof(document));
 		}
-		if (document is not TDocument typedDocument)
+		if (document is not TDoc typedDocument)
 		{
 			throw new ArgumentException(nameof(document));
 		}
@@ -100,7 +100,7 @@ public class PesemisticSequentialIdGenerator<TDocument> : IDSIdGenerator
 		{
 			throw new ArgumentNullException(nameof(container));
 		}
-		if (container is not IMongoCollection<TDocument> collection)
+		if (container is not IMongoCollection<TDoc> collection)
 		{
 			throw new ArgumentException(nameof(container));
 		}
@@ -108,7 +108,7 @@ public class PesemisticSequentialIdGenerator<TDocument> : IDSIdGenerator
 		{
 			throw new ArgumentNullException(nameof(document));
 		}
-		if (document is not TDocument typedDocument)
+		if (document is not TDoc typedDocument)
 		{
 			throw new ArgumentException(nameof(document));
 		}

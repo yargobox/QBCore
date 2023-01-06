@@ -1,6 +1,6 @@
-namespace QBCore.DataSource;
+namespace QBCore.DataSource.QueryBuilder.Mongo;
 
-internal static class ExtensionsForDataEntryPath
+internal static class ExtensionsForMongo
 {
 	public static string GetDBSideName(this DEPath path)
 	{

@@ -15,10 +15,10 @@ public interface IQueryBuilderFactory
 	IQBBuilder? DefaultSoftDelBuilder { get; }
 	IQBBuilder? DefaultRestoreBuilder { get; }
 
-	IInsertQueryBuilder<TDocument, TCreate> CreateQBInsert<TDocument, TCreate>(IDataContext dataContext) where TDocument : class;
-	ISelectQueryBuilder<TDocument, TSelect> CreateQBSelect<TDocument, TSelect>(IDataContext dataContext) where TDocument : class;
-	IUpdateQueryBuilder<TDocument, TUpdate> CreateQBUpdate<TDocument, TUpdate>(IDataContext dataContext) where TDocument : class;
-	IDeleteQueryBuilder<TDocument, TDelete> CreateQBDelete<TDocument, TDelete>(IDataContext dataContext) where TDocument : class;
-	IDeleteQueryBuilder<TDocument, TDelete> CreateQBSoftDel<TDocument, TDelete>(IDataContext dataContext) where TDocument : class;
-	IRestoreQueryBuilder<TDocument, TRestore> CreateQBRestore<TDocument, TRestore>(IDataContext dataContext) where TDocument : class;
+	IInsertQueryBuilder<TDoc, TCreate> CreateQBInsert<TDoc, TCreate>(IDataContext dataContext) where TDoc : class;
+	ISelectQueryBuilder<TDoc, TSelect> CreateQBSelect<TDoc, TSelect>(IDataContext dataContext) where TDoc : class;
+	IUpdateQueryBuilder<TDoc, TUpdate> CreateQBUpdate<TDoc, TUpdate>(IDataContext dataContext) where TDoc : class;
+	IDeleteQueryBuilder<TDoc, TDelete> CreateQBDelete<TDoc, TDelete>(IDataContext dataContext) where TDoc : class;
+	IDeleteQueryBuilder<TDoc, TDelete> CreateQBSoftDel<TDoc, TDelete>(IDataContext dataContext) where TDoc : class;
+	IRestoreQueryBuilder<TDoc, TRestore> CreateQBRestore<TDoc, TRestore>(IDataContext dataContext) where TDoc : class;
 }

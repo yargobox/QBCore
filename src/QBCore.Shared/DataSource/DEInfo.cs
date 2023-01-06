@@ -7,7 +7,7 @@ using QBCore.ObjectFactory;
 namespace QBCore.DataSource;
 
 [Flags]
-public enum DataEntryFlags
+public enum DataEntryFlags : ulong
 {
 	None = 0,
 	IdField = 1,
@@ -16,7 +16,10 @@ public enum DataEntryFlags
 	DateModifiedField = 8,
 	DateUpdatedField = 0x10,
 	DateDeletedField = 0x20,
-	ForeignId = 0x40
+	ForeignId = 0x40,
+	NoStorage = 0x80,
+	DocumentName = 0x0100,
+	Dependent = 0x2000
 }
 
 
@@ -30,6 +33,7 @@ public abstract class DEInfo : IComparable<DEInfo>, IEquatable<DEInfo>
 	public readonly Type UnderlyingType;
 	public readonly bool IsNullable;
 	public readonly int Order;
+	public readonly string[]? DependsOn;
 	public Func<object, object?> Getter => _getter ?? (_getter = MakeGetter());
 	protected Func<object, object?>? _getter;
 	public Action<object, object?>? Setter => _setter ?? (_setter = MakeSetter());
@@ -68,6 +72,11 @@ public abstract class DEInfo : IComparable<DEInfo>, IEquatable<DEInfo>
 		}
 
 		Order = memberInfo.GetCustomAttribute<DeOrderAttribute>()?.Order ?? 0;
+		DependsOn = memberInfo.GetCustomAttribute<DeDependsOnAttribute>()?.DataEntries;
+		if (DependsOn?.Length == 0)
+		{
+			DependsOn = null;
+		}
 	}
 
 	public override string ToString() => Name;
@@ -185,14 +194,14 @@ public abstract class DEInfo : IComparable<DEInfo>, IEquatable<DEInfo>
 		return documentInfo.DataEntries.GetValueOrDefault(memberInfo.Name);
 	}
 
-	public static DEInfo GetDataEntryInfo<TDocument>(string propertyOrFieldName, IDataLayerInfo? dataLayer = null)
+	public static DEInfo GetDataEntryInfo<TDoc>(string propertyOrFieldName, IDataLayerInfo? dataLayer = null)
 	{
-		return GetDataEntry(typeof(TDocument), propertyOrFieldName, dataLayer);
+		return GetDataEntry(typeof(TDoc), propertyOrFieldName, dataLayer);
 	}
 
-	public static DEInfo? GetDataEntryOrDefault<TDocument>(string propertyOrFieldName, IDataLayerInfo? dataLayer = null)
+	public static DEInfo? GetDataEntryOrDefault<TDoc>(string propertyOrFieldName, IDataLayerInfo? dataLayer = null)
 	{
-		return GetDataEntryOrDefault(typeof(TDocument), propertyOrFieldName, dataLayer);
+		return GetDataEntryOrDefault(typeof(TDoc), propertyOrFieldName, dataLayer);
 	}
 
 	public static DEInfo GetDataEntry(Type documentType, string propertyOrFieldName, IDataLayerInfo? dataLayer = null)
@@ -263,7 +272,7 @@ public abstract class DEInfo : IComparable<DEInfo>, IEquatable<DEInfo>
 
 
 [DebuggerDisplay("{ToString()}")]
-public readonly struct DEDefinition<TDocument> : IEquatable<DEDefinition<TDocument>>
+public readonly struct DEDefinition<TDoc> : IEquatable<DEDefinition<TDoc>>
 {
 	public readonly string? Name;
 	public readonly DEInfo? Info;
@@ -297,7 +306,7 @@ public readonly struct DEDefinition<TDocument> : IEquatable<DEDefinition<TDocume
 			return Info;
 		}
 
-		return DEInfo.GetDataEntryInfo<TDocument>(Name!, dataLayer);
+		return DEInfo.GetDataEntryInfo<TDoc>(Name!, dataLayer);
 	}
 	
 	public readonly DEPath ToDataEntryPath(IDataLayerInfo dataLayer)
@@ -307,7 +316,7 @@ public readonly struct DEDefinition<TDocument> : IEquatable<DEDefinition<TDocume
 			return new DEPath(Info);
 		}
 
-		return new DEPath(typeof(TDocument), Name!, false, dataLayer);
+		return new DEPath(typeof(TDoc), Name!, false, dataLayer);
 	}
 
 	public readonly override string ToString()
@@ -319,17 +328,17 @@ public readonly struct DEDefinition<TDocument> : IEquatable<DEDefinition<TDocume
 	{
 		if (shortDocumentName)
 		{
-			return string.Concat(typeof(TDocument).Name, ".", (Name ?? Info!.Name));
+			return string.Concat(typeof(TDoc).Name, ".", (Name ?? Info!.Name));
 		}
 		else
 		{
-			return string.Concat(typeof(TDocument).FullName, ".", (Name ?? Info!.Name));
+			return string.Concat(typeof(TDoc).FullName, ".", (Name ?? Info!.Name));
 		}
 	}
 
 	public readonly override int GetHashCode()
 	{
-		return typeof(TDocument).GetHashCode() ^ (Name ?? Info!.Name).GetHashCode();
+		return typeof(TDoc).GetHashCode() ^ (Name ?? Info!.Name).GetHashCode();
 	}
 
 	public readonly override bool Equals(object? obj)
@@ -338,32 +347,32 @@ public readonly struct DEDefinition<TDocument> : IEquatable<DEDefinition<TDocume
 		{
 			return false;
 		}
-		if (obj is DEDefinition<TDocument> value2)
+		if (obj is DEDefinition<TDoc> value2)
 		{
 			return Equals(value2);
 		}
 		return false;
 	}
 
-	public readonly bool Equals(DEDefinition<TDocument> other)
+	public readonly bool Equals(DEDefinition<TDoc> other)
 		=> (Name ?? Info!.Name) == (other.Name ?? other.Info!.Name);
 
-	public static implicit operator DEDefinition<TDocument>(string propertyOrFieldName)
-		=> new DEDefinition<TDocument>(propertyOrFieldName);
+	public static implicit operator DEDefinition<TDoc>(string propertyOrFieldName)
+		=> new DEDefinition<TDoc>(propertyOrFieldName);
 
-	public static implicit operator DEDefinition<TDocument>(DEInfo dataEntryInfo)
-		=> new DEDefinition<TDocument>(dataEntryInfo);
+	public static implicit operator DEDefinition<TDoc>(DEInfo dataEntryInfo)
+		=> new DEDefinition<TDoc>(dataEntryInfo);
 
-	public static bool operator ==(DEDefinition<TDocument> a, DEDefinition<TDocument> b)
+	public static bool operator ==(DEDefinition<TDoc> a, DEDefinition<TDoc> b)
 		=> a.Equals(b);
 
-	public static bool operator !=(DEDefinition<TDocument> a, DEDefinition<TDocument> b)
+	public static bool operator !=(DEDefinition<TDoc> a, DEDefinition<TDoc> b)
 		=> !a.Equals(b);
 }
 
 
 [DebuggerDisplay("{ToString()}")]
-public readonly struct DEDefinition<TDocument, TField> : IEquatable<DEDefinition<TDocument, TField>>, IEquatable<DEDefinition<TDocument>>
+public readonly struct DEDefinition<TDoc, TField> : IEquatable<DEDefinition<TDoc, TField>>, IEquatable<DEDefinition<TDoc>>
 {
 	public readonly string? Name;
 	public readonly DEInfo? Info;
@@ -401,7 +410,7 @@ public readonly struct DEDefinition<TDocument, TField> : IEquatable<DEDefinition
 			return Info;
 		}
 
-		var dataEntryInfo = DEInfo.GetDataEntryInfo<TDocument>(Name!, dataLayer);
+		var dataEntryInfo = DEInfo.GetDataEntryInfo<TDoc>(Name!, dataLayer);
 		if (dataEntryInfo.DataEntryType != typeof(TField))
 		{
 			throw new InvalidCastException($"DataEntry '{dataEntryInfo.ToString(true)}' is of type '{dataEntryInfo.DataEntryType.ToPretty()}' which does not match the expected '{typeof(TField).ToPretty()}'.");
@@ -418,17 +427,17 @@ public readonly struct DEDefinition<TDocument, TField> : IEquatable<DEDefinition
 	{
 		if (shortDocumentName)
 		{
-			return string.Concat(typeof(TDocument).Name, ".", (Name ?? Info!.Name));
+			return string.Concat(typeof(TDoc).Name, ".", (Name ?? Info!.Name));
 		}
 		else
 		{
-			return string.Concat(typeof(TDocument).FullName, ".", (Name ?? Info!.Name));
+			return string.Concat(typeof(TDoc).FullName, ".", (Name ?? Info!.Name));
 		}
 	}
 
 	public readonly override int GetHashCode()
 	{
-		return typeof(TDocument).GetHashCode() ^ (Name ?? Info!.Name).GetHashCode();
+		return typeof(TDoc).GetHashCode() ^ (Name ?? Info!.Name).GetHashCode();
 	}
 
 	public readonly override bool Equals(object? obj)
@@ -437,37 +446,37 @@ public readonly struct DEDefinition<TDocument, TField> : IEquatable<DEDefinition
 		{
 			return false;
 		}
-		if (obj is DEDefinition<TDocument, TField> a)
+		if (obj is DEDefinition<TDoc, TField> a)
 		{
 			return Equals(a);
 		}
-		if (obj is DEDefinition<TDocument> b)
+		if (obj is DEDefinition<TDoc> b)
 		{
 			return Equals(b);
 		}
 		return false;
 	}
 
-	public readonly bool Equals(DEDefinition<TDocument> other)
+	public readonly bool Equals(DEDefinition<TDoc> other)
 		=> (Name ?? Info!.Name) == (other.Name ?? other.Info!.Name);
 
-	public readonly bool Equals(DEDefinition<TDocument, TField> other)
+	public readonly bool Equals(DEDefinition<TDoc, TField> other)
 		=> (Name ?? Info!.Name) == (other.Name ?? other.Info!.Name);
 
-	public static bool operator ==(DEDefinition<TDocument, TField> a, DEDefinition<TDocument, TField> b)
+	public static bool operator ==(DEDefinition<TDoc, TField> a, DEDefinition<TDoc, TField> b)
 		=> a.Equals(b);
 
-	public static bool operator !=(DEDefinition<TDocument, TField> a, DEDefinition<TDocument, TField> b)
+	public static bool operator !=(DEDefinition<TDoc, TField> a, DEDefinition<TDoc, TField> b)
 		=> !a.Equals(b);
 
-	public static implicit operator DEDefinition<TDocument, TField>(DEDefinition<TDocument> definition)
+	public static implicit operator DEDefinition<TDoc, TField>(DEDefinition<TDoc> definition)
 		=> definition.Name != null
-			? new DEDefinition<TDocument, TField>(definition.Name)
-			: new DEDefinition<TDocument, TField>(definition.Info!);
+			? new DEDefinition<TDoc, TField>(definition.Name)
+			: new DEDefinition<TDoc, TField>(definition.Info!);
 
-	public static implicit operator DEDefinition<TDocument, TField>(string propertyOrFieldName)
-		=> new DEDefinition<TDocument, TField>(propertyOrFieldName);
+	public static implicit operator DEDefinition<TDoc, TField>(string propertyOrFieldName)
+		=> new DEDefinition<TDoc, TField>(propertyOrFieldName);
 
-	public static implicit operator DEDefinition<TDocument, TField>(DEInfo dataEntryInfo)
-		=> new DEDefinition<TDocument, TField>(dataEntryInfo);
+	public static implicit operator DEDefinition<TDoc, TField>(DEInfo dataEntryInfo)
+		=> new DEDefinition<TDoc, TField>(dataEntryInfo);
 }

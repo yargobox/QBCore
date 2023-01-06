@@ -1,6 +1,6 @@
 namespace QBCore.DataSource.QueryBuilder.Mongo;
 
-internal sealed partial class SelectQueryBuilder<TDocument, TSelect>
+internal sealed partial class SelectQueryBuilder<TDoc, TSelect>
 {
 	private enum StageOperations
 	{

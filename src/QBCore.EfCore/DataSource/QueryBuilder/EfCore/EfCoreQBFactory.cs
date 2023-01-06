@@ -67,7 +67,7 @@ internal class EfCoreQBFactory : IQueryBuilderFactory
 			}
 			else
 			{
-				var setupActionArgType = typeof(IQBEfCoreInsertBuilder<,>).MakeGenericType(_dsTypeInfo.TDocument, _dsTypeInfo.TCreate);
+				var setupActionArgType = typeof(IEfCoreInsertQBBuilder<,>).MakeGenericType(_dsTypeInfo.TDoc, _dsTypeInfo.TCreate);
 				_insertBuilderMethod = FactoryHelper.FindBuilder(setupActionArgType, _dsTypeInfo.Concrete, null)
 									?? FactoryHelper.FindBuilder(setupActionArgType, _dsTypeInfo.TCreate, null);
 			}
@@ -83,7 +83,7 @@ internal class EfCoreQBFactory : IQueryBuilderFactory
 			}
 			else
 			{
-				var setupActionArgType = typeof(IQBEfCoreSelectBuilder<,>).MakeGenericType(_dsTypeInfo.TDocument, _dsTypeInfo.TSelect);
+				var setupActionArgType = typeof(IEfCoreSelectQBBuilder<,>).MakeGenericType(_dsTypeInfo.TDoc, _dsTypeInfo.TSelect);
 				_selectBuilderMethod = FactoryHelper.FindBuilder(setupActionArgType, _dsTypeInfo.Concrete, null)
 									?? FactoryHelper.FindBuilder(setupActionArgType, _dsTypeInfo.TSelect, null);
 			}
@@ -99,7 +99,7 @@ internal class EfCoreQBFactory : IQueryBuilderFactory
 			}
 			else
 			{
-				var setupActionArgType = typeof(IQBEfCoreUpdateBuilder<,>).MakeGenericType(_dsTypeInfo.TDocument, _dsTypeInfo.TUpdate);
+				var setupActionArgType = typeof(IEfCoreUpdateQBBuilder<,>).MakeGenericType(_dsTypeInfo.TDoc, _dsTypeInfo.TUpdate);
 				_updateBuilderMethod = FactoryHelper.FindBuilder(setupActionArgType, _dsTypeInfo.Concrete, null)
 									?? FactoryHelper.FindBuilder(setupActionArgType, _dsTypeInfo.TUpdate, null);
 			}
@@ -117,7 +117,7 @@ internal class EfCoreQBFactory : IQueryBuilderFactory
 				}
 				else
 				{
-					var setupActionArgType = typeof(IQBEfCoreSoftDelBuilder<,>).MakeGenericType(_dsTypeInfo.TDocument, _dsTypeInfo.TDelete);
+					var setupActionArgType = typeof(IEfCoreSoftDelQBBuilder<,>).MakeGenericType(_dsTypeInfo.TDoc, _dsTypeInfo.TDelete);
 					_deleteBuilderMethod = FactoryHelper.FindBuilder(setupActionArgType, _dsTypeInfo.Concrete, null)
 										?? FactoryHelper.FindBuilder(setupActionArgType, _dsTypeInfo.TDelete, null);
 				}
@@ -133,7 +133,7 @@ internal class EfCoreQBFactory : IQueryBuilderFactory
 				}
 				else
 				{
-					var setupActionArgType = typeof(IQBEfCoreRestoreBuilder<,>).MakeGenericType(_dsTypeInfo.TDocument, _dsTypeInfo.TRestore);
+					var setupActionArgType = typeof(IEfCoreRestoreQBBuilder<,>).MakeGenericType(_dsTypeInfo.TDoc, _dsTypeInfo.TRestore);
 					_restoreBuilderMethod = FactoryHelper.FindBuilder(setupActionArgType, _dsTypeInfo.Concrete, null)
 										?? FactoryHelper.FindBuilder(setupActionArgType, _dsTypeInfo.TRestore, null);
 				}
@@ -149,7 +149,7 @@ internal class EfCoreQBFactory : IQueryBuilderFactory
 			}
 			else
 			{
-				var setupActionArgType = typeof(IQBEfCoreDeleteBuilder<,>).MakeGenericType(_dsTypeInfo.TDocument, _dsTypeInfo.TDelete);
+				var setupActionArgType = typeof(IEfCoreDeleteQBBuilder<,>).MakeGenericType(_dsTypeInfo.TDoc, _dsTypeInfo.TDelete);
 				_deleteBuilderMethod = FactoryHelper.FindBuilder(setupActionArgType, _dsTypeInfo.Concrete, null)
 									?? FactoryHelper.FindBuilder(setupActionArgType, _dsTypeInfo.TDelete, null);
 			}
@@ -166,63 +166,63 @@ internal class EfCoreQBFactory : IQueryBuilderFactory
 		}
 	}
 
-	public IInsertQueryBuilder<TDocument, TCreate> CreateQBInsert<TDocument, TCreate>(IDataContext dataContext) where TDocument : class
+	public IInsertQueryBuilder<TDoc, TCreate> CreateQBInsert<TDoc, TCreate>(IDataContext dataContext) where TDoc : class
 	{
-		var setup = (QBInsertBuilder<TDocument, TCreate>?)GetInsertBuilder()
+		var setup = (InsertQBBuilder<TDoc, TCreate>?)GetInsertBuilder()
 			?? throw EX.DataSource.Make.DataSourceDoesNotSupportOperation(_dsTypeInfo.Concrete.ToPretty(), QueryBuilderTypes.Insert.ToString());
 
-		return new InsertQueryBuilder<TDocument, TCreate>(new QBInsertBuilder<TDocument, TCreate>(setup), dataContext);
+		return new InsertQueryBuilder<TDoc, TCreate>(new InsertQBBuilder<TDoc, TCreate>(setup), dataContext);
 	}
-	public ISelectQueryBuilder<TDocument, TSelect> CreateQBSelect<TDocument, TSelect>(IDataContext dataContext) where TDocument : class
+	public ISelectQueryBuilder<TDoc, TSelect> CreateQBSelect<TDoc, TSelect>(IDataContext dataContext) where TDoc : class
 	{
-		var setup = (QBSelectBuilder<TDocument, TSelect>?)GetSelectBuilder()
+		var setup = (SelectQBBuilder<TDoc, TSelect>?)GetSelectBuilder()
 			?? throw EX.DataSource.Make.DataSourceDoesNotSupportOperation(_dsTypeInfo.Concrete.ToPretty(), QueryBuilderTypes.Select.ToString());
 
-		return new SelectQueryBuilder<TDocument, TSelect>(new QBSelectBuilder<TDocument, TSelect>(setup), dataContext);
+		return new SelectQueryBuilder<TDoc, TSelect>(new SelectQBBuilder<TDoc, TSelect>(setup), dataContext);
 	}
-	public IUpdateQueryBuilder<TDocument, TUpdate> CreateQBUpdate<TDocument, TUpdate>(IDataContext dataContext) where TDocument : class
+	public IUpdateQueryBuilder<TDoc, TUpdate> CreateQBUpdate<TDoc, TUpdate>(IDataContext dataContext) where TDoc : class
 	{
-		var setup = (QBUpdateBuilder<TDocument, TUpdate>?)GetUpdateBuilder()
+		var setup = (UpdateQBBuilder<TDoc, TUpdate>?)GetUpdateBuilder()
 			?? throw EX.DataSource.Make.DataSourceDoesNotSupportOperation(_dsTypeInfo.Concrete.ToPretty(), QueryBuilderTypes.Update.ToString());
 
-		return new UpdateQueryBuilder<TDocument, TUpdate>(new QBUpdateBuilder<TDocument, TUpdate>(setup), dataContext);
+		return new UpdateQueryBuilder<TDoc, TUpdate>(new UpdateQBBuilder<TDoc, TUpdate>(setup), dataContext);
 	}
-	public IDeleteQueryBuilder<TDocument, TDelete> CreateQBDelete<TDocument, TDelete>(IDataContext dataContext) where TDocument : class
+	public IDeleteQueryBuilder<TDoc, TDelete> CreateQBDelete<TDoc, TDelete>(IDataContext dataContext) where TDoc : class
 	{
-		var setup = (QBDeleteBuilder<TDocument, TDelete>?)GetDeleteBuilder()
+		var setup = (DeleteQBBuilder<TDoc, TDelete>?)GetDeleteBuilder()
 			?? throw EX.DataSource.Make.DataSourceDoesNotSupportOperation(_dsTypeInfo.Concrete.ToPretty(), QueryBuilderTypes.Delete.ToString());
 
-		return new DeleteQueryBuilder<TDocument, TDelete>(new QBDeleteBuilder<TDocument, TDelete>(setup), dataContext);
+		return new DeleteQueryBuilder<TDoc, TDelete>(new DeleteQBBuilder<TDoc, TDelete>(setup), dataContext);
 	}
-	public IDeleteQueryBuilder<TDocument, TDelete> CreateQBSoftDel<TDocument, TDelete>(IDataContext dataContext) where TDocument : class
+	public IDeleteQueryBuilder<TDoc, TDelete> CreateQBSoftDel<TDoc, TDelete>(IDataContext dataContext) where TDoc : class
 	{
-		var setup = (QBSoftDelBuilder<TDocument, TDelete>?)GetSoftDelBuilder()
+		var setup = (SoftDelQBBuilder<TDoc, TDelete>?)GetSoftDelBuilder()
 			?? throw EX.DataSource.Make.DataSourceDoesNotSupportOperation(_dsTypeInfo.Concrete.ToPretty(), QueryBuilderTypes.SoftDel.ToString());
 
-		return new SoftDelQueryBuilder<TDocument, TDelete>(new QBSoftDelBuilder<TDocument, TDelete>(setup), dataContext);
+		return new SoftDelQueryBuilder<TDoc, TDelete>(new SoftDelQBBuilder<TDoc, TDelete>(setup), dataContext);
 	}
-	public IRestoreQueryBuilder<TDocument, TRestore> CreateQBRestore<TDocument, TRestore>(IDataContext dataContext) where TDocument : class
+	public IRestoreQueryBuilder<TDoc, TRestore> CreateQBRestore<TDoc, TRestore>(IDataContext dataContext) where TDoc : class
 	{
-		var setup = (QBRestoreBuilder<TDocument, TRestore>?)GetRestoreBuilder()
+		var setup = (RestoreQBBuilder<TDoc, TRestore>?)GetRestoreBuilder()
 			?? throw EX.DataSource.Make.DataSourceDoesNotSupportOperation(_dsTypeInfo.Concrete.ToPretty(), QueryBuilderTypes.Restore.ToString());
 
-		return new RestoreQueryBuilder<TDocument, TRestore>(new QBRestoreBuilder<TDocument, TRestore>(setup), dataContext);
+		return new RestoreQueryBuilder<TDoc, TRestore>(new RestoreQBBuilder<TDoc, TRestore>(setup), dataContext);
 	}
 
 	private IQBBuilder? GetInsertBuilder()
-		=> (IQBBuilder?) _getInsertBuilder.MakeGenericMethod(_dsTypeInfo.TDocument, _dsTypeInfo.TCreate).Invoke(this, null);
+		=> (IQBBuilder?) _getInsertBuilder.MakeGenericMethod(_dsTypeInfo.TDoc, _dsTypeInfo.TCreate).Invoke(this, null);
 	private IQBBuilder? GetSelectBuilder()
-		=> (IQBBuilder?) _getSelectBuilder.MakeGenericMethod(_dsTypeInfo.TDocument, _dsTypeInfo.TSelect).Invoke(this, null);
+		=> (IQBBuilder?) _getSelectBuilder.MakeGenericMethod(_dsTypeInfo.TDoc, _dsTypeInfo.TSelect).Invoke(this, null);
 	private IQBBuilder? GetUpdateBuilder()
-		=> (IQBBuilder?) _getUpdateBuilder.MakeGenericMethod(_dsTypeInfo.TDocument, _dsTypeInfo.TUpdate).Invoke(this, null);
+		=> (IQBBuilder?) _getUpdateBuilder.MakeGenericMethod(_dsTypeInfo.TDoc, _dsTypeInfo.TUpdate).Invoke(this, null);
 	private IQBBuilder? GetDeleteBuilder()
-		=> (IQBBuilder?) _getDeleteBuilder.MakeGenericMethod(_dsTypeInfo.TDocument, _dsTypeInfo.TDelete).Invoke(this, null);
+		=> (IQBBuilder?) _getDeleteBuilder.MakeGenericMethod(_dsTypeInfo.TDoc, _dsTypeInfo.TDelete).Invoke(this, null);
 	private IQBBuilder? GetSoftDelBuilder()
-		=> (IQBBuilder?) _getSoftDelBuilder.MakeGenericMethod(_dsTypeInfo.TDocument, _dsTypeInfo.TDelete).Invoke(this, null);
+		=> (IQBBuilder?) _getSoftDelBuilder.MakeGenericMethod(_dsTypeInfo.TDoc, _dsTypeInfo.TDelete).Invoke(this, null);
 	private IQBBuilder? GetRestoreBuilder()
-		=> (IQBBuilder?) _getRestoreBuilder.MakeGenericMethod(_dsTypeInfo.TDocument, _dsTypeInfo.TRestore).Invoke(this, null);
+		=> (IQBBuilder?) _getRestoreBuilder.MakeGenericMethod(_dsTypeInfo.TDoc, _dsTypeInfo.TRestore).Invoke(this, null);
 
-	private IQBBuilder? GetInsertBuilder<TDocument, TCreate>() where TDocument : class
+	private IQBBuilder? GetInsertBuilder<TDoc, TCreate>() where TDoc : class
 	{
 		if (_insertBuilder != null)
 		{
@@ -233,11 +233,11 @@ internal class EfCoreQBFactory : IQueryBuilderFactory
 			return null;
 		}
 
-		QBInsertBuilder<TDocument, TCreate>? setup = null;
-		var setupAction = (Action<IQBEfCoreInsertBuilder<TDocument, TCreate>>?)_insertBuilderMethod;
+		InsertQBBuilder<TDoc, TCreate>? setup = null;
+		var setupAction = (Action<IEfCoreInsertQBBuilder<TDoc, TCreate>>?)_insertBuilderMethod;
 		if (setupAction != null)
 		{
-			setup = new QBInsertBuilder<TDocument, TCreate>();
+			setup = new InsertQBBuilder<TDoc, TCreate>();
 			setupAction(setup);
 		}
 		else
@@ -250,11 +250,11 @@ internal class EfCoreQBFactory : IQueryBuilderFactory
 
 			if (other != null)
 			{
-				setup = new QBInsertBuilder<TDocument, TCreate>(other);
+				setup = new InsertQBBuilder<TDoc, TCreate>(other);
 			}
 			else
 			{
-				setup = new QBInsertBuilder<TDocument, TCreate>();
+				setup = new InsertQBBuilder<TDoc, TCreate>();
 				setup.AutoBuild();
 			}
 		}
@@ -263,7 +263,7 @@ internal class EfCoreQBFactory : IQueryBuilderFactory
 		Interlocked.CompareExchange(ref _insertBuilder, setup, null);
 		return _insertBuilder;
 	}
-	private IQBBuilder? GetSelectBuilder<TDocument, TSelect>() where TDocument : class
+	private IQBBuilder? GetSelectBuilder<TDoc, TSelect>() where TDoc : class
 	{
 		if (_selectBuilder != null)
 		{
@@ -274,11 +274,11 @@ internal class EfCoreQBFactory : IQueryBuilderFactory
 			return null;
 		}
 
-		QBSelectBuilder<TDocument, TSelect>? setup = null;
-		var setupAction = (Action<IQBEfCoreSelectBuilder<TDocument, TSelect>>?)_selectBuilderMethod;
+		SelectQBBuilder<TDoc, TSelect>? setup = null;
+		var setupAction = (Action<IEfCoreSelectQBBuilder<TDoc, TSelect>>?)_selectBuilderMethod;
 		if (setupAction != null)
 		{
-			setup = new QBSelectBuilder<TDocument, TSelect>();
+			setup = new SelectQBBuilder<TDoc, TSelect>();
 			setupAction(setup);
 		}
 		else
@@ -291,11 +291,11 @@ internal class EfCoreQBFactory : IQueryBuilderFactory
 
 			if (other != null)
 			{
-				setup = new QBSelectBuilder<TDocument, TSelect>(other);
+				setup = new SelectQBBuilder<TDoc, TSelect>(other);
 			}
 			else
 			{
-				setup = new QBSelectBuilder<TDocument, TSelect>();
+				setup = new SelectQBBuilder<TDoc, TSelect>();
 				setup.AutoBuild();
 			}
 		}
@@ -304,7 +304,7 @@ internal class EfCoreQBFactory : IQueryBuilderFactory
 		Interlocked.CompareExchange(ref _selectBuilder, setup, null);
 		return _selectBuilder;
 	}
-	private IQBBuilder? GetUpdateBuilder<TDocument, TUpdate>() where TDocument : class
+	private IQBBuilder? GetUpdateBuilder<TDoc, TUpdate>() where TDoc : class
 	{
 		if (_updateBuilder != null)
 		{
@@ -315,11 +315,11 @@ internal class EfCoreQBFactory : IQueryBuilderFactory
 			return null;
 		}
 
-		QBUpdateBuilder<TDocument, TUpdate>? setup = null;
-		var setupAction = (Action<IQBEfCoreUpdateBuilder<TDocument, TUpdate>>?)_updateBuilderMethod;
+		UpdateQBBuilder<TDoc, TUpdate>? setup = null;
+		var setupAction = (Action<IEfCoreUpdateQBBuilder<TDoc, TUpdate>>?)_updateBuilderMethod;
 		if (setupAction != null)
 		{
-			setup = new QBUpdateBuilder<TDocument, TUpdate>();
+			setup = new UpdateQBBuilder<TDoc, TUpdate>();
 			setupAction(setup);
 		}
 		else
@@ -332,11 +332,11 @@ internal class EfCoreQBFactory : IQueryBuilderFactory
 
 			if (other != null)
 			{
-				setup = new QBUpdateBuilder<TDocument, TUpdate>(other);
+				setup = new UpdateQBBuilder<TDoc, TUpdate>(other);
 			}
 			else
 			{
-				setup = new QBUpdateBuilder<TDocument, TUpdate>();
+				setup = new UpdateQBBuilder<TDoc, TUpdate>();
 				setup.AutoBuild();
 			}
 		}
@@ -345,7 +345,7 @@ internal class EfCoreQBFactory : IQueryBuilderFactory
 		Interlocked.CompareExchange(ref _updateBuilder, setup, null);
 		return _updateBuilder;
 	}
-	private IQBBuilder? GetDeleteBuilder<TDocument, TDelete>() where TDocument : class
+	private IQBBuilder? GetDeleteBuilder<TDoc, TDelete>() where TDoc : class
 	{
 		if (_deleteBuilder != null)
 		{
@@ -356,11 +356,11 @@ internal class EfCoreQBFactory : IQueryBuilderFactory
 			return null;
 		}
 
-		QBDeleteBuilder<TDocument, TDelete>? setup = null;
-		var setupAction = (Action<IQBEfCoreDeleteBuilder<TDocument, TDelete>>?)_deleteBuilderMethod;
+		DeleteQBBuilder<TDoc, TDelete>? setup = null;
+		var setupAction = (Action<IEfCoreDeleteQBBuilder<TDoc, TDelete>>?)_deleteBuilderMethod;
 		if (setupAction != null)
 		{
-			setup = new QBDeleteBuilder<TDocument, TDelete>();
+			setup = new DeleteQBBuilder<TDoc, TDelete>();
 			setupAction(setup);
 		}
 		else
@@ -372,11 +372,11 @@ internal class EfCoreQBFactory : IQueryBuilderFactory
 
 			if (other != null)
 			{
-				setup = new QBDeleteBuilder<TDocument, TDelete>(other);
+				setup = new DeleteQBBuilder<TDoc, TDelete>(other);
 			}
 			else
 			{
-				setup = new QBDeleteBuilder<TDocument, TDelete>();
+				setup = new DeleteQBBuilder<TDoc, TDelete>();
 				setup.AutoBuild();
 			}
 		}
@@ -385,7 +385,7 @@ internal class EfCoreQBFactory : IQueryBuilderFactory
 		Interlocked.CompareExchange(ref _deleteBuilder, setup, null);
 		return _deleteBuilder;
 	}
-	private IQBBuilder? GetSoftDelBuilder<TDocument, TDelete>() where TDocument : class
+	private IQBBuilder? GetSoftDelBuilder<TDoc, TDelete>() where TDoc : class
 	{
 		if (_softDelBuilder != null)
 		{
@@ -396,11 +396,11 @@ internal class EfCoreQBFactory : IQueryBuilderFactory
 			return null;
 		}
 
-		QBSoftDelBuilder<TDocument, TDelete>? setup = null;
-		var setupAction = (Action<IQBEfCoreSoftDelBuilder<TDocument, TDelete>>?)_deleteBuilderMethod;
+		SoftDelQBBuilder<TDoc, TDelete>? setup = null;
+		var setupAction = (Action<IEfCoreSoftDelQBBuilder<TDoc, TDelete>>?)_deleteBuilderMethod;
 		if (setupAction != null)
 		{
-			setup = new QBSoftDelBuilder<TDocument, TDelete>();
+			setup = new SoftDelQBBuilder<TDoc, TDelete>();
 			setupAction(setup);
 		}
 		else
@@ -413,11 +413,11 @@ internal class EfCoreQBFactory : IQueryBuilderFactory
 
 			if (other != null)
 			{
-				setup = new QBSoftDelBuilder<TDocument, TDelete>(other);
+				setup = new SoftDelQBBuilder<TDoc, TDelete>(other);
 			}
 			else
 			{
-				setup = new QBSoftDelBuilder<TDocument, TDelete>();
+				setup = new SoftDelQBBuilder<TDoc, TDelete>();
 				setup.AutoBuild();
 			}
 		}
@@ -426,7 +426,7 @@ internal class EfCoreQBFactory : IQueryBuilderFactory
 		Interlocked.CompareExchange(ref _softDelBuilder, setup, null);
 		return _softDelBuilder;
 	}
-	private IQBBuilder? GetRestoreBuilder<TDocument, TRestore>() where TDocument : class
+	private IQBBuilder? GetRestoreBuilder<TDoc, TRestore>() where TDoc : class
 	{
 		if (_restoreBuilder != null)
 		{
@@ -437,11 +437,11 @@ internal class EfCoreQBFactory : IQueryBuilderFactory
 			return null;
 		}
 
-		QBRestoreBuilder<TDocument, TRestore>? setup = null;
-		var setupAction = (Action<IQBEfCoreRestoreBuilder<TDocument, TRestore>>?)_restoreBuilderMethod;
+		RestoreQBBuilder<TDoc, TRestore>? setup = null;
+		var setupAction = (Action<IEfCoreRestoreQBBuilder<TDoc, TRestore>>?)_restoreBuilderMethod;
 		if (setupAction != null)
 		{
-			setup = new QBRestoreBuilder<TDocument, TRestore>();
+			setup = new RestoreQBBuilder<TDoc, TRestore>();
 			setupAction(setup);
 		}
 		else
@@ -454,11 +454,11 @@ internal class EfCoreQBFactory : IQueryBuilderFactory
 
 			if (other != null)
 			{
-				setup = new QBRestoreBuilder<TDocument, TRestore>(other);
+				setup = new RestoreQBBuilder<TDoc, TRestore>(other);
 			}
 			else
 			{
-				setup = new QBRestoreBuilder<TDocument, TRestore>();
+				setup = new RestoreQBBuilder<TDoc, TRestore>();
 				setup.AutoBuild();
 			}
 		}

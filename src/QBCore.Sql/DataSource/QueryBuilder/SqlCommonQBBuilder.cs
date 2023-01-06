@@ -27,7 +27,7 @@ internal abstract class SqlCommonQBBuilder<TDoc, TDto> : QBBuilder<TDoc, TDto>
 
 	protected override void OnNormalize()
 	{
-		if (_isByOr != null || _parentheses > 0 || Containers.Count != 1)
+		if (_isByOr != null || _parentheses > 0)
 		{
 			throw new InvalidOperationException($"Incorrect condition definition of query builder '{typeof(TDto).ToPretty()}'.");
 		}
@@ -52,6 +52,12 @@ internal abstract class SqlCommonQBBuilder<TDoc, TDto> : QBBuilder<TDoc, TDto>
 			throw new ArgumentException(nameof(dbSideName));
 		}
 
+		var alias = ExtensionsForSql.ParseDbObjectName(dbSideName).Object;
+		if (alias.Contains('.'))
+		{
+			throw new InvalidOperationException($"Incorrect definition of query builder '{typeof(TDto).ToPretty()}': container alias '{alias}' cannot contain a period character '.'.");
+		}
+
 		if (_containers == null)
 		{
 			_containers = new List<QBContainer>(1);
@@ -60,7 +66,7 @@ internal abstract class SqlCommonQBBuilder<TDoc, TDto> : QBBuilder<TDoc, TDto>
 		IsNormalized = false;
 		_containers.Add(new QBContainer(
 			DocumentType: typeof(TDoc),
-			Alias: dbSideName,
+			Alias: alias,
 			DBSideName: dbSideName,
 			ContainerType: containerType,
 			ContainerOperation: containerOperation
@@ -269,29 +275,34 @@ internal abstract class SqlCommonQBBuilder<TDoc, TDto> : QBBuilder<TDoc, TDto>
 			_parentheses = 0;
 		}
 
-/* 		if (flags.HasFlag(QBConditionFlags.OnParam))
+		if (flags.HasFlag(QBConditionFlags.OnParam))
 		{
 			var fieldPath = _conditions![_conditions.Count - 1].Field;
 
-			AddParameter(paramName!, fieldPath.DataEntryType, fieldPath.IsNullable, System.Data.ParameterDirection.Input);
-		} */
+			AddParameter(paramName!, fieldPath.DataEntryType, fieldPath.IsNullable, System.Data.ParameterDirection.Input, null);
+		}
 
 		return this;
 	}
 
-	protected QBBuilder<TDoc, TDto> AddParameter(string name, Type underlyingType, bool isNullable, System.Data.ParameterDirection direction, Enum dbType)
+	protected QBBuilder<TDoc, TDto> AddParameter(string name, Type underlyingType, bool isNullable, System.Data.ParameterDirection direction, Enum? dbType)
 	{
 		if (_parameters == null)
 		{
 			_parameters = new List<QBParameter>(8);
 		}
 
-		var param = _parameters.FirstOrDefault(x => x.ParameterName == name);
-		if (param != null)
+		var paramIndex = _parameters.FindIndex(x => x.ParameterName == name);
+		if (paramIndex >= 0)
 		{
-			if (param.ClrType != underlyingType || param.IsNullable != isNullable || param.Direction != direction)
+			var param = _parameters[paramIndex];
+			if (param.ClrType != underlyingType || param.IsNullable != isNullable || param.Direction != direction || (dbType != null && param.DbType != null && dbType != param.DbType))
 			{
 				throw new InvalidOperationException($"Incorrect parameter definition of query builder '{typeof(TDto).ToPretty()}': parameter '{name}' has already been added before with different properties");
+			}
+			else if (dbType != null && param.DbType == null)
+			{
+				_parameters[paramIndex] = new QBParameter(name, underlyingType, isNullable, direction, dbType);
 			}
 		}
 		else

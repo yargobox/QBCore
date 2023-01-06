@@ -40,29 +40,22 @@ internal abstract class SqlSelectQBBuilder<TDoc, TSelect> : QBBuilder<TDoc, TSel
 	}
 	public SqlSelectQBBuilder(IQBBuilder other)
 	{
-		if (other.DocumentType != typeof(TDoc))
+		if (other is null) throw new ArgumentNullException(nameof(other));
+
+		if (other.DocType != typeof(TDoc))
 		{
-			throw new InvalidOperationException($"Could not make select query builder '{typeof(TDoc).ToPretty()}, {typeof(TSelect).ToPretty()}' from '{other.DocumentType.ToPretty()}, {other.ProjectionType.ToPretty()}'.");
+			throw new InvalidOperationException($"Could not make select query builder '{typeof(TDoc).ToPretty()}, {typeof(TSelect).ToPretty()}' from '{other.DocType.ToPretty()}, {other.DtoType.ToPretty()}'.");
 		}
 
-		var container = other.Containers.FirstOrDefault();
-		if (container?.DocumentType == null || container.DocumentType != typeof(TDoc) || container.ContainerType != ContainerTypes.Table)
+		other.Prepare();
+
+		var top = other.Containers.FirstOrDefault();
+		if (top?.DocumentType != typeof(TDoc) || (top.ContainerType != ContainerTypes.Table && top.ContainerType != ContainerTypes.View))
 		{
-			throw new InvalidOperationException($"Could not make select query builder '{typeof(TDoc).ToPretty()}, {typeof(TSelect).ToPretty()}' from '{other.DocumentType.ToPretty()}, {other.ProjectionType.ToPretty()}'.");
+			throw new InvalidOperationException($"Could not make select query builder '{typeof(TDoc).ToPretty()}, {typeof(TSelect).ToPretty()}' from '{other.DocType.ToPretty()}, {other.DtoType.ToPretty()}'.");
 		}
 
-		Select(container.DBSideName);
-	}
-
-	public override QBBuilder<TDoc, TSelect> AutoBuild()
-	{
-		if (Containers.Count > 0)
-		{
-			throw new InvalidOperationException($"Select query builder '{typeof(TSelect).ToPretty()}' has already been initialized.");
-		}
-
-		Select();
-		return this;
+		AutoBuild(top.DBSideName);
 	}
 
 	protected override void OnNormalize()
@@ -76,6 +69,11 @@ internal abstract class SqlSelectQBBuilder<TDoc, TSelect> : QBBuilder<TDoc, TSel
 		if (_sumParentheses != 0 || _autoOpenedParentheses != 0)
 		{
 			throw new InvalidOperationException($"Incorrect condition definition of select query builder '{typeof(TSelect).ToPretty()}'.");
+		}
+
+		if (_containers == null || _containers.Count == 0)
+		{
+			return;
 		}
 
 		var containers = _containers ?? EmptyLists.Containers;
@@ -173,6 +171,16 @@ internal abstract class SqlSelectQBBuilder<TDoc, TSelect> : QBBuilder<TDoc, TSel
 		}
 	}
 
+	protected override void OnPrepare()
+	{
+		base.OnPrepare();
+
+		if (Containers.Count == 0)
+		{
+			throw new InvalidOperationException($"Incompatible configuration of select query builder '{typeof(TSelect).ToPretty()}'.");
+		}
+	}
+
 	private SqlSelectQBBuilder<TDoc, TSelect> AddContainer(
 		Type documentType,
 		string? alias,
@@ -185,12 +193,21 @@ internal abstract class SqlSelectQBBuilder<TDoc, TSelect> : QBBuilder<TDoc, TSel
 			throw new InvalidOperationException($"Incorrect condition definition of select query builder '{typeof(TSelect).ToPretty()}'.");
 		}
 
-		dbSideName ??= DataLayer.GetDefaultDBSideContainerName(documentType);
-		alias ??= dbSideName;
-
 		if ((containerOperation & ContainerOperations.MainMask) != ContainerOperations.None && Containers.Any(x => x.ContainerOperation.HasFlag(ContainerOperations.MainMask)))
 		{
 			throw new InvalidOperationException($"Incorrect definition of select query builder '{typeof(TSelect).ToPretty()}': another initial container has already been added before.");
+		}
+
+		dbSideName ??= DataLayer.GetDefaultDBSideContainerName(documentType);
+		if (string.IsNullOrEmpty(dbSideName))
+		{
+			throw new ArgumentException(nameof(dbSideName));
+		}
+
+		alias ??= ExtensionsForSql.ParseDbObjectName(dbSideName).Object;
+		if (string.IsNullOrEmpty(alias))
+		{
+			throw new ArgumentException(nameof(alias));
 		}
 		if (alias.Contains('.'))
 		{
@@ -655,6 +672,23 @@ internal abstract class SqlSelectQBBuilder<TDoc, TSelect> : QBBuilder<TDoc, TSel
 		IsNormalized = false;
 		_sortOrders.Add(new QBSortOrder(alias, field, sortOrder));
 
+		return this;
+	}
+
+	public override QBBuilder<TDoc, TSelect> AutoBuild(string? tableName = null)
+	{
+		if (Containers.Count > 0)
+		{
+			throw new InvalidOperationException($"Select query builder '{typeof(TSelect).ToPretty()}' has already been initialized.");
+		}
+
+		Select(tableName);
+
+		return this;
+	}
+	ISqlSelectQBBuilder<TDoc, TSelect> ISqlSelectQBBuilder<TDoc, TSelect>.AutoBuild(string? tableName)
+	{
+		AutoBuild(tableName);
 		return this;
 	}
 

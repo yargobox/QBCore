@@ -6,6 +6,7 @@ using Dapper;
 using Npgsql;
 using QBCore.Configuration;
 using QBCore.DataSource.Options;
+using QBCore.DataSource.QueryBuilder;
 using QBCore.Extensions.Internals;
 
 namespace QBCore.DataSource.QueryBuilder.PgSql;
@@ -137,7 +138,7 @@ internal sealed partial class SelectQueryBuilder<TDoc, TSelect> : QueryBuilder<T
 
 				cursor = GetAsyncEnumerable<TSelect>(command, options?.Connection == null, cancellationToken);
 
-				if (take >= 0 && options?.ObtainLastPageMarker == true)
+				if (options?.ObtainLastPageMarker == true)
 				{
 					return new DSAsyncCursorWithLastPageMarker<TSelect>(cursor, take, cancellationToken);
 				}
@@ -173,33 +174,14 @@ internal sealed partial class SelectQueryBuilder<TDoc, TSelect> : QueryBuilder<T
 	private void BuildSelectQuery(StringBuilder sb, long skip, int take, NpgsqlParameterCollection commandParams)
 	{
 		var top = Builder.Containers.First();
-		var firstDbo = ParseDbObjectName(top.DBSideName);
-		var firstAlias = Builder.Containers.Count > 1 || firstDbo.Object != top.Alias
-			? top.Alias
-			: string.Empty;
+		var topDbo = ExtensionsForSql.ParseDbObjectName(top.DBSideName);
+		var topAlias = Builder.Containers.Count > 1 || topDbo.Object != top.Alias ? top.Alias : string.Empty;
 		bool next;
+		var dataEntries = Builder.DtoInfo?.DataEntries ?? Builder.DocInfo.DataEntries;
 
-		var getDBSideName = string (string alias, DEPath fieldPath) =>
-		{
-			if (alias == top.Alias)
-			{
-				if (firstAlias.Length == 0)
-				{
-					return string.Concat("\"", fieldPath.GetDBSideName(), "\"");
-				}
-				else
-				{
-					return string.Concat(firstAlias, ".\"", fieldPath.GetDBSideName(), "\"");
-				}
-			}
-
-			return string.Concat(alias, ".\"", fieldPath.GetDBSideName(), "\"");
-		};
-
-		var getAsFieldName = string (DEPath fieldPath) =>
-		{
-			return fieldPath.Name == fieldPath.GetDBSideName() ? string.Empty : " AS " + fieldPath.Name;
-		};
+		Func<string?, DEPath, string> getDBSideName = topAlias.Length > 0
+			? GetQuotedDBSideName
+			: (alias, fieldPath) => GetQuotedDBSideName(alias == top.Alias ? null : alias, fieldPath);
 
 		foreach (var container in Builder.Containers)
 		{
@@ -208,14 +190,21 @@ internal sealed partial class SelectQueryBuilder<TDoc, TSelect> : QueryBuilder<T
 				sb.Append("SELECT").AppendLine();
 
 				next = false;
-				foreach (var de in (Builder.ProjectionInfo?.DataEntries ?? Builder.DocumentInfo.DataEntries).Values.Cast<SqlDEInfo>())
+				foreach (var de in dataEntries.Values.Cast<SqlDEInfo>())
 				{
 					if (next) sb.AppendLine(","); next = true;
 
-					var fld = Builder.Fields.FirstOrDefault(x => x.Field.Name == de.Name);
+					//!!!
+					var fld = Builder.Fields.FirstOrDefault(x => x.Field.Path == de.Name);
 					if (fld == null)
 					{
-						sb.Append(firstAlias).Append(firstAlias.Length == 0 ? "" : ".").Append('"').Append(de.DBSideName).Append('"');
+						sb.Append('\t');
+						
+						if (topAlias.Length > 0)
+						{
+							sb.Append(topAlias).Append('.');
+						}
+						sb.Append('"').Append(de.DBSideName).Append('"');
 					}
 					else if (!fld.IncludeOrExclude && fld.OptionalExclusion)
 					{
@@ -232,27 +221,21 @@ internal sealed partial class SelectQueryBuilder<TDoc, TSelect> : QueryBuilder<T
 					}
 				}
 
-				sb.AppendLine().Append("FROM ");
+				sb.AppendLine().Append("FROM ").AppendContainer(topDbo);
 
-				var dbo = ParseDbObjectName(container.DBSideName);
-				if (dbo.Schema.Length > 0) sb.Append(dbo.Schema).Append('.');
-				sb.Append('"').Append(dbo.Object).Append('"');
-
-				if (Builder.Containers.Count > 1 || container.DBSideName != container.Alias) sb.Append(" AS ").Append(container.Alias);
+				if (topAlias.Length > 0)
+				{
+					sb.Append(" AS ").Append(container.Alias);
+				}
 
 				sb.AppendLine();
 			}
 			else if (container.ContainerOperation == ContainerOperations.Join || container.ContainerOperation == ContainerOperations.LeftJoin)
 			{
-				sb.AppendLine().Append(container.ContainerOperation == ContainerOperations.Join ? "JOIN " : "LEFT JOIN ");
-
-				var dbo = ParseDbObjectName(container.DBSideName);
-				if (dbo.Schema.Length > 0) sb.Append(dbo.Schema).Append('.');
-				sb.Append('"').Append(dbo.Object).Append('"');
-
-				sb.Append(" AS ").Append(container.Alias);
-
-				sb.Append(" ON ");
+				sb
+					.AppendLine()
+					.Append(container.ContainerOperation == ContainerOperations.Join ? "JOIN " : "LEFT JOIN ")
+						.AppendContainer(container).Append(" AS ").Append(container.Alias).Append(" ON ");
 
 				BuildConditionTree(sb, Builder.Connects, getDBSideName, Builder.Parameters, commandParams);
 
@@ -260,15 +243,9 @@ internal sealed partial class SelectQueryBuilder<TDoc, TSelect> : QueryBuilder<T
 			}
 			else if (container.ContainerOperation == ContainerOperations.CrossJoin)
 			{
-				sb.AppendLine().Append("CROSS JOIN ");
-
-				var dbo = ParseDbObjectName(container.DBSideName);
-				if (dbo.Schema.Length > 0) sb.Append(dbo.Schema).Append('.');
-				sb.Append('"').Append(dbo.Object).Append('"');
-
-				sb.Append(" AS ").Append(container.Alias);
-
-				sb.AppendLine();
+				sb
+					.AppendLine()
+					.Append("CROSS JOIN ").AppendContainer(container).Append(" AS ").Append(container.Alias).AppendLine();
 			}
 			else
 			{
@@ -276,11 +253,14 @@ internal sealed partial class SelectQueryBuilder<TDoc, TSelect> : QueryBuilder<T
 			}
 		}
 
-		sb.Append("WHERE ");
+		if (Builder.Conditions.Count > 0)
+		{
+			sb.Append("WHERE ");
 
-		BuildConditionTree(sb, Builder.Conditions, getDBSideName, Builder.Parameters, commandParams);
+			BuildConditionTree(sb, Builder.Conditions, getDBSideName, Builder.Parameters, commandParams);
 
-		sb.AppendLine();
+			sb.AppendLine();
+		}
 
 		next = false;
 		foreach (var sort in Builder.SortOrders)
@@ -292,10 +272,37 @@ internal sealed partial class SelectQueryBuilder<TDoc, TSelect> : QueryBuilder<T
 			else
 			{
 				next = true;
-				sb.Append("ORDER BY");
+				sb.Append("ORDER BY ");
 			}
 
-			sb.Append(' ').Append(getDBSideName(sort.Alias, sort.Field));
+			if (sort.Alias.Length == 0)
+			{
+				//!!!
+				var de = (SqlDEInfo?)dataEntries.GetValueOrDefault(sort.Field.Path)
+					?? throw new InvalidOperationException("");
+				var fld = Builder.Fields.FirstOrDefault(x => x.Field.Path == de.Name);
+				if (fld == null)
+				{
+					if (topAlias.Length > 0)
+					{
+						sb.Append(topAlias).Append('.');
+					}
+					sb.Append('"').Append(de.DBSideName).Append('"');
+				}
+				else if (!fld.IncludeOrExclude && fld.OptionalExclusion)
+				{
+					sb.Append("NULL");//!!!
+				}
+				else
+				{
+					throw new NotSupportedException("Field inclusion is not supported.");//!!!
+				}
+			}
+			else
+			{
+				sb.Append(getDBSideName(sort.Alias, sort.Field));
+			}
+
 			if (sort.SortOrder == SO.Descending)
 			{
 				sb.Append(" DESC");

@@ -10,17 +10,17 @@ public class DataSourceMappings : Profile
 	{
 		foreach (var info in StaticFactory.DataSources.Values)
 		{
-			if (info.DSTypeInfo.TCreate != info.DSTypeInfo.TDocument && info.DSTypeInfo.TCreate != typeof(NotSupported) && info.Options.HasFlag(DataSourceOptions.CanInsert))
+			if (info.DSTypeInfo.TCreate != info.DSTypeInfo.TDoc && info.DSTypeInfo.TCreate != typeof(NotSupported) && info.Options.HasFlag(DataSourceOptions.CanInsert))
 			{
-				CreateMap(info.DSTypeInfo.TCreate, info.DSTypeInfo.TDocument);
+				CreateMap(info.DSTypeInfo.TCreate, info.DSTypeInfo.TDoc);
 			}
-			if (info.DSTypeInfo.TUpdate != info.DSTypeInfo.TDocument && info.DSTypeInfo.TUpdate != typeof(NotSupported) && info.Options.HasFlag(DataSourceOptions.CanUpdate))
+			if (info.DSTypeInfo.TUpdate != info.DSTypeInfo.TDoc && info.DSTypeInfo.TUpdate != typeof(NotSupported) && info.Options.HasFlag(DataSourceOptions.CanUpdate))
 			{
-				CreateMap(info.DSTypeInfo.TUpdate, info.DSTypeInfo.TDocument);
+				CreateMap(info.DSTypeInfo.TUpdate, info.DSTypeInfo.TDoc);
 			}
 			if (info.DSTypeInfo.TSelect != info.DSTypeInfo.TSelect && info.DSTypeInfo.TSelect != typeof(NotSupported) && info.Options.HasFlag(DataSourceOptions.CanSelect))
 			{
-				CreateMap(info.DSTypeInfo.TDocument, info.DSTypeInfo.TSelect);
+				CreateMap(info.DSTypeInfo.TDoc, info.DSTypeInfo.TSelect);
 			}
 		}
 	}
@@ -34,25 +34,25 @@ public class DataSourceMappings : Profile
 
 		foreach (var info in StaticFactory.DataSources.Values)
 		{
-			if (info.DSTypeInfo.TCreate != info.DSTypeInfo.TDocument && info.DSTypeInfo.TCreate != typeof(NotSupported) && info.Options.HasFlag(DataSourceOptions.CanInsert))
+			if (info.DSTypeInfo.TCreate != info.DSTypeInfo.TDoc && info.DSTypeInfo.TCreate != typeof(NotSupported) && info.Options.HasFlag(DataSourceOptions.CanInsert))
 			{
-				if (createDefaultMap(info.DSTypeInfo.TCreate, info.DSTypeInfo.TDocument))
+				if (createDefaultMap(info.DSTypeInfo.TCreate, info.DSTypeInfo.TDoc))
 				{
-					CreateMap(info.DSTypeInfo.TCreate, info.DSTypeInfo.TDocument);
+					CreateMap(info.DSTypeInfo.TCreate, info.DSTypeInfo.TDoc);
 				}
 			}
-			if (info.DSTypeInfo.TUpdate != info.DSTypeInfo.TDocument && info.DSTypeInfo.TUpdate != typeof(NotSupported) && info.Options.HasFlag(DataSourceOptions.CanUpdate))
+			if (info.DSTypeInfo.TUpdate != info.DSTypeInfo.TDoc && info.DSTypeInfo.TUpdate != typeof(NotSupported) && info.Options.HasFlag(DataSourceOptions.CanUpdate))
 			{
-				if (createDefaultMap(info.DSTypeInfo.TUpdate, info.DSTypeInfo.TDocument))
+				if (createDefaultMap(info.DSTypeInfo.TUpdate, info.DSTypeInfo.TDoc))
 				{
-					CreateMap(info.DSTypeInfo.TUpdate, info.DSTypeInfo.TDocument);
+					CreateMap(info.DSTypeInfo.TUpdate, info.DSTypeInfo.TDoc);
 				}
 			}
-			if (info.DSTypeInfo.TSelect != info.DSTypeInfo.TDocument && info.DSTypeInfo.TSelect != typeof(NotSupported) && info.Options.HasFlag(DataSourceOptions.CanSelect))
+			if (info.DSTypeInfo.TSelect != info.DSTypeInfo.TDoc && info.DSTypeInfo.TSelect != typeof(NotSupported) && info.Options.HasFlag(DataSourceOptions.CanSelect))
 			{
-				if (createDefaultMap(info.DSTypeInfo.TDocument, info.DSTypeInfo.TSelect))
+				if (createDefaultMap(info.DSTypeInfo.TDoc, info.DSTypeInfo.TSelect))
 				{
-					CreateMap(info.DSTypeInfo.TDocument, info.DSTypeInfo.TSelect);
+					CreateMap(info.DSTypeInfo.TDoc, info.DSTypeInfo.TSelect);
 				}
 			}
 		}

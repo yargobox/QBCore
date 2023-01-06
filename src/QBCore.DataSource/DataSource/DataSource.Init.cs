@@ -3,7 +3,7 @@ using QBCore.ObjectFactory;
 
 namespace QBCore.DataSource;
 
-public abstract partial class DataSource<TKey, TDocument, TCreate, TSelect, TUpdate, TDelete, TRestore, TDataSource>
+public abstract partial class DataSource<TKey, TDoc, TCreate, TSelect, TUpdate, TDelete, TRestore, TDataSource>
 {
 	protected bool TryAddInternalObject(OKeyName okeyName, object? obj)
 	{
@@ -57,7 +57,7 @@ public abstract partial class DataSource<TKey, TDocument, TCreate, TSelect, TUpd
 			var node = cdsInfo.Nodes[keyName.DSOrNodeName];
 			if (node.Parent != null && node.Parent.Conditions.Any())
 			{
-				var listener = new CDSChildNodeDSListener<TKey, TDocument, TCreate, TSelect, TUpdate, TDelete, TRestore>(node.Parent.Conditions, keyName);
+				var listener = new CDSChildNodeDSListener<TKey, TDoc, TCreate, TSelect, TUpdate, TDelete, TRestore>(node.Parent.Conditions, keyName);
 				AttachListener(listener, true);
 			}
 		}

@@ -6,11 +6,11 @@ using QBCore.Extensions.Internals;
 
 namespace QBCore.DataSource.QueryBuilder.Mongo;
 
-internal sealed class DeleteQueryBuilder<TDocument, TDelete> : QueryBuilder<TDocument, TDelete>, IDeleteQueryBuilder<TDocument, TDelete>
+internal sealed class DeleteQueryBuilder<TDoc, TDelete> : QueryBuilder<TDoc, TDelete>, IDeleteQueryBuilder<TDoc, TDelete>
 {
 	public override QueryBuilderTypes QueryBuilderType => QueryBuilderTypes.Delete;
 
-	public DeleteQueryBuilder(QBDeleteBuilder<TDocument, TDelete> building, IDataContext dataContext) : base(building, dataContext)
+	public DeleteQueryBuilder(DeleteQBBuilder<TDoc, TDelete> building, IDataContext dataContext) : base(building, dataContext)
 	{
 		building.Normalize();
 	}
@@ -38,15 +38,15 @@ internal sealed class DeleteQueryBuilder<TDocument, TDelete> : QueryBuilder<TDoc
 			}
 		}
 
-		var collection = _mongoDbContext.AsMongoDatabase().GetCollection<TDocument>(top.DBSideName);
+		var collection = _mongoDbContext.AsMongoDatabase().GetCollection<TDoc>(top.DBSideName);
 
 		var deleteOptions = (DeleteOptions?)options?.NativeOptions ?? new DeleteOptions();
 		var clientSessionHandle = (IClientSessionHandle?)options?.NativeClientSession;
 
-		var deId = (MongoDEInfo?)Builder.DocumentInfo.IdField
-			?? throw EX.QueryBuilder.Make.DocumentDoesNotHaveIdDataEntry(Builder.DocumentInfo.DocumentType.ToPretty());
+		var deId = (MongoDEInfo?)Builder.DocInfo.IdField
+			?? throw EX.QueryBuilder.Make.DocumentDoesNotHaveIdDataEntry(Builder.DocInfo.DocumentType.ToPretty());
 
-		var filter = Builders<TDocument>.Filter.Eq(deId.Name, id);
+		var filter = Builders<TDoc>.Filter.Eq(deId.Name, id);
 
 		if (options != null)
 		{
@@ -54,7 +54,7 @@ internal sealed class DeleteQueryBuilder<TDocument, TDelete> : QueryBuilder<TDoc
 			{
 				var queryString = string.Concat(
 					"db.", top.DBSideName, ".deleteOne(",
-					filter.Render(BsonSerializer.SerializerRegistry.GetSerializer<TDocument>(), BsonSerializer.SerializerRegistry).ToString(), ");"
+					filter.Render(BsonSerializer.SerializerRegistry.GetSerializer<TDoc>(), BsonSerializer.SerializerRegistry).ToString(), ");"
 				);
 				await options.QueryStringCallbackAsync(queryString).ConfigureAwait(false);
 			}
@@ -62,7 +62,7 @@ internal sealed class DeleteQueryBuilder<TDocument, TDelete> : QueryBuilder<TDoc
 			{
 				var queryString = string.Concat(
 					"db.", top.DBSideName, ".deleteOne(",
-					filter.Render(BsonSerializer.SerializerRegistry.GetSerializer<TDocument>(), BsonSerializer.SerializerRegistry).ToString(), ");"
+					filter.Render(BsonSerializer.SerializerRegistry.GetSerializer<TDoc>(), BsonSerializer.SerializerRegistry).ToString(), ");"
 				);
 				options.QueryStringCallback(queryString);
 			}
@@ -82,12 +82,12 @@ internal sealed class DeleteQueryBuilder<TDocument, TDelete> : QueryBuilder<TDoc
 		{
 			if (result.DeletedCount <= 0)
 			{
-				throw EX.QueryBuilder.Make.OperationFailedNoSuchRecord(QueryBuilderType.ToString(), id.ToString(), Builder.DocumentInfo.DocumentType.ToPretty());
+				throw EX.QueryBuilder.Make.OperationFailedNoSuchRecord(QueryBuilderType.ToString(), id.ToString(), Builder.DocInfo.DocumentType.ToPretty());
 			}
 		}
 		else
 		{
-			throw EX.QueryBuilder.Make.OperationFailedNoAcknowledgment(QueryBuilderType.ToString(), id.ToString(), Builder.DocumentInfo.DocumentType.ToPretty());
+			throw EX.QueryBuilder.Make.OperationFailedNoAcknowledgment(QueryBuilderType.ToString(), id.ToString(), Builder.DocInfo.DocumentType.ToPretty());
 		}
 	}
 }

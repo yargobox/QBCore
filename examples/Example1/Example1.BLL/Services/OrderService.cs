@@ -30,11 +30,11 @@ public sealed class OrderService : DataSource<int?, Order, OrderCreateDto, Order
 		//builder.RestoreBuilder = RestoreBuilder;
 	}
 
-	static void SoftDelBuilder(IQBMongoSoftDelBuilder<Order, SoftDelDto> qb)
+	static void SoftDelBuilder(IMongoSoftDelQBBuilder<Order, SoftDelDto> qb)
 	{
 		qb.Update("orders");
 	}
-	static void RestoreBuilder(IQBMongoRestoreBuilder<Order, SoftDelDto> qb)
+	static void RestoreBuilder(IMongoRestoreQBBuilder<Order, SoftDelDto> qb)
 	{
 		qb.Update("orders");
 	}

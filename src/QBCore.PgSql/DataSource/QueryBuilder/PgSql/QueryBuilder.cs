@@ -17,16 +17,16 @@ using QBCore.Extensions.Text;
 
 namespace QBCore.DataSource.QueryBuilder.PgSql;
 
-internal abstract class QueryBuilder<TDoc, TProj> : IQueryBuilder<TDoc, TProj> where TDoc : class
+internal abstract class QueryBuilder<TDoc, TDto> : IQueryBuilder<TDoc, TDto> where TDoc : class
 {
 	public abstract QueryBuilderTypes QueryBuilderType { get; }
-	public Type DocumentType => typeof(TDoc);
-	public DSDocumentInfo DocumentInfo => Builder.DocumentInfo;
-	public Type ProjectionType => typeof(TProj);
-	public DSDocumentInfo? ProjectionInfo => Builder.ProjectionInfo;
+	public Type DocType => typeof(TDoc);
+	public DSDocumentInfo DocInfo => Builder.DocInfo;
+	public Type DtoType => typeof(TDto);
+	public DSDocumentInfo? DtoInfo => Builder.DtoInfo;
 	public Type DataContextInterfaceType => typeof(IPgSqlDataContext);
 	public IDataContext DataContext { get; }
-	public QBBuilder<TDoc, TProj> Builder { get; }
+	public QBBuilder<TDoc, TDto> Builder { get; }
 
 	#region Const Properties
 	private const FO _supportedOperations =
@@ -48,7 +48,7 @@ internal abstract class QueryBuilder<TDoc, TProj> : IQueryBuilder<TDoc, TProj> w
 		| FO.BitsOr;
 	#endregion
 
-	public QueryBuilder(QBBuilder<TDoc, TProj> builder, IDataContext dataContext)
+	public QueryBuilder(QBBuilder<TDoc, TDto> builder, IDataContext dataContext)
 	{
 		if (builder is null) throw new ArgumentNullException(nameof(builder));
 		if (dataContext is null) throw new ArgumentNullException(nameof(dataContext));
@@ -432,9 +432,20 @@ internal abstract class QueryBuilder<TDoc, TProj> : IQueryBuilder<TDoc, TProj> w
 		}
 	}
 
-	protected static string GetDBSideName(string? alias, DEPath fieldPath)
+	protected static string GetQuotedDBSideName(string? alias, DEPath fieldPath)
 	{
-		return fieldPath.GetDBSideName();
+		if (string.IsNullOrEmpty(alias))
+		{
+			return string.Concat("\"", fieldPath.GetDBSideName(), "\"");
+		}
+		else
+		{
+			return string.Concat(alias, ".\"", fieldPath.GetDBSideName(), "\"");
+		}
+	}
+	protected static string GetQuotedDBSideNameWithoutAlias(string? _, DEPath fieldPath)
+	{
+		return string.Concat("\"", fieldPath.GetDBSideName(), "\"");
 	}
 
 	private static void RenderCondition(StringBuilder filter, QBCondition cond, QBParameter? parameter, object? value, bool allowCaseInsensitive, string command, string leftField, NpgsqlParameterCollection commandParams)
@@ -443,7 +454,7 @@ internal abstract class QueryBuilder<TDoc, TProj> : IQueryBuilder<TDoc, TProj> w
 		{
 			if (command == "<>" || command == "IS NOT" || command == "NOT LIKE")
 			{
-				filter.Append('"').Append(leftField).Append("\" IS NOT NULL");
+				filter.Append(leftField).Append(" IS NOT NULL");
 				return;
 			}
 
@@ -457,7 +468,7 @@ internal abstract class QueryBuilder<TDoc, TProj> : IQueryBuilder<TDoc, TProj> w
 				command = "IS";
 			}
 
-			filter.Append('"').Append(leftField).Append("\" ").Append(command).Append(" NULL");
+			filter.Append(leftField).Append(' ').Append(command).Append(" NULL");
 			return;
 		}
 
@@ -473,12 +484,12 @@ internal abstract class QueryBuilder<TDoc, TProj> : IQueryBuilder<TDoc, TProj> w
 			}
 
 			commandParams.Add(MakeUnnamedParameter(parameter, ((string)value).ToLower()));//!!! Localization
-			filter.Append("LOWER(\"").Append(leftField).Append("\") ").Append(command).Append(" $").Append(commandParams.Count);
+			filter.Append("LOWER(").Append(leftField).Append(") ").Append(command).Append(" $").Append(commandParams.Count);
 		}
 		else
 		{
 			commandParams.Add(MakeUnnamedParameter(parameter, value));
-			filter.Append('"').Append(leftField).Append("\" ").Append(command).Append(" $").Append(commandParams.Count);
+			filter.Append(leftField).Append(' ').Append(command).Append(" $").Append(commandParams.Count);
 		}
 	}
 
@@ -499,11 +510,11 @@ internal abstract class QueryBuilder<TDoc, TProj> : IQueryBuilder<TDoc, TProj> w
 
 		if (cond.Operation.HasFlag(FO.CaseInsensitive))
 		{
-			filter.Append("LOWER(\"").Append(leftField).Append("\") ").Append(command).Append(" ANY(ARRAY[$").Append(commandParams.Count).Append("])");
+			filter.Append("LOWER(").Append(leftField).Append(") ").Append(command).Append(" ANY(ARRAY[$").Append(commandParams.Count).Append("])");
 		}
 		else
 		{
-			filter.Append('"').Append(leftField).Append("\" ").Append(command).Append(" ANY(ARRAY[$").Append(commandParams.Count).Append("])");
+			filter.Append(leftField).Append(" ").Append(command).Append(" ANY(ARRAY[$").Append(commandParams.Count).Append("])");
 		}
 	}
 
@@ -524,13 +535,13 @@ internal abstract class QueryBuilder<TDoc, TProj> : IQueryBuilder<TDoc, TProj> w
 					throw new ArgumentNullException(nameof(value), $"Field {cond.Alias}.{cond.FieldPath} does not support null values.");
 				}
 
-				filter.Append('"').Append(leftField).Append("\" ").Append(command).Append(" NULL");
+				filter.Append(leftField).Append(' ').Append(command).Append(" NULL");
 			}
 			else
 			{
 				commandParams.Add(MakeUnnamedParameter(parameter, value));
 
-				filter.Append('"').Append(leftField).Append("\" ").Append(command).Append(" $").Append(commandParams.Count);
+				filter.Append(leftField).Append(' ').Append(command).Append(" $").Append(commandParams.Count);
 			}
 		}
 
@@ -560,9 +571,9 @@ internal abstract class QueryBuilder<TDoc, TProj> : IQueryBuilder<TDoc, TProj> w
 			}
 
 			if (command == "&")
-				filter.Append("(\"").Append(leftField).Append("\" & NULL) = NULL");
+				filter.Append('(').Append(leftField).Append(" & NULL) = NULL");
 			else if (command == "|")
-				filter.Append("(\"").Append(leftField).Append("\" & NULL) <> 0");
+				filter.Append('(').Append(leftField).Append(" & NULL) <> 0");
 			else
 				throw new ArgumentException(nameof(command));
 
@@ -571,9 +582,9 @@ internal abstract class QueryBuilder<TDoc, TProj> : IQueryBuilder<TDoc, TProj> w
 
 		commandParams.Add(MakeUnnamedParameter(parameter, value));
 		if (command == "&")
-			filter.Append("(\"").Append(leftField).Append("\" & $").Append(commandParams.Count).Append(") = $").Append(commandParams.Count);
+			filter.Append('(').Append(leftField).Append(" & $").Append(commandParams.Count).Append(") = $").Append(commandParams.Count);
 		else if (command == "|")
-			filter.Append("(\"").Append(leftField).Append("\" & $").Append(commandParams.Count).Append(") <> 0");
+			filter.Append('(').Append(leftField).Append(" & $").Append(commandParams.Count).Append(") <> 0");
 		else
 			throw new ArgumentException(nameof(command));
 	}
@@ -600,13 +611,13 @@ internal abstract class QueryBuilder<TDoc, TProj> : IQueryBuilder<TDoc, TProj> w
 					throw new ArgumentNullException(nameof(value), $"Field {cond.Alias}.{cond.FieldPath} does not support null values.");
 				}
 
-				filter.Append("(\"").Append(leftField).Append("\" & NULL) = NULL");
+				filter.Append('(').Append(leftField).Append(" & NULL) = NULL");
 			}
 			else
 			{
 				commandParams.Add(MakeUnnamedParameter(parameter, value));
 
-				filter.Append("(\"").Append(leftField).Append("\" & $").Append(commandParams.Count).Append(") = $").Append(commandParams.Count);
+				filter.Append('(').Append(leftField).Append(" & $").Append(commandParams.Count).Append(") = $").Append(commandParams.Count);
 			}
 		}
 
@@ -646,7 +657,7 @@ internal abstract class QueryBuilder<TDoc, TProj> : IQueryBuilder<TDoc, TProj> w
 
 				if ((itemCounter & 1) == 0)
 				{
-					filter.Append("\"").Append(leftField).Append("\" BETWEEN NULL AND ");
+					filter.Append(leftField).Append(" BETWEEN NULL AND ");
 				}
 				else
 				{
@@ -659,7 +670,7 @@ internal abstract class QueryBuilder<TDoc, TProj> : IQueryBuilder<TDoc, TProj> w
 
 				if ((itemCounter & 1) == 0)
 				{
-					filter.Append("\"").Append(leftField).Append("\" BETWEEN NULL AND $").Append(commandParams.Count);
+					filter.Append(leftField).Append(" BETWEEN NULL AND $").Append(commandParams.Count);
 				}
 				else
 				{
@@ -721,7 +732,7 @@ internal abstract class QueryBuilder<TDoc, TProj> : IQueryBuilder<TDoc, TProj> w
 
 		if (parameter == null)
 		{
-			commandParam.NpgsqlValue = value;
+			commandParam.NpgsqlValue = value is null ? DBNull.Value : value;
 		}
 		else
 		{
@@ -729,17 +740,17 @@ internal abstract class QueryBuilder<TDoc, TProj> : IQueryBuilder<TDoc, TProj> w
 
 			if (parameter.DbType is null)
 			{
-				commandParam.NpgsqlValue = value;
+				commandParam.NpgsqlValue = value is null ? DBNull.Value : value;
 			}
 			else if (parameter.DbType is NpgsqlDbType npgsqlDbType)
 			{
 				commandParam.NpgsqlDbType = npgsqlDbType;
-				commandParam.NpgsqlValue = value;
+				commandParam.NpgsqlValue = value is null ? DBNull.Value : value;
 			}
 			else if (parameter.DbType is System.Data.DbType dbType)
 			{
 				commandParam.DbType = dbType;
-				commandParam.Value = value;
+				commandParam.Value = value is null ? DBNull.Value : value;
 			}
 			else
 			{
@@ -794,20 +805,6 @@ internal abstract class QueryBuilder<TDoc, TProj> : IQueryBuilder<TDoc, TProj> w
 		}
 	}
 
-	protected static (string Schema, string Object) ParseDbObjectName(string dbObjectName)
-	{
-		var i = dbObjectName?.IndexOf('.') ?? throw new ArgumentNullException(nameof(dbObjectName));
-		if (i < 0)
-		{
-			return (string.Empty, dbObjectName);
-		}
-		if (i > 0 && i + 1 < dbObjectName.Length)
-		{
-			return (dbObjectName.Substring(0, i), dbObjectName.Substring(i + 1));
-		}
-		throw new ArgumentException(nameof(dbObjectName));
-	}
-
 	/// <summary>
 	/// Slice the conditions to the smalest possible parts separated by AND
 	/// </summary>
@@ -841,7 +838,7 @@ internal abstract class QueryBuilder<TDoc, TProj> : IQueryBuilder<TDoc, TProj> w
 				continue;
 			}
 
-			SqlSelectQBBuilder<TDoc, TProj>.TrimParentheses(conds);
+			SqlSelectQBBuilder<TDoc, TDto>.TrimParentheses(conds);
 
 			first = conds[0].Parentheses;
 			splitIndex = -1;

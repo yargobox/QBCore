@@ -8,7 +8,7 @@ public class ProductUpdateDto
 	[DeViewName] public string? Name { get; set; }
 	[DeForeignId] public int? BrandId { get; set; }
 
-	static void Builder(IQBMongoUpdateBuilder<Product, ProductUpdateDto> builder)
+	static void Builder(IMongoUpdateQBBuilder<Product, ProductUpdateDto> builder)
 	{
 		builder.Update("products");
 	}

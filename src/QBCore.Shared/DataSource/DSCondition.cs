@@ -3,15 +3,15 @@ using QBCore.Extensions.Linq.Expressions;
 
 namespace QBCore.DataSource;
 
-public record DSCondition<TDocument>
+public record DSCondition<TDoc>
 {
 	public readonly bool IsByOr;
 	public readonly int Parentheses;
-	public readonly DEPathDefinition<TDocument> Field;
+	public readonly DEPathDefinition<TDoc> Field;
 	public readonly FO Operation;
 	public readonly object? Value;
 
-	public DSCondition(Expression<Func<TDocument, object?>> field, FO operation, object? value)
+	public DSCondition(Expression<Func<TDoc, object?>> field, FO operation, object? value)
 	{
 		if (field == null)
 		{
@@ -28,7 +28,7 @@ public record DSCondition<TDocument>
 		Value = value;
 	}
 
-	public DSCondition(DEPathDefinition<TDocument> field, FO operation, object? value)
+	public DSCondition(DEPathDefinition<TDoc> field, FO operation, object? value)
 	{
 		if (field.Count == 0)
 		{
@@ -40,7 +40,7 @@ public record DSCondition<TDocument>
 		Value = value;
 	}
 
-	public DSCondition(bool isByOr, Expression<Func<TDocument, object?>> field, FO operation, object? value)
+	public DSCondition(bool isByOr, Expression<Func<TDoc, object?>> field, FO operation, object? value)
 	{
 		if (field == null)
 		{
@@ -59,7 +59,7 @@ public record DSCondition<TDocument>
 		Value = value;
 	}
 
-	public DSCondition(bool isByOr, DEPathDefinition<TDocument> field, FO operation, object? value)
+	public DSCondition(bool isByOr, DEPathDefinition<TDoc> field, FO operation, object? value)
 	{
 		if (field.Count == 0)
 		{
@@ -72,7 +72,7 @@ public record DSCondition<TDocument>
 		Value = value;
 	}
 
-	public DSCondition(int parentheses, Expression<Func<TDocument, object?>> field, FO operation, object? value)
+	public DSCondition(int parentheses, Expression<Func<TDoc, object?>> field, FO operation, object? value)
 	{
 		if (field == null)
 		{
@@ -91,7 +91,7 @@ public record DSCondition<TDocument>
 		Value = value;
 	}
 
-	public DSCondition(int parentheses, DEPathDefinition<TDocument> field, FO operation, object? value)
+	public DSCondition(int parentheses, DEPathDefinition<TDoc> field, FO operation, object? value)
 	{
 		if (field.Count == 0)
 		{
@@ -104,7 +104,7 @@ public record DSCondition<TDocument>
 		Value = value;
 	}
 
-	public DSCondition(bool isByOr, int parentheses, Expression<Func<TDocument, object?>> field, FO operation, object? value)
+	public DSCondition(bool isByOr, int parentheses, Expression<Func<TDoc, object?>> field, FO operation, object? value)
 	{
 		if (field == null)
 		{
@@ -124,7 +124,7 @@ public record DSCondition<TDocument>
 		Value = value;
 	}
 
-	public DSCondition(bool isByOr, int parentheses, DEPathDefinition<TDocument> field, FO operation, object? value)
+	public DSCondition(bool isByOr, int parentheses, DEPathDefinition<TDoc> field, FO operation, object? value)
 	{
 		if (field.Count == 0)
 		{

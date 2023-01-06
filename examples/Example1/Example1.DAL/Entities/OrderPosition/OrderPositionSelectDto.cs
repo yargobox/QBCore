@@ -19,7 +19,7 @@ public class OrderPositionSelectDto
 	[DeUpdated] public DateTimeOffset? Updated { get; set; }
 	[DeDeleted] public DateTimeOffset? Deleted { get; set; }
 
-	static void Builder(IQBMongoSelectBuilder<OrderPosition, OrderPositionSelectDto> builder)
+	static void Builder(IMongoSelectQBBuilder<OrderPosition, OrderPositionSelectDto> builder)
 	{
 		builder.Select("order_positions");
 	}

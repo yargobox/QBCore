@@ -5,7 +5,7 @@ namespace Develop.Entities.DVP;
 
 public class Project
 {
-	[DeId, Required]
+	[DeId, Required, DeReadOnly]
 	public int ProjectId { get; set; }
 
 	[DeViewName, MaxLength(80), Required]

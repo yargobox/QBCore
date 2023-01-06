@@ -10,16 +10,16 @@ using QBCore.Extensions.Text;
 
 namespace QBCore.DataSource.QueryBuilder.Mongo;
 
-internal abstract class QueryBuilder<TDocument, TProjection> : IQueryBuilder<TDocument, TProjection>
+internal abstract class QueryBuilder<TDoc, TDto> : IQueryBuilder<TDoc, TDto>
 {
 	public abstract QueryBuilderTypes QueryBuilderType { get; }
-	public Type DocumentType => typeof(TDocument);
-	public DSDocumentInfo DocumentInfo => Builder.DocumentInfo;
-	public Type ProjectionType => typeof(TProjection);
-	public DSDocumentInfo? ProjectionInfo => Builder.ProjectionInfo;
+	public Type DocType => typeof(TDoc);
+	public DSDocumentInfo DocInfo => Builder.DocInfo;
+	public Type DtoType => typeof(TDto);
+	public DSDocumentInfo? DtoInfo => Builder.DtoInfo;
 	public Type DataContextInterfaceType => typeof(IMongoDataContext);
 	public IDataContext DataContext { get; }
-	public QBBuilder<TDocument, TProjection> Builder { get; }
+	public QBBuilder<TDoc, TDto> Builder { get; }
 
 	protected IMongoDataContext _mongoDbContext;
 
@@ -53,7 +53,7 @@ internal abstract class QueryBuilder<TDocument, TProjection> : IQueryBuilder<TDo
 
 	#endregion
 
-	public QueryBuilder(QBBuilder<TDocument, TProjection> builder, IDataContext dataContext)
+	public QueryBuilder(QBBuilder<TDoc, TDto> builder, IDataContext dataContext)
 	{
 		if (builder == null)
 		{
@@ -106,7 +106,7 @@ internal abstract class QueryBuilder<TDocument, TProjection> : IQueryBuilder<TDo
 				continue;
 			}
 
-			QBSelectBuilder<TDocument, TProjection>.TrimParentheses(conds);
+			SelectQBBuilder<TDoc, TDto>.TrimParentheses(conds);
 
 			first = conds[0].Parentheses;
 			splitIndex = -1;

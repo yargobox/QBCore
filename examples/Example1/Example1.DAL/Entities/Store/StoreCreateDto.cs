@@ -7,7 +7,7 @@ public class StoreCreateDto
 {
 	[DeViewName] public string? Name { get; set; }
 
-	static void Builder(IQBMongoInsertBuilder<Store, StoreCreateDto> builder)
+	static void Builder(IMongoInsertQBBuilder<Store, StoreCreateDto> builder)
 	{
 		builder.Insert("stores");
 	}

@@ -57,7 +57,7 @@ public sealed class DevelopDataContextProvider : IPgSqlDataContextProvider
 				{
 					var settings = _listener?.Value1 ?? _settings;
 
-					var dataSourceBuilder = new NpgsqlDataSourceBuilder(_settings!.ConnectionString());
+					var dataSourceBuilder = new NpgsqlDataSourceBuilder(settings!.ConnectionString());
 					var dataSource = dataSourceBuilder.Build();
 					var dataContext = new PgSqlDataContext(dataSource, _defaultDataContextName);
 

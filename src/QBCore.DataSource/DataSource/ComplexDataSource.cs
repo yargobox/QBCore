@@ -30,10 +30,10 @@ public abstract class ComplexDataSource<TComplexDataSource> : IComplexDataSource
 
 		foreach (var nodeInfo in CDSInfo.Nodes)
 		{
-			var dataSOurceType = typeof(ITransient<>).MakeGenericType(nodeInfo.Value.DataSourceType);
+			var dataSourceType = typeof(ITransient<>).MakeGenericType(nodeInfo.Value.DataSourceType);
 			var keyName = new DSKeyName(CDSInfo.Name, nodeInfo.Value.Name);
 
-			orderedDictionary.Add(nodeInfo.Key, new Lazy<IDataSource>(() => CreateNode(dataSOurceType, keyName), LazyThreadSafetyMode.PublicationOnly));
+			orderedDictionary.Add(nodeInfo.Key, new Lazy<IDataSource>(() => CreateNode(dataSourceType, keyName), LazyThreadSafetyMode.PublicationOnly));
 		}
 	}
 

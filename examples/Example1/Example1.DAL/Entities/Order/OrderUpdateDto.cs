@@ -10,7 +10,7 @@ public class OrderUpdateDto
 	public List<OrderPositionSelectDto>? OrderPositions { get; set; }
 	public decimal? Total { get; set; }
 
-	static void Builder(IQBMongoUpdateBuilder<Order, OrderUpdateDto> builder)
+	static void Builder(IMongoUpdateQBBuilder<Order, OrderUpdateDto> builder)
 	{
 		builder.Update("orders");
 	}

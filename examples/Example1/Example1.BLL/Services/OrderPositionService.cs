@@ -12,11 +12,11 @@ public sealed class OrderPositionService : DataSource<int?, OrderPosition, Order
 {
 	public OrderPositionService(IServiceProvider serviceProvider) : base(serviceProvider) { }
 
-	static void SoftDelBuilder(IQBMongoSoftDelBuilder<OrderPosition, SoftDelDto> qb)
+	static void SoftDelBuilder(IMongoSoftDelQBBuilder<OrderPosition, SoftDelDto> qb)
 	{
 		qb.Update("order_positions");
 	}
-	static void RestoreBuilder(IQBMongoRestoreBuilder<OrderPosition, SoftDelDto> qb)
+	static void RestoreBuilder(IMongoRestoreQBBuilder<OrderPosition, SoftDelDto> qb)
 	{
 		qb.Update("order_positions");
 	}

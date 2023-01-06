@@ -33,20 +33,20 @@ public sealed class ProjectDS : DataSource<int, Project, ProjectCreateDto, Proje
 /* 	static void SoftDelBuilder(IQbEfSoftDelBuilder<Project, SoftDelDto> qb)
 	{
 		qb.Update("projects")
-			.Condition(doc => doc.Id, FO.Equal, "id")
+			.Condition(doc => doc.Id, FO.Equal, "@id")
 			.Condition(doc => doc.Deleted, null, FO.IsNull)
 		;
 	}
 	static void RestoreBuilder(IQbEfRestoreBuilder<Project, SoftDelDto> qb)
 	{
 		qb.Update("projects")
-			.Condition(doc => doc.Id, FO.Equal, "id")
+			.Condition(doc => doc.Id, FO.Equal, "@id")
 			.Condition(doc => doc.Deleted, null, FO.IsNotNull)
 		;
 	}
 	static void DeleteBuilder(IQbEfDeleteBuilder<Project, SoftDelDto> qb)
 	{
 		qb.Delete("projects")
-			.Condition(doc => doc.Id, FO.Equal, "id");
+			.Condition(doc => doc.Id, FO.Equal, "@id");
 	} */
 }

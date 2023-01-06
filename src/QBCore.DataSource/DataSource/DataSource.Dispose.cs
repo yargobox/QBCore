@@ -2,7 +2,7 @@ using QBCore.Extensions.Threading.Tasks;
 
 namespace QBCore.DataSource;
 
-public abstract partial class DataSource<TKey, TDocument, TCreate, TSelect, TUpdate, TDelete, TRestore, TDataSource>
+public abstract partial class DataSource<TKey, TDoc, TCreate, TSelect, TUpdate, TDelete, TRestore, TDataSource>
 {
 	~DataSource()
 	{

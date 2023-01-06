@@ -187,7 +187,8 @@ QBCore.Develop is an application for developing QBCore applications. The main id
 # CLI & other
 #### PostgreSQL
 - `docker pull postgres`
-- `docker run -d --name pgsql -e POSTGRES_USER=user1 -e POSTGRES_PASSWORD=Pass#word1 -p 5432:5432 -v /data:/var/lib/postgresql/data postgres`
+- `docker volume create qbcore-pgsql`
+- `docker run -d --name pgsql -e POSTGRES_USER=user1 -e POSTGRES_PASSWORD=Pass#word1 -p 5432:5432 -v qbcore-pgsql:/var/lib/postgresql/data postgres`
 - `docker start pgsql`
 
 #### PgAdmin 4
@@ -201,5 +202,6 @@ QBCore.Develop is an application for developing QBCore applications. The main id
 - `dotnet user-secrets set SqlDbSettings:Password Pass#word1`
 
 #### Mongo
+- `docker volume create mongodbdata`
 - `docker run -d --name mongo -p 27017:27017 -v mongodbdata:/data/db -e MONGO_INITDB_ROOT_USERNAME=mongoadmin -e MONGO_INITDB_ROOT_PASSWORD=Pass#word1 mongo:5.0.8`
 - `docker exec -it mongo mongosh "mongodb://mongoadmin:Pass%23word1@127.0.0.1:27017/?authSource=admin&readPreference=primary&ssl=false"`

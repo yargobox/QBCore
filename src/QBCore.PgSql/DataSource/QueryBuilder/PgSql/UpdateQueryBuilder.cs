@@ -24,7 +24,7 @@ internal sealed class UpdateQueryBuilder<TDoc, TUpdate> : QueryBuilder<TDoc, TUp
 		if (document is null) throw EX.QueryBuilder.Make.DocumentNotSpecified(nameof(document));
 
 		var top = Builder.Containers.FirstOrDefault();
-		if (top?.ContainerOperation != ContainerOperations.Delete && top?.ContainerOperation != ContainerOperations.Exec)
+		if (top?.ContainerOperation != ContainerOperations.Update && top?.ContainerOperation != ContainerOperations.Exec)
 		{
 			throw EX.QueryBuilder.Make.QueryBuilderOperationNotSupported(Builder.DataLayer.Name, QueryBuilderType.ToString(), top?.ContainerOperation.ToString());
 		}
@@ -55,26 +55,20 @@ internal sealed class UpdateQueryBuilder<TDoc, TUpdate> : QueryBuilder<TDoc, TUp
 				throw EX.QueryBuilder.Make.QueryBuilderMustHaveAtLeastOneCondition(Builder.DataLayer.Name, QueryBuilderType.ToString());
 			}
 
-			var deId = (SqlDEInfo?)Builder.DocumentInfo.IdField
-				?? throw EX.QueryBuilder.Make.DocumentDoesNotHaveIdDataEntry(Builder.DocumentInfo.DocumentType.ToPretty());
+			var deId = (SqlDEInfo?)Builder.DocInfo.IdField
+				?? throw EX.QueryBuilder.Make.DocumentDoesNotHaveIdDataEntry(Builder.DocInfo.DocumentType.ToPretty());
 			if (deId.Setter == null)
-				throw EX.QueryBuilder.Make.DataEntryDoesNotHaveSetter(Builder.DocumentInfo.DocumentType.ToPretty(), deId.Name);
-			var deUpdated = (SqlDEInfo?)Builder.DocumentInfo.DateUpdatedField;
-			var deModified = (SqlDEInfo?)Builder.DocumentInfo.DateModifiedField;
+				throw EX.QueryBuilder.Make.DataEntryDoesNotHaveSetter(Builder.DocInfo.DocumentType.ToPretty(), deId.Name);
+			var deUpdated = (SqlDEInfo?)Builder.DocInfo.DateUpdatedField;
+			var deModified = (SqlDEInfo?)Builder.DocInfo.DateModifiedField;
 
 			string queryString;
 			var sb = new StringBuilder();
-			var dbo = ParseDbObjectName(top.DBSideName);
 			var command = new NpgsqlCommand();
 
-			sb.Append("UPDATE ");
-			if (dbo.Schema.Length > 0)
-			{
-				sb.Append(dbo.Schema).Append('.');
-			}
-			sb.Append('"').Append(dbo.Object).AppendLine("\" SET");
+			sb.Append("UPDATE ").AppendContainer(top).Append(" SET").AppendLine();
 
-			var dataEntries = (Builder.ProjectionInfo?.DataEntries ?? Builder.DocumentInfo.DataEntries).Values.Cast<SqlDEInfo>();
+			var dataEntries = (Builder.DtoInfo?.DataEntries ?? Builder.DocInfo.DataEntries).Values.Cast<SqlDEInfo>();
 			bool isSetValue, isUpdatedSet = false, isModifiedSet = false, next = false;
 			object? value;
 			SqlDEInfo? deDoc;
@@ -82,13 +76,13 @@ internal sealed class UpdateQueryBuilder<TDoc, TUpdate> : QueryBuilder<TDoc, TUp
 
 			foreach (var deProj in dataEntries.Where(x => x.Name != deId.Name && (validFieldNames == null || validFieldNames.Contains(x.Name))))
 			{
-				if (deProj.Document == Builder.DocumentInfo)
+				if (deProj.Document == Builder.DocInfo)
 				{
 					deDoc = deProj;
 				}
 				else
 				{
-					deDoc = (SqlDEInfo?)Builder.DocumentInfo.DataEntries.GetValueOrDefault(deProj.Name);
+					deDoc = (SqlDEInfo?)Builder.DocInfo.DataEntries.GetValueOrDefault(deProj.Name);
 					if (deDoc == null)
 					{
 						continue;
@@ -124,12 +118,7 @@ internal sealed class UpdateQueryBuilder<TDoc, TUpdate> : QueryBuilder<TDoc, TUp
 				{
 					sb.Clear();
 					
-					sb.Append("SELECT * FROM ");
-					if (dbo.Schema.Length > 0)
-					{
-						sb.Append(dbo.Schema).Append('.');
-					}
-					sb.Append('"').Append(dbo.Object).Append('"');
+					sb.Append("SELECT * FROM ").AppendContainer(top);
 
 					foreach (var p in Builder.Parameters.Where(x => (x.Direction & ParameterDirection.Input) == ParameterDirection.Input && x.ParameterName == "@id"))
 					{
@@ -138,7 +127,7 @@ internal sealed class UpdateQueryBuilder<TDoc, TUpdate> : QueryBuilder<TDoc, TUp
 					}
 
 					sb.AppendLine().Append("WHERE ");
-					BuildConditionTree(sb, Builder.Conditions, GetDBSideName, Builder.Parameters, command.Parameters);
+					BuildConditionTree(sb, Builder.Conditions, GetQuotedDBSideNameWithoutAlias, Builder.Parameters, command.Parameters);
 					sb.AppendLine().Append("LIMIT 1");
 
 					queryString = sb.ToString();
@@ -171,7 +160,7 @@ internal sealed class UpdateQueryBuilder<TDoc, TUpdate> : QueryBuilder<TDoc, TUp
 							return result;
 						}
 
-						throw EX.QueryBuilder.Make.OperationFailedNoSuchRecord(QueryBuilderType.ToString(), id.ToString(), Builder.DocumentInfo.DocumentType.ToPretty());
+						throw EX.QueryBuilder.Make.OperationFailedNoSuchRecord(QueryBuilderType.ToString(), id.ToString(), Builder.DocInfo.DocumentType.ToPretty());
 					}
 					finally
 					{
@@ -201,14 +190,14 @@ internal sealed class UpdateQueryBuilder<TDoc, TUpdate> : QueryBuilder<TDoc, TUp
 				sb.AppendLine(",").Append("\t\"").Append(deModified.DBSideName).Append("\" = NOW()");
 			}
 
-			foreach (var p in Builder.Parameters.Where(x => (x.Direction & ParameterDirection.Input) == ParameterDirection.Input && x.ParameterName == "@id"))
+			foreach (var p in Builder.Parameters.Where(x => x.Direction.HasFlag(ParameterDirection.Input) && x.ParameterName == "@id"))
 			{
 				p.Value = id;
 				break;
 			}
 
 			sb.AppendLine().Append("WHERE ");
-			BuildConditionTree(sb, Builder.Conditions, GetDBSideName, Builder.Parameters, command.Parameters);
+			BuildConditionTree(sb, Builder.Conditions, GetQuotedDBSideNameWithoutAlias, Builder.Parameters, command.Parameters);
 
 			if (options?.FetchResultDocument == true)
 			{
@@ -251,14 +240,14 @@ internal sealed class UpdateQueryBuilder<TDoc, TUpdate> : QueryBuilder<TDoc, TUp
 					while (await dataReader.NextResultAsync().ConfigureAwait(false))
 					{ }
 
-					return result ?? throw EX.QueryBuilder.Make.OperationFailedNoSuchRecord(QueryBuilderType.ToString(), id.ToString(), Builder.DocumentInfo.DocumentType.ToPretty());
+					return result ?? throw EX.QueryBuilder.Make.OperationFailedNoSuchRecord(QueryBuilderType.ToString(), id.ToString(), Builder.DocInfo.DocumentType.ToPretty());
 				}
 				else
 				{
 					var rowsAffected = await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
 					if (rowsAffected == 0)
 					{
-						throw EX.QueryBuilder.Make.OperationFailedNoSuchRecord(QueryBuilderType.ToString(), id.ToString(), Builder.DocumentInfo.DocumentType.ToPretty());
+						throw EX.QueryBuilder.Make.OperationFailedNoSuchRecord(QueryBuilderType.ToString(), id.ToString(), Builder.DocInfo.DocumentType.ToPretty());
 					}
 
 					return default(TDoc?);
