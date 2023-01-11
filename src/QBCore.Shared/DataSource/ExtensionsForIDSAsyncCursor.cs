@@ -1,534 +1,686 @@
-using System.Collections;
+using System.Data;
+using System.Runtime.CompilerServices;
 
 namespace QBCore.DataSource;
 
 public static class ExtensionsForIDSAsyncCursor
 {
 	/// <summary>
-	/// Determines whether the cursor contains any documents.
+	/// Determines whether a cursor contains any elements.
 	/// </summary>
-	/// <typeparam name="T">The type of the document.</typeparam>
-	/// <param name="cursor">The cursor.</param>
-	/// <param name="cancellationToken">The cancellation token.</param>
-	/// <returns>True if the cursor contains any documents.</returns>
-	public static bool Any<T>(this IDSAsyncCursor<T> cursor, CancellationToken cancellationToken = default(CancellationToken))
+	/// <typeparam name="T">The type of the elements of source.</typeparam>
+	/// <param name="source">The <see cref="IDSAsyncCursor{T}"/> to check for emptiness.</param>
+    /// <param name="cancellationToken">The cancellation token.</param>
+	/// <returns>A <see cref="Task"/> whose result is true if the source cursor contains any elements; otherwise, false.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="source"/> is null.</exception>
+	public static async Task<bool> AnyAsync<T>(this IDSAsyncCursor<T> source, CancellationToken cancellationToken = default(CancellationToken))
 	{
-		if (cursor == null) throw new ArgumentNullException(nameof(cursor));
+		if (source == null) throw new ArgumentNullException(nameof(source));
 
-		using (cursor)
+		await using (source)
 		{
-			var batch = GetFirstBatch(cursor, cancellationToken);
-			return batch.Any();
+			return await source.MoveNextAsync(CommandBehavior.SingleRow, cancellationToken).ConfigureAwait(false);
 		}
 	}
 
 	/// <summary>
-	/// Determines whether the cursor contains any documents.
-	/// </summary>
-	/// <typeparam name="T">The type of the document.</typeparam>
-	/// <param name="cursor">The cursor.</param>
-	/// <param name="cancellationToken">The cancellation token.</param>
-	/// <returns>A Task whose result is true if the cursor contains any documents.</returns>
-	public static async Task<bool> AnyAsync<T>(this IDSAsyncCursor<T> cursor, CancellationToken cancellationToken = default(CancellationToken))
+    /// Determines whether any element of a cursor satisfies a condition.
+    /// </summary>
+    /// <typeparam name="T">The type of the elements of source.</typeparam>
+    /// <param name="source">An <see cref="IDSAsyncCursor{T}"/> whose elements to apply the predicate to.</param>
+    /// <param name="predicate">A function to test each element for a condition.</param>
+    /// <param name="cancellationToken">The cancellation token.</param>
+    /// <returns>A <see cref="Task"/> whose result is true if the source cursor is not empty and at least one of its elements passes the test in the specified predicate; otherwise, false.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="source"/> or <paramref name="predicate"/> is null.</exception>
+	public static async Task<bool> AnyAsync<T>(this IDSAsyncCursor<T> source, Func<T, bool> predicate, CancellationToken cancellationToken = default(CancellationToken))
 	{
-		if (cursor == null) throw new ArgumentNullException(nameof(cursor));
+		if (source == null) throw new ArgumentNullException(nameof(source));
+		if (predicate == null) throw new ArgumentNullException(nameof(predicate));
 
-		using (cursor)
+		await using (source)
 		{
-			var batch = await GetFirstBatchAsync(cursor, cancellationToken).ConfigureAwait(false);
-			return batch.Any();
+			while (await source.MoveNextAsync(CommandBehavior.Default, cancellationToken).ConfigureAwait(false))
+			{
+				if (predicate(source.Current)) return true;
+			}
+		}
+
+		return false;
+	}
+
+	/// <summary>
+    /// Determines whether all elements of a cursor satisfy a condition.
+    /// </summary>
+    /// <typeparam name="T">The type of the elements of source.</typeparam>
+    /// <param name="source">An <see cref="IDSAsyncCursor{T}"/> that contains the elements to apply the predicate to.</param>
+    /// <param name="predicate">A function to test each element for a condition.</param>
+    /// <param name="cancellationToken">The cancellation token.</param>
+    /// <returns>A <see cref="Task"/> whose result is true if every element of the source cursor passes the test in the specified predicate,
+    /// or if the cursor is empty; otherwise, false.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="source"/> or <paramref name="predicate"/> is null.</exception>
+	public static async Task<bool> AllAsync<T>(this IDSAsyncCursor<T> source, Func<T, bool> predicate, CancellationToken cancellationToken = default(CancellationToken))
+	{
+		if (source == null) throw new ArgumentNullException(nameof(source));
+		if (predicate == null) throw new ArgumentNullException(nameof(predicate));
+
+		await using (source)
+		{
+			while (await source.MoveNextAsync(CommandBehavior.Default, cancellationToken).ConfigureAwait(false))
+			{
+				if (!predicate(source.Current)) return false;
+			}
+		}
+
+		return true;
+	}
+
+	/// <summary>
+    /// Returns the number of elements in a cursor.
+    /// </summary>
+    /// <typeparam name="T">The type of the elements of source.</typeparam>
+    /// <param name="source">A cursor that contains elements to be counted.</param>
+    /// <param name="cancellationToken">The cancellation token.</param>
+    /// <returns>A <see cref="Task"/> whose result is the number of elements in the cursor.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="source"/> is null.</exception>
+    /// <exception cref="OverflowException">The number of elements in <paramref name="source"/> is larger than <see cref="Int32.MaxValue"/>.</exception>
+	public static async Task<int> CountAsync<T>(this IDSAsyncCursor<T> source, CancellationToken cancellationToken = default(CancellationToken))
+	{
+		if (source == null) throw new ArgumentNullException(nameof(source));
+
+		var index = 0;
+
+		await using (source)
+		{
+			while (await source.MoveNextAsync(CommandBehavior.Default, cancellationToken).ConfigureAwait(false))
+			{
+				index++;
+			}
+		}
+
+		return index;
+	}
+
+	/// <summary>
+    /// Returns a number that represents how many elements in the specified cursor satisfy a condition.
+    /// </summary>
+    /// <typeparam name="T">The type of the elements of source.</typeparam>
+    /// <param name="source">A cursor that contains elements to be tested and counted.</param>
+    /// <param name="predicate">A function to test each element for a condition.</param>
+    /// <param name="cancellationToken">The cancellation token.</param>
+    /// <returns>A <see cref="Task"/> whose result is a number that represents how many elements in the cursor satisfy the condition in the predicate function.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="source"/> or <paramref name="predicate"/> is null.</exception>
+    /// <exception cref="OverflowException">The number of elements in <paramref name="source"/> is larger than <see cref="Int32.MaxValue"/>.</exception>
+	public static async Task<int> CountAsync<T>(this IDSAsyncCursor<T> source, Func<T, bool> predicate, CancellationToken cancellationToken = default(CancellationToken))
+	{
+		if (source == null) throw new ArgumentNullException(nameof(source));
+		if (predicate == null) throw new ArgumentNullException(nameof(predicate));
+
+		var index = 0;
+
+		await using (source)
+		{
+			while (await source.MoveNextAsync(CommandBehavior.Default, cancellationToken).ConfigureAwait(false))
+			{
+				if (predicate(source.Current))
+				{
+					index++;
+				}
+			}
+		}
+
+		return index;
+	}
+
+	/// <summary>
+	/// Returns the first element of a cursor.
+	/// </summary>
+	/// <typeparam name="T">The type of the elements of source.</typeparam>
+	/// <param name="source">The <see cref="IDSAsyncCursor{T}"/> to return the first element of.</param>
+    /// <param name="cancellationToken">The cancellation token.</param>
+	/// <returns>A <see cref="Task"/> whose result is the first element in the specified cursor.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="source"/> is null.</exception>
+    /// <exception cref="InvalidOperationException">The source cursor is empty.</exception>
+	public static async Task<T> FirstAsync<T>(this IDSAsyncCursor<T> source, CancellationToken cancellationToken = default(CancellationToken))
+	{
+		if (source == null) throw new ArgumentNullException(nameof(source));
+
+		await using (source)
+		{
+			return await source.MoveNextAsync(CommandBehavior.SingleRow, cancellationToken).ConfigureAwait(false)
+				? source.Current
+				: throw new InvalidOperationException("Cursor contains no elements");
 		}
 	}
 
 	/// <summary>
-	/// Returns the first document of a cursor.
+	/// Returns the first element in a cursor that satisfies a specified condition.
 	/// </summary>
-	/// <typeparam name="T">The type of the document.</typeparam>
-	/// <param name="cursor">The cursor.</param>
-	/// <param name="cancellationToken">The cancellation token.</param>
-	/// <returns>The first document.</returns>
-	public static T First<T>(this IDSAsyncCursor<T> cursor, CancellationToken cancellationToken = default(CancellationToken))
+	/// <typeparam name="T">The type of the elements of source.</typeparam>
+	/// <param name="source">An <see cref="IDSAsyncCursor{T}"/> to return an element from.</param>
+    /// <param name="predicate">A function to test each element for a condition.</param>
+    /// <param name="cancellationToken">The cancellation token.</param>
+	/// <returns>A <see cref="Task"/> whose result is the first element in the cursor that passes the test in the specified predicate function.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="source"/> or <paramref name="predicate"/> is null.</exception>
+    /// <exception cref="InvalidOperationException">No element satisfies the condition in <paramref name="predicate"/>. -or- The <paramref name="source"/> cursor is empty.</exception>
+	public static async Task<T> FirstAsync<T>(this IDSAsyncCursor<T> source, Func<T, bool> predicate, CancellationToken cancellationToken = default(CancellationToken))
 	{
-		if (cursor == null) throw new ArgumentNullException(nameof(cursor));
+		if (source == null) throw new ArgumentNullException(nameof(source));
+		if (predicate == null) throw new ArgumentNullException(nameof(predicate));
 
-		using (cursor)
+		await using (source)
 		{
-			var batch = GetFirstBatch(cursor, cancellationToken);
-			return batch.First();
+			while (await source.MoveNextAsync(CommandBehavior.Default, cancellationToken).ConfigureAwait(false))
+			{
+				if (predicate(source.Current)) return source.Current;
+			}
+		}
+
+		throw new InvalidOperationException("Cursor contains no elements");
+	}
+
+	/// <summary>
+	/// Returns the first element of a cursor, or a default value if the cursor contains no elements.
+	/// </summary>
+	/// <typeparam name="T">The type of the elements of source.</typeparam>
+	/// <param name="source">The <see cref="IDSAsyncCursor{T}"/> to return the first element of.</param>
+    /// <param name="cancellationToken">The cancellation token.</param>
+	/// <returns>A <see cref="Task"/> whose result is default(<typeparamref name="T"/>) if <paramref name="source"/> is empty; otherwise, the first element in <paramref name="source"/>.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="source"/> is null.</exception>
+	public static async Task<T?> FirstOrDefaultAsync<T>(this IDSAsyncCursor<T> source, CancellationToken cancellationToken = default(CancellationToken))
+	{
+		if (source == null) throw new ArgumentNullException(nameof(source));
+
+		await using (source)
+		{
+			return await source.MoveNextAsync(CommandBehavior.SingleRow, cancellationToken).ConfigureAwait(false) ? source.Current : default(T);
 		}
 	}
 
 	/// <summary>
-	/// Returns the first document of a cursor.
+	/// Returns the first element of a cursor, or a specified default value if the cursor contains no elements.
 	/// </summary>
-	/// <typeparam name="T">The type of the document.</typeparam>
-	/// <param name="cursor">The cursor.</param>
-	/// <param name="cancellationToken">The cancellation token.</param>
-	/// <returns>A Task whose result is the first document.</returns>
-	public static async Task<T> FirstAsync<T>(this IDSAsyncCursor<T> cursor, CancellationToken cancellationToken = default(CancellationToken))
+	/// <typeparam name="T">The type of the elements of source.</typeparam>
+	/// <param name="source">The <see cref="IDSAsyncCursor{T}"/> to return the first element of.</param>
+    /// <param name="defaultValue">The default value to return if the cursor is empty.</param>
+    /// <param name="cancellationToken">The cancellation token.</param>
+	/// <returns>A <see cref="Task"/> whose result is <paramref name="defaultValue"/> if <paramref name="source"/> is empty; otherwise, the first element in <paramref name="source"/>.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="source"/> is null.</exception>
+	public static async Task<T?> FirstOrDefaultAsync<T>(this IDSAsyncCursor<T> source, T defaultValue, CancellationToken cancellationToken = default(CancellationToken))
 	{
-		if (cursor == null) throw new ArgumentNullException(nameof(cursor));
+		if (source == null) throw new ArgumentNullException(nameof(source));
 
-		using (cursor)
+		await using (source)
 		{
-			var batch = await GetFirstBatchAsync(cursor, cancellationToken).ConfigureAwait(false);
-			return batch.First();
+			return await source.MoveNextAsync(CommandBehavior.SingleRow, cancellationToken).ConfigureAwait(false) ? source.Current : defaultValue;
 		}
 	}
 
 	/// <summary>
-	/// Returns the first document of a cursor, or a default value if the cursor contains no documents.
+	/// Returns the first element in a cursor that satisfies a specified condition.
 	/// </summary>
-	/// <typeparam name="T">The type of the document.</typeparam>
-	/// <param name="cursor">The cursor.</param>
-	/// <param name="cancellationToken">The cancellation token.</param>
-	/// <returns>The first document of the cursor, or a default value if the cursor contains no documents.</returns>
-	public static T? FirstOrDefault<T>(this IDSAsyncCursor<T> cursor, CancellationToken cancellationToken = default(CancellationToken))
+	/// <typeparam name="T">The type of the elements of source.</typeparam>
+	/// <param name="source">An <see cref="IDSAsyncCursor{T}"/> to return an element from.</param>
+    /// <param name="predicate">A function to test each element for a condition.</param>
+    /// <param name="cancellationToken">The cancellation token.</param>
+	/// <returns>A <see cref="Task"/> whose result is the first element in the cursor that passes the test in the specified predicate function.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="source"/> or <paramref name="predicate"/> is null.</exception>
+	public static async Task<T?> FirstOrDefaultAsync<T>(this IDSAsyncCursor<T> source, Func<T, bool> predicate, CancellationToken cancellationToken = default(CancellationToken))
 	{
-		if (cursor == null) throw new ArgumentNullException(nameof(cursor));
+		if (source == null) throw new ArgumentNullException(nameof(source));
+		if (predicate == null) throw new ArgumentNullException(nameof(predicate));
 
-		using (cursor)
+		await using (source)
 		{
-			var batch = GetFirstBatch(cursor, cancellationToken);
-			return batch.FirstOrDefault();
+			while (await source.MoveNextAsync(CommandBehavior.Default, cancellationToken).ConfigureAwait(false))
+			{
+				if (predicate(source.Current)) return source.Current;
+			}
 		}
+
+		return default(T);
 	}
 
 	/// <summary>
-	/// Returns the first document of the cursor, or a default value if the cursor contains no documents.
+	/// Returns the first element of the cursor that satisfies a condition, or a specified default value if no such element is found.
 	/// </summary>
-	/// <typeparam name="T">The type of the document.</typeparam>
-	/// <param name="cursor">The cursor.</param>
-	/// <param name="cancellationToken">The cancellation token.</param>
-	/// <returns>A task whose result is the first document of the cursor, or a default value if the cursor contains no documents.</returns>
-	public static async Task<T?> FirstOrDefaultAsync<T>(this IDSAsyncCursor<T> cursor, CancellationToken cancellationToken = default(CancellationToken))
+	/// <typeparam name="T">The type of the elements of source.</typeparam>
+	/// <param name="source">An <see cref="IDSAsyncCursor{T}"/> to return an element from.</param>
+    /// <param name="defaultValue">The default value to return if the cursor is empty.</param>
+    /// <param name="predicate">A function to test each element for a condition.</param>
+    /// <param name="cancellationToken">The cancellation token.</param>
+	/// <returns>A <see cref="Task"/> whose result is <paramref name="defaultValue"/> if <paramref name="source"/> is empty or if no element passes
+    /// the test specified by <paramref name="predicate"/>; otherwise, the first element in <paramref name="source"/> that passes the test specified by <paramref name="predicate"/>.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="source"/> or <paramref name="predicate"/> is null.</exception>
+	public static async Task<T?> FirstOrDefaultAsync<T>(this IDSAsyncCursor<T> source, Func<T, bool> predicate, T defaultValue, CancellationToken cancellationToken = default(CancellationToken))
 	{
-		if (cursor == null) throw new ArgumentNullException(nameof(cursor));
+		if (source == null) throw new ArgumentNullException(nameof(source));
+		if (predicate == null) throw new ArgumentNullException(nameof(predicate));
 
-		using (cursor)
+		await using (source)
 		{
-			var batch = await GetFirstBatchAsync(cursor, cancellationToken).ConfigureAwait(false);
-			return batch.FirstOrDefault();
+			while (await source.MoveNextAsync(CommandBehavior.Default, cancellationToken).ConfigureAwait(false))
+			{
+				if (predicate(source.Current)) return source.Current;
+			}
 		}
+
+		return defaultValue;
 	}
 
 	/// <summary>
-	/// Calls a delegate for each document returned by the cursor.
+	/// Performs the specified action on each element of the <see cref="IDSAsyncCursor{T}"/>.
 	/// </summary>
-	/// <typeparam name="T">The type of the document.</typeparam>
-	/// <param name="source">The source.</param>
-	/// <param name="processor">The processor.</param>
+	/// <typeparam name="T">The type of the elements of source.</typeparam>
+	/// <param name="source">An <see cref="IDSAsyncCursor{T}"/> whose elements to perform the specified action to.</param>
+	/// <param name="processor">The <see cref="Func{T, Task}"/> delegate to perform on each element of the <see cref="IDSAsyncCursor{T}"/>.</param>
 	/// <param name="cancellationToken">The cancellation token.</param>
-	/// <returns>A Task that completes when all the documents have been processed.</returns>
-	public static Task ForEachAsync<T>(this IDSAsyncCursor<T> source, Func<T, Task> processor, CancellationToken cancellationToken = default(CancellationToken))
+	/// <returns>A <see cref="Task"/> that completes when all the elements have been processed.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="source"/> or <paramref name="processor"/> is null.</exception>
+	public static async Task ForEachAsync<T>(this IDSAsyncCursor<T> source, Func<T, Task> processor, CancellationToken cancellationToken = default(CancellationToken))
 	{
-		return ForEachAsync(source, (doc, _) => processor(doc), cancellationToken);
-	}
-
-	/// <summary>
-	/// Calls a delegate for each document returned by the cursor.
-	/// </summary>
-	/// <typeparam name="T">The type of the document.</typeparam>
-	/// <param name="cursor">The source.</param>
-	/// <param name="processor">The processor.</param>
-	/// <param name="cancellationToken">The cancellation token.</param>
-	/// <returns>A Task that completes when all the documents have been processed.</returns>
-	public static async Task ForEachAsync<T>(this IDSAsyncCursor<T> cursor, Func<T, int, Task> processor, CancellationToken cancellationToken = default(CancellationToken))
-	{
-		if (cursor == null) throw new ArgumentNullException(nameof(cursor));
+		if (source == null) throw new ArgumentNullException(nameof(source));
 		if (processor == null) throw new ArgumentNullException(nameof(processor));
 
-		using (cursor)
+		await using (source)
 		{
-			var index = 0;
-			while (await cursor.MoveNextAsync(cancellationToken).ConfigureAwait(false))
+			while (await source.MoveNextAsync(CommandBehavior.Default, cancellationToken).ConfigureAwait(false))
 			{
-				foreach (var document in cursor.Current)
-				{
-					await processor(document, index++).ConfigureAwait(false);
-					cancellationToken.ThrowIfCancellationRequested();
-				}
+				await processor(source.Current).ConfigureAwait(false);
 			}
 		}
 	}
 
 	/// <summary>
-	/// Calls a delegate for each document returned by the cursor.
+	/// Performs the specified action on each element of the <see cref="IDSAsyncCursor{T}"/>.
+	/// </summary>
+	/// <typeparam name="T">The type of the elements of source.</typeparam>
+	/// <param name="source">An <see cref="IDSAsyncCursor{T}"/> whose elements to perform the specified action to.</param>
+	/// <param name="processor">The <see cref="Func{T, int, Task}"/> delegate to perform on each element of the <see cref="IDSAsyncCursor{T}"/>.</param>
+	/// <param name="cancellationToken">The cancellation token.</param>
+	/// <returns>A <see cref="Task"/> that completes when all the elements have been processed.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="source"/> or <paramref name="processor"/> is null.</exception>
+	public static async Task ForEachAsync<T>(this IDSAsyncCursor<T> source, Func<T, int, Task> processor, CancellationToken cancellationToken = default(CancellationToken))
+	{
+		if (source == null) throw new ArgumentNullException(nameof(source));
+		if (processor == null) throw new ArgumentNullException(nameof(processor));
+
+		await using (source)
+		{
+			var index = 0;
+
+			while (await source.MoveNextAsync(CommandBehavior.Default, cancellationToken).ConfigureAwait(false))
+			{
+				await processor(source.Current, index++).ConfigureAwait(false);
+			}
+		}
+	}
+
+	/// <summary>
+	/// Performs the specified action on each element of the <see cref="IDSAsyncCursor{T}"/>.
 	/// </summary>
 	/// <remarks>
 	/// If your delegate is going to take a long time to execute or is going to block
 	/// consider using a different overload of ForEachAsync that uses a delegate that
 	/// returns a Task instead.
 	/// </remarks>
-	/// <typeparam name="T">The type of the document.</typeparam>
-	/// <param name="source">The source.</param>
-	/// <param name="processor">The processor.</param>
+	/// <typeparam name="T">The type of the elements of source.</typeparam>
+	/// <param name="source">An <see cref="IDSAsyncCursor{T}"/> whose elements to perform the specified action to.</param>
+	/// <param name="processor">The <see cref="Action{T}"/> delegate to perform on each element of the <see cref="IDSAsyncCursor{T}"/>.</param>
 	/// <param name="cancellationToken">The cancellation token.</param>
-	/// <returns>A Task that completes when all the documents have been processed.</returns>
-	public static Task ForEachAsync<T>(this IDSAsyncCursor<T> source, Action<T> processor, CancellationToken cancellationToken = default(CancellationToken))
+	/// <returns>A <see cref="Task"/> that completes when all the elements have been processed.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="source"/> or <paramref name="processor"/> is null.</exception>
+	public static async Task ForEachAsync<T>(this IDSAsyncCursor<T> source, Action<T> processor, CancellationToken cancellationToken = default(CancellationToken))
 	{
-		return ForEachAsync(source, (doc, _) => processor(doc), cancellationToken);
+		if (source == null) throw new ArgumentNullException(nameof(source));
+		if (processor == null) throw new ArgumentNullException(nameof(processor));
+
+		await using (source)
+		{
+			while (await source.MoveNextAsync(CommandBehavior.Default, cancellationToken).ConfigureAwait(false))
+			{
+				processor(source.Current);
+			}
+		}
 	}
 
 	/// <summary>
-	/// Calls a delegate for each document returned by the cursor.
+	/// Performs the specified action on each element of the <see cref="IDSAsyncCursor{T}"/>.
 	/// </summary>
 	/// <remarks>
 	/// If your delegate is going to take a long time to execute or is going to block
 	/// consider using a different overload of ForEachAsync that uses a delegate that
 	/// returns a Task instead.
 	/// </remarks>
-	/// <typeparam name="T">The type of the document.</typeparam>
-	/// <param name="cursor">The source.</param>
-	/// <param name="processor">The processor.</param>
+	/// <typeparam name="T">The type of the elements of source.</typeparam>
+	/// <param name="source">An <see cref="IDSAsyncCursor{T}"/> whose elements to perform the specified action to.</param>
+	/// <param name="processor">The <see cref="Action{T, int}"/> delegate to perform on each element of the <see cref="IDSAsyncCursor{T}"/>.</param>
 	/// <param name="cancellationToken">The cancellation token.</param>
-	/// <returns>A Task that completes when all the documents have been processed.</returns>
-	public static async Task ForEachAsync<T>(this IDSAsyncCursor<T> cursor, Action<T, int> processor, CancellationToken cancellationToken = default(CancellationToken))
+	/// <returns>A <see cref="Task"/> that completes when all the elements have been processed.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="source"/> or <paramref name="processor"/> is null.</exception>
+	public static async Task ForEachAsync<T>(this IDSAsyncCursor<T> source, Action<T, int> processor, CancellationToken cancellationToken = default(CancellationToken))
 	{
-		if (cursor == null) throw new ArgumentNullException(nameof(cursor));
+		if (source == null) throw new ArgumentNullException(nameof(source));
 		if (processor == null) throw new ArgumentNullException(nameof(processor));
 
-		using (cursor)
+		await using (source)
 		{
 			var index = 0;
-			while (await cursor.MoveNextAsync(cancellationToken).ConfigureAwait(false))
+
+			while (await source.MoveNextAsync(CommandBehavior.Default, cancellationToken).ConfigureAwait(false))
 			{
-				foreach (var document in cursor.Current)
+				processor(source.Current, index++);
+			}
+		}
+	}
+
+	/// <summary>
+	/// Returns the only element of a cursor, and throws an exception if there is not exactly one element in the cursor.
+	/// </summary>
+	/// <typeparam name="T">The type of the elements of source.</typeparam>
+	/// <param name="source">An <see cref="IDSAsyncCursor{T}"/> to return the single element of.</param>
+    /// <param name="cancellationToken">The cancellation token.</param>
+	/// <returns>A <see cref="Task"/> whose result is the single element of the cursor.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="source"/> is null.</exception>
+    /// <exception cref="InvalidOperationException">The cursor contains more than one element. -or- The cursor is empty.</exception>
+	public static async Task<T> SingleAsync<T>(this IDSAsyncCursor<T> source, CancellationToken cancellationToken = default(CancellationToken))
+	{
+		if (source == null) throw new ArgumentNullException(nameof(source));
+
+		await using (source)
+		{
+			if (!await source.MoveNextAsync(CommandBehavior.Default, cancellationToken).ConfigureAwait(false)) throw new InvalidOperationException("Cursor contains no elements");
+
+			var result = source.Current;
+
+			if (await source.MoveNextAsync(CommandBehavior.Default, cancellationToken).ConfigureAwait(false)) throw new InvalidOperationException("Cursor contains more than one element");
+
+			return result;
+		}
+	}
+
+	/// <summary>
+	/// Returns the only element of a cursor that satisfies a specified condition, and throws an exception if more than one such element exists.
+	/// </summary>
+	/// <typeparam name="T">The type of the elements of source.</typeparam>
+	/// <param name="source">An <see cref="IDSAsyncCursor{T}"/> to return a single element from.</param>
+    /// <param name="predicate">A function to test an element for a condition.</param>
+    /// <param name="cancellationToken">The cancellation token.</param>
+	/// <returns>A <see cref="Task"/> whose result is the single element of the cursor that satisfies a condition.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="source"/> or <paramref name="predicate"/> is null.</exception>
+    /// <exception cref="InvalidOperationException">No element satisfies the condition in predicate. -or- More than one element satisfies the condition in predicate. -or- The source cursor is empty.</exception>
+	public static async Task<T> SingleAsync<T>(this IDSAsyncCursor<T> source, Func<T, bool> predicate, CancellationToken cancellationToken = default(CancellationToken))
+	{
+		if (source == null) throw new ArgumentNullException(nameof(source));
+		if (predicate == null) throw new ArgumentNullException(nameof(predicate));
+
+		await using (source)
+		{
+			while (await source.MoveNextAsync(CommandBehavior.Default, cancellationToken).ConfigureAwait(false))
+			{
+				if (predicate(source.Current))
 				{
-					processor(document, index++);
-					cancellationToken.ThrowIfCancellationRequested();
-				}
-			}
-		}
-	}
+					var result = source.Current;
 
-	/// <summary>
-	/// Returns the only document of a cursor. This method throws an exception if the cursor does not contain exactly one document.
-	/// </summary>
-	/// <typeparam name="T">The type of the document.</typeparam>
-	/// <param name="cursor">The cursor.</param>
-	/// <param name="cancellationToken">The cancellation token.</param>
-	/// <returns>The only document of a cursor.</returns>
-	public static T Single<T>(this IDSAsyncCursor<T> cursor, CancellationToken cancellationToken = default(CancellationToken))
-	{
-		if (cursor == null) throw new ArgumentNullException(nameof(cursor));		
-
-		using (cursor)
-		{
-			var batch = GetFirstBatch(cursor, cancellationToken);
-			return batch.Single();
-		}
-	}
-
-	/// <summary>
-	/// Returns the only document of a cursor. This method throws an exception if the cursor does not contain exactly one document.
-	/// </summary>
-	/// <typeparam name="T">The type of the document.</typeparam>
-	/// <param name="cursor">The cursor.</param>
-	/// <param name="cancellationToken">The cancellation token.</param>
-	/// <returns>A Task whose result is the only document of a cursor.</returns>
-	public static async Task<T> SingleAsync<T>(this IDSAsyncCursor<T> cursor, CancellationToken cancellationToken = default(CancellationToken))
-	{
-		if (cursor == null) throw new ArgumentNullException(nameof(cursor));	
-
-		using (cursor)
-		{
-			var batch = await GetFirstBatchAsync(cursor, cancellationToken).ConfigureAwait(false);
-			return batch.Single();
-		}
-	}
-
-	/// <summary>
-	/// Returns the only document of a cursor, or a default value if the cursor contains no documents.
-	/// This method throws an exception if the cursor contains more than one document.
-	/// </summary>
-	/// <typeparam name="T">The type of the document.</typeparam>
-	/// <param name="cursor">The cursor.</param>
-	/// <param name="cancellationToken">The cancellation token.</param>
-	/// <returns>The only document of a cursor, or a default value if the cursor contains no documents.</returns>
-	public static T? SingleOrDefault<T>(this IDSAsyncCursor<T> cursor, CancellationToken cancellationToken = default(CancellationToken))
-	{
-		if (cursor == null) throw new ArgumentNullException(nameof(cursor));		
-
-		using (cursor)
-		{
-			var batch = GetFirstBatch(cursor, cancellationToken);
-			return batch.SingleOrDefault();
-		}
-	}
-
-	/// <summary>
-	/// Returns the only document of a cursor, or a default value if the cursor contains no documents.
-	/// This method throws an exception if the cursor contains more than one document.
-	/// </summary>
-	/// <typeparam name="T">The type of the document.</typeparam>
-	/// <param name="cursor">The cursor.</param>
-	/// <param name="cancellationToken">The cancellation token.</param>
-	/// <returns>A Task whose result is the only document of a cursor, or a default value if the cursor contains no documents.</returns>
-	public static async Task<T?> SingleOrDefaultAsync<T>(this IDSAsyncCursor<T> cursor, CancellationToken cancellationToken = default(CancellationToken))
-	{
-		if (cursor == null) throw new ArgumentNullException(nameof(cursor));	
-
-		using (cursor)
-		{
-			var batch = await GetFirstBatchAsync(cursor, cancellationToken).ConfigureAwait(false);
-			return batch.SingleOrDefault();
-		}
-	}
-
-	/// <summary>
-	/// Wraps a cursor in an IEnumerable that can be enumerated one time.
-	/// </summary>
-	/// <typeparam name="T">The type of the document.</typeparam>
-	/// <param name="cursor">The cursor.</param>
-	/// <param name="cancellationToken">The cancellation token.</param>
-	/// <returns>An IEnumerable</returns>
-	public static IEnumerable<T> ToEnumerable<T>(this IDSAsyncCursor<T> cursor, CancellationToken cancellationToken = default(CancellationToken))
-	{
-		return new AsyncCursorEnumerableOneTimeAdapter<T>(cursor, cancellationToken);
-	}
-
-	/// <summary>
-	/// Returns a list containing all the documents returned by a cursor.
-	/// </summary>
-	/// <typeparam name="T">The type of the document.</typeparam>
-	/// <param name="cursor">The source.</param>
-	/// <param name="cancellationToken">The cancellation token.</param>
-	/// <returns>The list of documents.</returns>
-	public static List<T> ToList<T>(this IDSAsyncCursor<T> cursor, CancellationToken cancellationToken = default(CancellationToken))
-	{
-		if (cursor == null) throw new ArgumentNullException(nameof(cursor));	
-
-		var list = new List<T>();
-		using (cursor)
-		{
-			while (cursor.MoveNext(cancellationToken))
-			{
-				list.AddRange(cursor.Current);
-				cancellationToken.ThrowIfCancellationRequested();
-			}
-		}
-		return list;
-	}
-
-	/// <summary>
-	/// Returns a list containing all the documents returned by a cursor.
-	/// </summary>
-	/// <typeparam name="T">The type of the document.</typeparam>
-	/// <param name="cursor">The source.</param>
-	/// <param name="cancellationToken">The cancellation token.</param>
-	/// <returns>A Task whose value is the list of documents.</returns>
-	public static async Task<List<T>> ToListAsync<T>(this IDSAsyncCursor<T> cursor, CancellationToken cancellationToken = default(CancellationToken))
-	{
-		if (cursor == null) throw new ArgumentNullException(nameof(cursor));
-
-		var list = new List<T>();
-		using (cursor)
-		{
-			while (await cursor.MoveNextAsync(cancellationToken).ConfigureAwait(false))
-			{
-				list.AddRange(cursor.Current);
-				cancellationToken.ThrowIfCancellationRequested();
-			}
-		}
-
-		return list;
-	}
-
-	/// <summary>
-	/// Returns a list containing all the documents returned by a cursor.
-	/// </summary>
-	/// <typeparam name="T">The type of the document.</typeparam>
-	/// <param name="cursor">The source.</param>
-	/// <param name="lastPageMarkerCallback">The callback to detect the last page.</param>
-	/// <param name="cancellationToken">The cancellation token.</param>
-	/// <returns>A Task whose value is the list of documents.</returns>
-	public static async Task<List<T>> ToListAsync<T>(this IDSAsyncCursor<T> cursor, Action<bool> lastPageMarkerCallback, CancellationToken cancellationToken = default(CancellationToken))
-	{
-		if (cursor == null) throw new ArgumentNullException(nameof(cursor));
-		if (lastPageMarkerCallback == null) throw new ArgumentNullException(nameof(lastPageMarkerCallback));
-
-		var list = new List<T>();
-		using (cursor)
-		{
-			cursor.LastPageMarkerCallback = lastPageMarkerCallback;
-			while (await cursor.MoveNextAsync(cancellationToken).ConfigureAwait(false))
-			{
-				list.AddRange(cursor.Current);
-				cancellationToken.ThrowIfCancellationRequested();
-			}
-		}
-
-		return list;
-	}
-
-	/// <summary>
-	/// Returns a list containing all the documents returned by a cursor.
-	/// </summary>
-	/// <typeparam name="T">The type of the document.</typeparam>
-	/// <param name="cursor">The source.</param>
-	/// <param name="totalCountCallback">The callback to get a total row count.</param>
-	/// <param name="cancellationToken">The cancellation token.</param>
-	/// <returns>A Task whose value is the list of documents.</returns>
-	public static async Task<List<T>> ToListAsync<T>(this IDSAsyncCursor<T> cursor, Action<long> totalCountCallback, CancellationToken cancellationToken = default(CancellationToken))
-	{
-		if (cursor == null) throw new ArgumentNullException(nameof(cursor));
-		if (totalCountCallback == null) throw new ArgumentNullException(nameof(totalCountCallback));
-
-		var list = new List<T>();
-		using (cursor)
-		{
-			cursor.TotalCountCallback = totalCountCallback;
-			while (await cursor.MoveNextAsync(cancellationToken).ConfigureAwait(false))
-			{
-				list.AddRange(cursor.Current);
-				cancellationToken.ThrowIfCancellationRequested();
-			}
-		}
-
-		return list;
-	}
-
-	private static IEnumerable<T> GetFirstBatch<T>(IDSAsyncCursor<T> cursor, CancellationToken cancellationToken)
-	{
-		if (cursor.MoveNext(cancellationToken))
-		{
-			return cursor.Current;
-		}
-		else
-		{
-			return Enumerable.Empty<T>();
-		}
-	}
-
-	private static async Task<IEnumerable<T>> GetFirstBatchAsync<T>(IDSAsyncCursor<T> cursor, CancellationToken cancellationToken)
-	{
-		if (await cursor.MoveNextAsync(cancellationToken).ConfigureAwait(false))
-		{
-			return cursor.Current;
-		}
-		else
-		{
-			return Enumerable.Empty<T>();
-		}
-	}
-
-	private class AsyncCursorEnumerableOneTimeAdapter<T> : IEnumerable<T>
-	{
-		private readonly IDSAsyncCursor<T> _cursor;
-		private readonly CancellationToken _cancellationToken;
-		private bool _hasBeenEnumerated;
-
-		public AsyncCursorEnumerableOneTimeAdapter(IDSAsyncCursor<T> cursor, CancellationToken cancellationToken)
-		{
-			if (cursor == null) throw new ArgumentNullException(nameof(cursor));
-
-			_cursor = cursor;
-			_cancellationToken = cancellationToken;
-		}
-
-		public IEnumerator<T> GetEnumerator()
-		{
-			if (_hasBeenEnumerated) throw new InvalidOperationException("An IDSAsyncCursor can only be enumerated once.");
-
-			_hasBeenEnumerated = true;
-			return new AsyncCursorEnumerator<T>(_cursor, _cancellationToken);
-		}
-
-		IEnumerator IEnumerable.GetEnumerator()
-		{
-			return GetEnumerator();
-		}
-	}
-
-	private class AsyncCursorEnumerator<T> : IEnumerator<T>
-	{
-		private readonly IDSAsyncCursor<T> _cursor;
-		private readonly CancellationToken _cancellationToken;
-		private IEnumerator<T>? _batchEnumerator;
-		private bool _disposed;
-		private bool _finished;
-		private bool _started;
-
-		public AsyncCursorEnumerator(IDSAsyncCursor<T> cursor, CancellationToken cancellationToken)
-		{
-			if (cursor == null) throw new ArgumentNullException(nameof(cursor));
-
-			_cursor = cursor;
-			_cancellationToken = cancellationToken;
-		}
-
-		public T Current
-		{
-			get
-			{
-				ThrowIfDisposed();
-				if (!_started)
-				{
-					throw new InvalidOperationException("Enumeration has not started. Call MoveNext.");
-				}
-				if (_finished)
-				{
-					throw new InvalidOperationException("Enumeration already finished.");
-				}
-				return _batchEnumerator!.Current;
-			}
-		}
-
-		object IEnumerator.Current => Current!;
-
-		public void Dispose()
-		{
-			if (!_disposed)
-			{
-				_disposed = true;
-				_batchEnumerator?.Dispose();
-				_cursor.Dispose();
-			}
-		}
-
-		public bool MoveNext()
-		{
-			ThrowIfDisposed();
-			_started = true;
-
-			if (_batchEnumerator != null && _batchEnumerator.MoveNext())
-			{
-				return true;
-			}
-
-			while (true)
-			{
-				if (_cursor.MoveNext(_cancellationToken))
-				{
-					_batchEnumerator?.Dispose();
-					_batchEnumerator = _cursor.Current.GetEnumerator();
-					if (_batchEnumerator.MoveNext())
+					while (await source.MoveNextAsync(CommandBehavior.Default, cancellationToken).ConfigureAwait(false))
 					{
-						return true;
+						if (predicate(source.Current)) throw new InvalidOperationException("Cursor contains more than one element");
 					}
-				}
-				else
-				{
-					_batchEnumerator = null;
-					_finished = true;
-					return false;
+
+					return result;
 				}
 			}
-		}
 
-		public void Reset()
-		{
-			ThrowIfDisposed();
-			throw new NotSupportedException();
+			throw new InvalidOperationException("Cursor contains no elements");
 		}
+	}
 
-		private void ThrowIfDisposed()
+	/// <summary>
+	/// Returns the only element of a cursor, or a default value if the cursor is empty; this method throws an exception if there is more than one element in the cursor.
+	/// </summary>
+	/// <typeparam name="T">The type of the elements of source.</typeparam>
+	/// <param name="source">An <see cref="IDSAsyncCursor{T}"/> to return the single element of.</param>
+	/// <param name="cancellationToken">The cancellation token.</param>
+	/// <returns>A <see cref="Task"/> whose result is the single element of the cursor, or default(<typeparamref name="T"/>) if the cursor contains no elements.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="source"/> is null.</exception>
+    /// <exception cref="InvalidOperationException">The cursor contains more than one element.</exception>
+	public static async Task<T?> SingleOrDefaultAsync<T>(this IDSAsyncCursor<T> source, CancellationToken cancellationToken = default(CancellationToken))
+	{
+		if (source == null) throw new ArgumentNullException(nameof(source));
+
+		await using (source)
 		{
-			if (_disposed)
+			if (!await source.MoveNextAsync(CommandBehavior.Default, cancellationToken).ConfigureAwait(false)) return default(T);
+
+			var result = source.Current;
+
+			if (await source.MoveNextAsync(CommandBehavior.Default, cancellationToken).ConfigureAwait(false)) throw new InvalidOperationException("Cursor contains more than one element");
+
+			return result;
+		}
+	}
+
+	/// <summary>
+	/// Returns the only element of a cursor, or a specified default value if the cursor is empty; this method throws an exception if there is more than one element in the cursor.
+	/// </summary>
+	/// <typeparam name="T">The type of the elements of source.</typeparam>
+	/// <param name="source">An <see cref="IDSAsyncCursor{T}"/> to return the single element of.</param>
+    /// <param name="defaultValue">The default value to return if the cursor is empty.</param>
+	/// <param name="cancellationToken">The cancellation token.</param>
+	/// <returns>A <see cref="Task"/> whose result is the single element of the cursor, or <paramref name="defaultValue"/> if the cursor contains no elements.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="source"/> is null.</exception>
+    /// <exception cref="InvalidOperationException">The cursor contains more than one element.</exception>
+	public static async Task<T?> SingleOrDefaultAsync<T>(this IDSAsyncCursor<T> source, T defaultValue, CancellationToken cancellationToken = default(CancellationToken))
+	{
+		if (source == null) throw new ArgumentNullException(nameof(source));
+
+		await using (source)
+		{
+			if (!await source.MoveNextAsync(CommandBehavior.Default, cancellationToken).ConfigureAwait(false)) return defaultValue;
+
+			var result = source.Current;
+
+			if (await source.MoveNextAsync(CommandBehavior.Default, cancellationToken).ConfigureAwait(false)) throw new InvalidOperationException("Cursor contains more than one element");
+
+			return result;
+		}
+	}
+
+	/// <summary>
+	/// Returns the only element of a cursor that satisfies a specified condition or a default value if no such element exists;
+    /// this method throws an exception if more than one element satisfies the condition.
+	/// </summary>
+	/// <typeparam name="T">The type of the elements of source.</typeparam>
+	/// <param name="source">An <see cref="IDSAsyncCursor{T}"/> to return the single element of.</param>
+    /// <param name="predicate">A function to test an element for a condition.</param>
+    /// <param name="cancellationToken">The cancellation token.</param>
+	/// <returns>A <see cref="Task"/> whose result is the single element of the cursor that satisfies the condition, or default(<typeparamref name="T"/>) if no such element is found.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="source"/> or <paramref name="predicate"/> is null.</exception>
+    /// <exception cref="InvalidOperationException">More than one element satisfies the condition in predicate.</exception>
+	public static async Task<T?> SingleOrDefaultAsync<T>(this IDSAsyncCursor<T> source, Func<T, bool> predicate, CancellationToken cancellationToken = default(CancellationToken))
+	{
+		if (source == null) throw new ArgumentNullException(nameof(source));
+		if (predicate == null) throw new ArgumentNullException(nameof(predicate));
+
+		await using (source)
+		{
+			while (await source.MoveNextAsync(CommandBehavior.Default, cancellationToken).ConfigureAwait(false))
 			{
-				throw new ObjectDisposedException(GetType().Name);
+				if (predicate(source.Current))
+				{
+					var result = source.Current;
+
+					while (await source.MoveNextAsync(CommandBehavior.Default, cancellationToken).ConfigureAwait(false))
+					{
+						if (predicate(source.Current)) throw new InvalidOperationException("Cursor contains more than one element");
+					}
+
+					return result;
+				}
+			}
+
+			return default(T);
+		}
+	}
+
+	/// <summary>
+	/// Returns the only element of a cursor that satisfies a specified condition, or a specified default value
+    /// if no such element exists; this method throws an exception if more than one element satisfies the condition.
+	/// </summary>
+	/// <typeparam name="T">The type of the elements of source.</typeparam>
+	/// <param name="source">An <see cref="IDSAsyncCursor{T}"/> to return the single element of.</param>
+    /// <param name="predicate">A function to test an element for a condition.</param>
+    /// <param name="defaultValue">The default value to return if the cursor is empty.</param>
+    /// <param name="cancellationToken">The cancellation token.</param>
+	/// <returns>A <see cref="Task"/> whose result is the single element of the cursor that satisfies the condition, or <paramref name="defaultValue"/> if no such element is found.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="source"/> or <paramref name="predicate"/> is null.</exception>
+    /// <exception cref="InvalidOperationException">More than one element satisfies the condition in predicate.</exception>
+	public static async Task<T?> SingleOrDefaultAsync<T>(this IDSAsyncCursor<T> source, Func<T, bool> predicate, T defaultValue, CancellationToken cancellationToken = default(CancellationToken))
+	{
+		if (source == null) throw new ArgumentNullException(nameof(source));
+		if (predicate == null) throw new ArgumentNullException(nameof(predicate));
+
+		await using (source)
+		{
+			while (await source.MoveNextAsync(CommandBehavior.Default, cancellationToken).ConfigureAwait(false))
+			{
+				if (predicate(source.Current))
+				{
+					var result = source.Current;
+
+					while (await source.MoveNextAsync(CommandBehavior.Default, cancellationToken).ConfigureAwait(false))
+					{
+						if (predicate(source.Current)) throw new InvalidOperationException("Cursor contains more than one element");
+					}
+
+					return result;
+				}
+			}
+
+			return defaultValue;
+		}
+	}
+
+	/// <summary>
+	/// Represents a cursor as <see cref="IAsyncEnumerable{T}"/> and allows to specify a cancellation token for it.
+	/// </summary>
+	/// <typeparam name="T">The type of the elements of source.</typeparam>
+	/// <param name="source">The source cursor to type as <see cref="IAsyncEnumerable{T}"/>.</param>
+	/// <param name="cancellationToken">The cancellation token.</param>
+	/// <returns>The cursor typed as <see cref="IAsyncEnumerable{T}"/>.</returns>
+	/// <exception cref="ArgumentNullException"></exception>
+	public static async IAsyncEnumerable<T> AsAsyncEnumerable<T>(this IDSAsyncCursor<T> source, [EnumeratorCancellation] CancellationToken cancellationToken = default(CancellationToken))
+	{
+		if (source == null) throw new ArgumentNullException(nameof(source));
+
+		await using (source)
+		{
+			while (await source.MoveNextAsync(CommandBehavior.Default, cancellationToken).ConfigureAwait(false))
+			{
+				yield return source.Current;
 			}
 		}
+	}
+
+	/// <summary>
+	/// Represents a cursor as <see cref="IEnumerable{T}"/> and allows to specify a cancellation token for it.
+	/// </summary>
+	/// <typeparam name="T">The type of the elements of source.</typeparam>
+	/// <param name="source">The source cursor to type as <see cref="IEnumerable{T}"/>.</param>
+	/// <param name="cancellationToken">The cancellation token.</param>
+	/// <returns>The cursor typed as <see cref="IEnumerable{T}"/>.</returns>
+	/// <exception cref="ArgumentNullException"></exception>
+	public static IEnumerable<T> AsEnumerable<T>(this IDSAsyncCursor<T> source, CancellationToken cancellationToken = default(CancellationToken))
+	{
+		if (source == null) throw new ArgumentNullException(nameof(source));
+
+		using (source)
+		{
+			while (source.MoveNext(CommandBehavior.Default, cancellationToken))
+			{
+				yield return source.Current;
+			}
+		}
+	}
+
+	/// <summary>
+	/// Creates a <see cref="List{T}"/> from an <see cref="IDSAsyncCursor{T}"/>.
+	/// </summary>
+	/// <typeparam name="T">The type of the elements of source.</typeparam>
+	/// <param name="source">The <see cref="IDSAsyncCursor{T}"/> to create a <see cref="List{T}"/> from.</param>
+	/// <param name="cancellationToken">The cancellation token.</param>
+	/// <returns>A <see cref="Task"/> whose value is the <see cref="List{T}"/> that contains elements from the cursor.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="source"/> is null.</exception>
+	public static async Task<List<T>> ToListAsync<T>(this IDSAsyncCursor<T> source, CancellationToken cancellationToken = default(CancellationToken))
+	{
+		if (source == null) throw new ArgumentNullException(nameof(source));
+
+		var list = new List<T>();
+
+		await using (source)
+		{
+			while (await source.MoveNextAsync(CommandBehavior.Default, cancellationToken).ConfigureAwait(false))
+			{
+				list.Add(source.Current);
+			}
+		}
+
+		return list;
+	}
+
+	/// <summary>
+	/// Creates a <see cref="List{T}"/> from an <see cref="IDSAsyncCursor{T}"/>.
+	/// </summary>
+	/// <typeparam name="T">The type of the elements of source.</typeparam>
+	/// <param name="source">The <see cref="IDSAsyncCursor{T}"/> to create a <see cref="List{T}"/> from.</param>
+	/// <param name="cancellationToken">The cancellation token.</param>
+	/// <returns>The <see cref="List{T}"/> that contains elements from the cursor.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="source"/> is null.</exception>
+	public static List<T> ToList<T>(this IDSAsyncCursor<T> source, CancellationToken cancellationToken = default(CancellationToken))
+	{
+		if (source == null) throw new ArgumentNullException(nameof(source));
+
+		var list = new List<T>();
+
+		using (source)
+		{
+			while (source.MoveNext(CommandBehavior.Default, cancellationToken))
+			{
+				list.Add(source.Current);
+			}
+		}
+
+		return list;
+	}
+
+	/// <summary>
+    /// Sets a callback action to get a mark whether the given page is the last one. It is called when a cursor reaches the end.
+    /// </summary>
+    /// <typeparam name="T">The type of the elements of source.</typeparam>
+    /// <param name="source">An <see cref="IDSAsyncCursor{T}"/> to return the last page mark of.</param>
+    /// <param name="lastPageCallback">Callback action to call when the cursor reaches the end.</param>
+    /// <exception cref="ArgumentNullException"><paramref name="source"/> or <paramref name="lastPageCallback"/> is null.</exception>
+	/// <exception cref="NotSupportedException">Obtaining the last page mark is not supported by <paramref name="source"/>.</exception>
+	public static IDSAsyncCursor<T> GetLastPageMark<T>(this IDSAsyncCursor<T> source, Action<bool> lastPageCallback)
+	{
+		if (source == null) throw new ArgumentNullException(nameof(source));
+
+		source.OnLastPage += lastPageCallback;
+		return source;
+	}
+
+	/// <summary>
+    /// Sets a callback action to get the total number of rows. It is called when a cursor reaches the end.
+    /// </summary>
+    /// <typeparam name="T">The type of the elements of source.</typeparam>
+    /// <param name="source">An <see cref="IDSAsyncCursor{T}"/> to return the total number of rows of.</param>
+    /// <param name="totalCountCallback">Callback action to call when the cursor reaches the end.</param>
+    /// <exception cref="ArgumentNullException"><paramref name="source"/> or <paramref name="totalCountCallback"/> is null.</exception>
+	/// <exception cref="NotSupportedException">Obtaining the total number of rows is not supported by <paramref name="source"/>.</exception>
+	public static IDSAsyncCursor<T> GetTotalCount<T>(this IDSAsyncCursor<T> source, Action<long> totalCountCallback)
+	{
+		if (source == null) throw new ArgumentNullException(nameof(source));
+
+		source.OnTotalCount += totalCountCallback;
+		return source;
 	}
 }

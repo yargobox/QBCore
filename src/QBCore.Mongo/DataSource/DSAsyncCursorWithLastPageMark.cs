@@ -4,22 +4,24 @@ using MongoDB.Driver;
 
 namespace QBCore.DataSource;
 
-internal class DSAsyncCursor<T> : IDSAsyncCursor<T>
+internal class DSAsyncCursorWithLastPageMark<T> : IDSAsyncCursor<T>
 {
 	private IAsyncCursor<T>? _cursor;
 	private IEnumerator<T>? _current;
 	private readonly CancellationToken _cancellationToken;
+	private int _take;
+	private Action<bool>? _callback;
 
 	public T Current => _current is not null ? _current.Current : default(T)!;
 	public CancellationToken CancellationToken => _cancellationToken;
 
-	public bool ObtainsLastPage => false;
-	public bool IsLastPageAvailable => throw NotSupportedByThisCursor();
-	public bool IsLastPage => throw NotSupportedByThisCursor();
+	public bool ObtainsLastPage => true;
+	public bool IsLastPageAvailable => _cursor == null;
+	public bool IsLastPage => _cursor == null ? _take >= 0 : throw NotAvailableYet();
 	public event Action<bool> OnLastPage
 	{
-		add => throw NotSupportedByThisCursor();
-		remove => throw NotSupportedByThisCursor();
+		add => _callback += value ?? throw new ArgumentNullException(nameof(value));
+		remove => _callback -= value ?? throw new ArgumentNullException(nameof(value));
 	}
 
 	public bool ObtainsTotalCount => false;
@@ -31,10 +33,11 @@ internal class DSAsyncCursor<T> : IDSAsyncCursor<T>
 		remove => throw NotSupportedByThisCursor();
 	}
 
-	public DSAsyncCursor(IAsyncCursor<T> cursor, CancellationToken cancellationToken = default(CancellationToken))
+	public DSAsyncCursorWithLastPageMark(IAsyncCursor<T> cursor, int take, CancellationToken cancellationToken = default(CancellationToken))
 	{
 		_cursor = cursor;
 		_cancellationToken = cancellationToken;
+		_take = take < 0 ? int.MaxValue : take;
 	}
 
 	public async ValueTask<bool> MoveNextAsync(CommandBehavior commandBehavior = CommandBehavior.Default, CancellationToken cancellationToken = default(CancellationToken))
@@ -51,6 +54,11 @@ internal class DSAsyncCursor<T> : IDSAsyncCursor<T>
 				}
 				else
 				{
+					if (_take >= 0 && _callback != null)
+					{
+						_callback(true);
+					}
+
 					Dispose();
 					return false;
 				}
@@ -58,6 +66,17 @@ internal class DSAsyncCursor<T> : IDSAsyncCursor<T>
 			
 			if (_current.MoveNext())
 			{
+				if (--_take < 0)
+				{
+					if (_callback != null)
+					{
+						_callback(false);
+					}
+
+					Dispose();
+					return false;
+				}
+
 				return true;
 			}
 			else
@@ -80,17 +99,33 @@ internal class DSAsyncCursor<T> : IDSAsyncCursor<T>
 
 				if (_cursor.MoveNext((cancellationToken == default(CancellationToken) ? _cancellationToken : cancellationToken)))
 				{
-                    _current = _cursor.Current.GetEnumerator();
+					_current = _cursor.Current.GetEnumerator();
 				}
 				else
 				{
-                    Dispose();
+					if (_take >= 0 && _callback != null)
+					{
+						_callback(true);
+					}
+
+					Dispose();
 					return false;
 				}
 			}
 			
 			if (_current.MoveNext())
 			{
+				if (--_take < 0)
+				{
+					if (_callback != null)
+					{
+						_callback(false);
+					}
+
+					Dispose();
+					return false;
+				}
+
 				return true;
 			}
 			else
@@ -120,6 +155,8 @@ internal class DSAsyncCursor<T> : IDSAsyncCursor<T>
 			var cursor = _cursor;
 			_cursor = null;
 
+			_callback = null;
+
 			current?.Dispose();
 			cursor?.Dispose();
 		}
@@ -127,4 +164,6 @@ internal class DSAsyncCursor<T> : IDSAsyncCursor<T>
 
 	static NotSupportedException NotSupportedByThisCursor([CallerMemberName] string memberName = "")
 		=> new NotSupportedException($"Property or method '{memberName}' is not supported by this cursor!");
+	static InvalidOperationException NotAvailableYet([CallerMemberName] string memberName = "")
+		=> new InvalidOperationException($"{nameof(IsLastPage)} is not available yet!");
 }

@@ -75,7 +75,107 @@ internal sealed partial class SelectQueryBuilder<TDoc, TSelect> : QueryBuilder<T
 		} */
 	}
 
+	public long Count(DataSourceCountOptions? options = null, CancellationToken cancellationToken = default(CancellationToken))
+	{
+		throw new NotImplementedException();
+	}
+
 	public async Task<IDSAsyncCursor<TSelect>> SelectAsync(long skip = 0L, int take = -1, DataSourceSelectOptions? options = null, CancellationToken cancellationToken = default(CancellationToken))
+	{
+		if (skip < 0) throw new ArgumentOutOfRangeException(nameof(skip));
+
+		var top = Builder.Containers.FirstOrDefault();
+		if (top?.ContainerOperation != ContainerOperations.Select && top?.ContainerOperation != ContainerOperations.Exec)
+		{
+			throw EX.QueryBuilder.Make.QueryBuilderOperationNotSupported(Builder.DataLayer.Name, QueryBuilderType.ToString(), top?.ContainerOperation.ToString());
+		}
+
+		NpgsqlConnection? connection = null;
+		NpgsqlTransaction? transaction = null;
+		if (options != null)
+		{
+			if (options.ObtainLastPageMark && options.ObtainTotalCount)
+			{
+				throw new ArgumentException(nameof(options.ObtainLastPageMark));
+			}
+
+			if (options.Connection != null)
+			{
+				connection = (options.Connection as NpgsqlConnection) ?? throw new ArgumentException(nameof(options.Connection));
+			}
+			if (options.Transaction != null)
+			{
+				transaction = (options.Transaction as NpgsqlTransaction) ?? throw new ArgumentException(nameof(options.Transaction));
+				
+				if (transaction.Connection != connection)
+				{
+					throw  EX.QueryBuilder.Make.SpecifiedTransactionOpenedForDifferentConnection();
+				}
+			}
+		}
+
+		if (top.ContainerOperation == ContainerOperations.Select)
+		{
+			string queryString;
+			var sb = new StringBuilder();
+			var command = new NpgsqlCommand();
+
+			BuildSelectQuery(sb, skip, take >= 0 && options?.ObtainLastPageMark == true ? take + 1 : take, command.Parameters);
+
+			queryString = sb.ToString();
+
+			if (options != null)
+			{
+				if (options.QueryStringCallbackAsync != null)
+				{
+					await options.QueryStringCallbackAsync(queryString).ConfigureAwait(false);
+				}
+				else if (options.QueryStringCallback != null)
+				{
+					options.QueryStringCallback(queryString);
+				}
+			}
+
+			try
+			{
+				command.CommandText = queryString;
+				command.CommandType = CommandType.Text;
+				command.Connection ??= connection;
+				command.Connection ??= await DataContext.AsNpgsqlDataSource().OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
+				command.Transaction ??= transaction;
+
+				return options?.ObtainLastPageMark == true
+					? new DSAsyncCursorWithLastPageMark<TSelect>(command, connection == null, take, cancellationToken)
+					: new DSAsyncCursor<TSelect>(command, connection == null, cancellationToken);
+			}
+			catch
+			{
+				if (connection == null)
+				{
+					connection = command.Connection;
+				}
+				else
+				{
+					connection = null;
+				}
+
+				await command.DisposeAsync().ConfigureAwait(false);
+				
+				if (connection != null)
+				{
+					await connection.DisposeAsync().ConfigureAwait(false);
+				}
+
+				throw;
+			}
+		}
+		else/*  if (top.ContainerOperation == ContainerOperations.Exec) */
+		{
+			throw new NotImplementedException();
+		}
+	}
+
+	public IDSAsyncCursor<TSelect> Select(long skip = 0L, int take = -1, DataSourceSelectOptions? options = null, CancellationToken cancellationToken = default(CancellationToken))
 	{
 		if (skip < 0) throw new ArgumentOutOfRangeException(nameof(skip));
 
@@ -110,59 +210,49 @@ internal sealed partial class SelectQueryBuilder<TDoc, TSelect> : QueryBuilder<T
 			var sb = new StringBuilder();
 			var command = new NpgsqlCommand();
 
-			BuildSelectQuery(sb, skip, take >= 0 && options?.ObtainLastPageMarker == true ? take + 1 : take, command.Parameters);
+			BuildSelectQuery(sb, skip, take >= 0 && options?.ObtainLastPageMark == true ? take + 1 : take, command.Parameters);
 
 			queryString = sb.ToString();
 
 			if (options != null)
 			{
-				if (options.QueryStringCallbackAsync != null)
-				{
-					await options.QueryStringCallbackAsync(queryString).ConfigureAwait(false);
-				}
-				else if (options.QueryStringCallback != null)
+				if (options.QueryStringCallback != null)
 				{
 					options.QueryStringCallback(queryString);
 				}
+				else if (options.QueryStringCallbackAsync != null)
+				{
+					throw new NotSupportedException($"Incompatible options of select query builder '{typeof(TSelect).ToPretty()}': '{nameof(DataSourceCountOptions.QueryStringCallbackAsync)}' is not supported in sync method.");
+				}
 			}
 
-			IAsyncEnumerable<TSelect>? cursor = null;
 			try
 			{
 				command.CommandText = queryString;
 				command.CommandType = CommandType.Text;
+				command.Connection ??= connection;
+				command.Connection ??= DataContext.AsNpgsqlDataSource().OpenConnection();
+				command.Transaction ??= transaction;
 
-				connection ??= await DataContext.AsNpgsqlDataSource().OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
-				command.Connection = connection;
-				command.Transaction = transaction;
-
-				cursor = GetAsyncEnumerable<TSelect>(command, options?.Connection == null, cancellationToken);
-
-				if (options?.ObtainLastPageMarker == true)
-				{
-					return new DSAsyncCursorWithLastPageMarker<TSelect>(cursor, take, cancellationToken);
-				}
-				else
-				{
-					return new DSAsyncCursor<TSelect>(cursor, cancellationToken);
-				}
+				return options?.ObtainLastPageMark == true
+					? new DSAsyncCursorWithLastPageMark<TSelect>(command, connection == null, take, cancellationToken)
+					: new DSAsyncCursor<TSelect>(command, connection == null, cancellationToken);
 			}
 			catch
 			{
-				cursor = null;
-				throw;
-			}
-			finally
-			{
-				if (cursor == null)
+				if (connection == null)
 				{
-					await command.DisposeAsync().ConfigureAwait(false);
-
-					if (connection != null && options?.Connection == null)
-					{
-						await connection.DisposeAsync().ConfigureAwait(false);
-					}
+					connection = command.Connection;
 				}
+				else
+				{
+					connection = null;
+				}
+
+				command.Dispose();
+				connection?.Dispose();
+
+				throw;
 			}
 		}
 		else/*  if (top.ContainerOperation == ContainerOperations.Exec) */

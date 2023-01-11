@@ -148,16 +148,19 @@ internal sealed class UpdateQueryBuilder<TDoc, TUpdate> : QueryBuilder<TDoc, TUp
 					{
 						command.CommandText = queryString;
 						command.CommandType = CommandType.Text;
+						command.Connection ??= connection;
+						command.Connection ??= await DataContext.AsNpgsqlDataSource().OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
+						command.Transaction ??= transaction;
 
-						connection ??= await DataContext.AsNpgsqlDataSource().OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
-						command.Connection = connection;
-						command.Transaction = transaction;
-
-						await foreach (var result in GetAsyncEnumerable<TDoc>(command, options?.Connection == null, cancellationToken))
+						await using (var cursor = new DSAsyncCursor<TDoc>(command, connection == null, cancellationToken))
 						{
 							command = null;
 							connection = null;
-							return result;
+
+							if (await cursor.MoveNextAsync(CommandBehavior.SingleRow, cancellationToken))
+							{
+								return cursor.Current;
+							}
 						}
 
 						throw EX.QueryBuilder.Make.OperationFailedNoSuchRecord(QueryBuilderType.ToString(), id.ToString(), Builder.DocInfo.DocumentType.ToPretty());
@@ -169,7 +172,7 @@ internal sealed class UpdateQueryBuilder<TDoc, TUpdate> : QueryBuilder<TDoc, TUp
 							await command.DisposeAsync().ConfigureAwait(false);
 						}
 
-						if (connection != null && options?.Connection == null)
+						if (connection != null)
 						{
 							await connection.DisposeAsync().ConfigureAwait(false);
 						}
@@ -225,7 +228,7 @@ internal sealed class UpdateQueryBuilder<TDoc, TUpdate> : QueryBuilder<TDoc, TUp
 
 				connection ??= await DataContext.AsNpgsqlDataSource().OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
 				command.Connection = connection;
-				command.Transaction = transaction;
+				command.Transaction ??= transaction;
 
 				if (options?.FetchResultDocument == true)
 				{

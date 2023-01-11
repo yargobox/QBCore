@@ -1,16 +1,17 @@
 using System.Data;
 using System.Runtime.CompilerServices;
-using Microsoft.EntityFrameworkCore;
-using QBCore.Extensions.Threading.Tasks;
+using Dapper;
+using Npgsql;
 
 namespace QBCore.DataSource;
 
 internal class DSAsyncCursorWithLastPageMark<T> : IDSAsyncCursor<T>
 {
-	private IQueryable<T>? _queryable;
-	private IAsyncEnumerator<T>? _asyncEnumerator;
-	private IEnumerator<T>? _syncEnumerator;
+	private NpgsqlCommand? _command;
+	private NpgsqlDataReader? _dataReader;
+	private Func<IDataReader, T>? _rowParser;
 	private T _current;
+	private readonly bool _disposeConnection;
 	private readonly CancellationToken _cancellationToken;
 	private int _take;
 	private Action<bool>? _callback;
@@ -19,8 +20,8 @@ internal class DSAsyncCursorWithLastPageMark<T> : IDSAsyncCursor<T>
 	public CancellationToken CancellationToken => _cancellationToken;
 
 	public bool ObtainsLastPage => true;
-	public bool IsLastPageAvailable => _queryable == null;
-	public bool IsLastPage => _queryable == null ? _take >= 0 : throw NotAvailableYet();
+	public bool IsLastPageAvailable => _command == null;
+	public bool IsLastPage => _command == null ? _take >= 0 : throw NotAvailableYet();
 	public event Action<bool> OnLastPage
 	{
 		add => _callback += value ?? throw new ArgumentNullException(nameof(value));
@@ -36,9 +37,10 @@ internal class DSAsyncCursorWithLastPageMark<T> : IDSAsyncCursor<T>
 		remove => throw NotSupportedByThisCursor();
 	}
 
-	public DSAsyncCursorWithLastPageMark(IQueryable<T> queryable, int take, CancellationToken cancellationToken = default(CancellationToken))
+	public DSAsyncCursorWithLastPageMark(NpgsqlCommand command, bool disposeConnection, int take, CancellationToken cancellationToken = default(CancellationToken))
 	{
-		_queryable = queryable;
+		_command = command;
+		_disposeConnection = disposeConnection;
 		_cancellationToken = cancellationToken;
 		_current = default(T)!;
 		_take = take < 0 ? int.MaxValue : take;
@@ -46,15 +48,15 @@ internal class DSAsyncCursorWithLastPageMark<T> : IDSAsyncCursor<T>
 
 	public async ValueTask<bool> MoveNextAsync(CommandBehavior commandBehavior = CommandBehavior.Default, CancellationToken cancellationToken = default(CancellationToken))
 	{
-		if (_asyncEnumerator == null)
+		if (_dataReader == null)
 		{
-			if (_queryable == null) throw new ObjectDisposedException(GetType().FullName);
-			if (_syncEnumerator != null) throw new InvalidOperationException();
+			if (_command == null) throw new ObjectDisposedException(GetType().FullName);
 
-			_asyncEnumerator = _queryable.AsAsyncEnumerable().GetAsyncEnumerator(cancellationToken);
+			_dataReader = await _command.ExecuteReaderAsync(commandBehavior, cancellationToken == default(CancellationToken) ? _cancellationToken : cancellationToken).ConfigureAwait(false);
+			_rowParser = _dataReader.GetRowParser<T>();
 		}
 
-		if (await _asyncEnumerator.MoveNextAsync().ConfigureAwait(false))
+		if (await _dataReader.ReadAsync(cancellationToken == default(CancellationToken) ? _cancellationToken : cancellationToken).ConfigureAwait(false))
 		{
 			if (--_take < 0)
 			{
@@ -67,9 +69,12 @@ internal class DSAsyncCursorWithLastPageMark<T> : IDSAsyncCursor<T>
 				return false;
 			}
 
-			_current = _asyncEnumerator.Current;
+			_current = _rowParser!(_dataReader);
 			return true;
 		}
+
+		while (await _dataReader.NextResultAsync(cancellationToken == default(CancellationToken) ? _cancellationToken : cancellationToken).ConfigureAwait(false))
+		{ }
 
 		if (_take >= 0 && _callback != null)
 		{
@@ -82,15 +87,15 @@ internal class DSAsyncCursorWithLastPageMark<T> : IDSAsyncCursor<T>
 
 	public bool MoveNext(CommandBehavior commandBehavior = CommandBehavior.Default, CancellationToken cancellationToken = default(CancellationToken))
 	{
-		if (_syncEnumerator == null)
+		if (_dataReader == null)
 		{
-			if (_queryable == null) throw new ObjectDisposedException(GetType().FullName);
-			if (_asyncEnumerator != null) throw new InvalidOperationException();
+			if (_command == null) throw new ObjectDisposedException(GetType().FullName);
 
-			_syncEnumerator = _queryable.GetEnumerator();
+			_dataReader = _command.ExecuteReader(commandBehavior);
+			_rowParser = _dataReader.GetRowParser<T>();
 		}
 
-		if (_syncEnumerator.MoveNext())
+		if (_dataReader.Read())
 		{
 			if (--_take < 0)
 			{
@@ -103,9 +108,12 @@ internal class DSAsyncCursorWithLastPageMark<T> : IDSAsyncCursor<T>
 				return false;
 			}
 
-			_current = _syncEnumerator.Current;
+			_current = _rowParser!(_dataReader);
 			return true;
 		}
+
+		while (_dataReader.NextResult())
+		{ }
 
 		if (_take >= 0 && _callback != null)
 		{
@@ -118,53 +126,43 @@ internal class DSAsyncCursorWithLastPageMark<T> : IDSAsyncCursor<T>
 
 	public async ValueTask DisposeAsync()
 	{
-		if (_queryable != null)
+		if (_command != null)
 		{
-			var queryable = _queryable as IDisposable;
-			_queryable = null;
+			var connection = _disposeConnection ? _command.Connection : null;
 
-			var asyncEnumerator = _asyncEnumerator;
-			_asyncEnumerator = null;
+			var command = _command;
+			_command = null;
 
-			var syncEnumerator = _syncEnumerator;
-			_syncEnumerator = null;
+			var dataReader = _dataReader;
+			_dataReader = null;
 
+			_rowParser = null;
 			_callback = null;
 
-			if (asyncEnumerator != null) await asyncEnumerator.DisposeAsync().ConfigureAwait(false);
-			syncEnumerator?.Dispose();
-			queryable?.Dispose();
+			if (dataReader != null) await dataReader.DisposeAsync().ConfigureAwait(false);
+			await command.DisposeAsync().ConfigureAwait(false);
+			if (connection != null) await connection.DisposeAsync().ConfigureAwait(false);
 		}
 	}
 
 	public void Dispose()
 	{
-		if (_queryable != null)
+		if (_command != null)
 		{
-			var queryable = _queryable as IDisposable;
-			_queryable = null;
+			var connection = _disposeConnection ? _command.Connection : null;
 
-			var asyncEnumerator = _asyncEnumerator;
-			_asyncEnumerator = null;
+			var command = _command;
+			_command = null;
 
-			var syncEnumerator = _syncEnumerator;
-			_syncEnumerator = null;
+			var dataReader = _dataReader;
+			_dataReader = null;
 
+			_rowParser = null;
 			_callback = null;
 
-			if (asyncEnumerator != null)
-			{
-				if (asyncEnumerator is IDisposable disposable)
-				{
-					disposable.Dispose();
-				}
-				else
-				{
-					AsyncHelper.RunSync(async () => await asyncEnumerator.DisposeAsync());
-				}
-			}
-			syncEnumerator?.Dispose();
-			queryable?.Dispose();
+			dataReader?.Close();
+			command.Dispose();
+			connection?.Dispose();
 		}
 	}
 

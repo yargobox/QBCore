@@ -28,7 +28,9 @@ public interface ISelectQueryBuilder<TDoc, TSelect> : IQueryBuilder<TDoc, TSelec
 {
 	IQueryable<TDoc> AsQueryable(DataSourceQueryableOptions? options = null);
 	Task<long> CountAsync(DataSourceCountOptions? options = null, CancellationToken cancellationToken = default(CancellationToken));
+	long Count(DataSourceCountOptions? options = null, CancellationToken cancellationToken = default(CancellationToken));
 	Task<IDSAsyncCursor<TSelect>> SelectAsync(long skip = 0L, int take = -1, DataSourceSelectOptions? options = null, CancellationToken cancellationToken = default(CancellationToken));
+	IDSAsyncCursor<TSelect> Select(long skip = 0L, int take = -1, DataSourceSelectOptions? options = null, CancellationToken cancellationToken = default(CancellationToken));
 }
 
 public interface IUpdateQueryBuilder<TDoc, TUpdate> : IQueryBuilder<TDoc, TUpdate>

@@ -172,7 +172,7 @@ internal sealed class InsertQueryBuilder<TDoc, TCreate> : QueryBuilder<TDoc, TCr
 				command.CommandType = CommandType.Text;
 				connection ??= await DataContext.AsNpgsqlDataSource().OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
 				command.Connection = connection;
-				command.Transaction = transaction;
+				command.Transaction ??= transaction;
 
 				if (deId?.Flags.HasAnyFlag(DataEntryFlags.ReadOnly | DataEntryFlags.NoStorage) == true)
 				{

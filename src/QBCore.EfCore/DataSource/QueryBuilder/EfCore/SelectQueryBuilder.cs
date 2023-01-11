@@ -67,6 +67,11 @@ internal sealed partial class SelectQueryBuilder<TDoc, TSelect> : QueryBuilder<T
 		}
 	}
 
+	public long Count(DataSourceCountOptions? options = null, CancellationToken cancellationToken = default(CancellationToken))
+	{
+		throw new NotImplementedException();
+	}
+
 	public async Task<IDSAsyncCursor<TSelect>> SelectAsync(long skip = 0L, int take = -1, DataSourceSelectOptions? options = null, CancellationToken cancellationToken = default(CancellationToken))
 	{
 		if (skip < 0)
@@ -109,7 +114,7 @@ internal sealed partial class SelectQueryBuilder<TDoc, TSelect> : QueryBuilder<T
 		}
 		if (take >= 0)
 		{
-			query = query.Take(take + (options?.ObtainLastPageMarker == true ? 1 : 0));
+			query = query.Take(take + (options?.ObtainLastPageMark == true ? 1 : 0));
 		}
 
 		if (options != null)
@@ -135,14 +140,9 @@ internal sealed partial class SelectQueryBuilder<TDoc, TSelect> : QueryBuilder<T
 
 		try
 		{
-			if (options?.ObtainLastPageMarker == true)
-			{
-				return await Task.FromResult(new DSAsyncCursorWithLastPageMarker<TSelect>(query.AsAsyncEnumerable(), take, cancellationToken));
-			}
-			else
-			{
-				return await Task.FromResult(new DSAsyncCursor<TSelect>(query.AsAsyncEnumerable(), cancellationToken));
-			}
+			return options?.ObtainLastPageMark == true
+				? await Task.FromResult(new DSAsyncCursorWithLastPageMark<TSelect>(query, take, cancellationToken))
+				: await Task.FromResult(new DSAsyncCursor<TSelect>(query, cancellationToken));
 		}
 		finally
 		{
@@ -151,5 +151,10 @@ internal sealed partial class SelectQueryBuilder<TDoc, TSelect> : QueryBuilder<T
 				logger.QueryStringCallback -= options.QueryStringCallback;
 			}
 		}
+	}
+
+	public IDSAsyncCursor<TSelect> Select(long skip = 0L, int take = -1, DataSourceSelectOptions? options = null, CancellationToken cancellationToken = default(CancellationToken))
+	{
+		throw new NotImplementedException();
 	}
 }

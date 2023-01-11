@@ -50,7 +50,7 @@ internal sealed partial class SelectQueryBuilder<TDoc, TSelect> : QueryBuilder<T
 		return Collection.AsQueryable((IClientSessionHandle?)options?.NativeClientSession, (AggregateOptions?)options?.NativeOptions);
 	}
 
-	public async Task<long> CountAsync(DataSourceCountOptions? options = null, CancellationToken cancellationToken = default(CancellationToken))
+	private (List<BsonDocument> query, AggregateOptions? aggregateOptions, IClientSessionHandle? clientSessionHandle) CountImpl(DataSourceCountOptions? options)
 	{
 		if (options != null)
 		{
@@ -221,30 +221,61 @@ internal sealed partial class SelectQueryBuilder<TDoc, TSelect> : QueryBuilder<T
 							} } });
 		}
 
+		return (query, aggregateOptions, clientSessionHandle);
+	}
+
+	public async Task<long> CountAsync(DataSourceCountOptions? options = null, CancellationToken cancellationToken = default(CancellationToken))
+	{
+		var prep = CountImpl(options);
+		
 		if (options != null)
 		{
 			if (options.QueryStringCallbackAsync != null)
 			{
-				var queryString = string.Concat("db.", Builder.Containers.First().DBSideName, ".aggregate(", new BsonArray(query).ToString(), ");");
+				var queryString = string.Concat("db.", Builder.Containers.First().DBSideName, ".aggregate(", new BsonArray(prep.query).ToString(), ");");
 				await options.QueryStringCallbackAsync(queryString).ConfigureAwait(false);
 			}
 			else if (options.QueryStringCallback != null)
 			{
-				var queryString = string.Concat("db.", Builder.Containers.First().DBSideName, ".aggregate(", new BsonArray(query).ToString(), ");");
+				var queryString = string.Concat("db.", Builder.Containers.First().DBSideName, ".aggregate(", new BsonArray(prep.query).ToString(), ");");
 				options.QueryStringCallback(queryString);
 			}
 		}
 
-		using (var cursor = clientSessionHandle == null
-			? await Collection.AggregateAsync<TSelect>(query, aggregateOptions, cancellationToken)
-			: await Collection.AggregateAsync<TSelect>(clientSessionHandle, query, aggregateOptions, cancellationToken))
+		var cursor = prep.clientSessionHandle == null
+			? await Collection.AggregateAsync<TSelect>(prep.query, prep.aggregateOptions, cancellationToken)
+			: await Collection.AggregateAsync<TSelect>(prep.clientSessionHandle, prep.query, prep.aggregateOptions, cancellationToken);
+		
+		var bsonTotalCount = (await cursor.FirstAsync(cancellationToken)).ToBsonDocument();
+		return bsonTotalCount["n"].ToInt64();
+	}
+	
+	public long Count(DataSourceCountOptions? options = null, CancellationToken cancellationToken = default(CancellationToken))
+	{
+		var prep = CountImpl(options);
+
+		if (options != null)
 		{
-			var bsonTotalCount = (await cursor.FirstAsync(cancellationToken)).ToBsonDocument();
-			return bsonTotalCount["n"].ToInt64();
+			if (options.QueryStringCallback != null)
+			{
+				var queryString = string.Concat("db.", Builder.Containers.First().DBSideName, ".aggregate(", new BsonArray(prep.query).ToString(), ");");
+				options.QueryStringCallback(queryString);
+			}
+			else if (options.QueryStringCallbackAsync != null)
+			{
+				throw new NotSupportedException($"Incompatible options of select query builder '{typeof(TSelect).ToPretty()}': '{nameof(DataSourceCountOptions.QueryStringCallbackAsync)}' is not supported in sync method.");
+			}
 		}
+
+		var cursor = prep.clientSessionHandle == null
+			? Collection.Aggregate<TSelect>(prep.query, prep.aggregateOptions, cancellationToken)
+			: Collection.Aggregate<TSelect>(prep.clientSessionHandle, prep.query, prep.aggregateOptions, cancellationToken);
+
+		var bsonTotalCount = cursor.First(cancellationToken).ToBsonDocument();
+		return bsonTotalCount["n"].ToInt64();
 	}
 
-	public async Task<IDSAsyncCursor<TSelect>> SelectAsync(long skip = 0L, int take = -1, DataSourceSelectOptions? options = null, CancellationToken cancellationToken = default(CancellationToken))
+	private (List<BsonDocument> query, AggregateOptions? aggregateOptions, IClientSessionHandle? clientSessionHandle) SelectImpl(long skip, int take, DataSourceSelectOptions? options)
 	{
 		if (skip < 0)
 		{
@@ -275,39 +306,71 @@ internal sealed partial class SelectQueryBuilder<TDoc, TSelect> : QueryBuilder<T
 		}
 		if (take >= 0)
 		{
-			query.Add(new BsonDocument { { "$limit", (uint)take + (options?.ObtainLastPageMarker == true ? 1U : 0U) } });
+			query.Add(new BsonDocument { { "$limit", (uint)take + (options?.ObtainLastPageMark == true ? 1U : 0U) } });
 		}
+
+		return (query, aggregateOptions, clientSessionHandle);
+	}
+
+	public async Task<IDSAsyncCursor<TSelect>> SelectAsync(long skip = 0L, int take = -1, DataSourceSelectOptions? options = null, CancellationToken cancellationToken = default(CancellationToken))
+	{
+		var prep = SelectImpl(skip, take, options);
 
 		if (options != null)
 		{
 			if (options.NativeSelectQueryCallback != null)
 			{
-				options.NativeSelectQueryCallback(query);
+				options.NativeSelectQueryCallback(prep.query);
 			}
 			if (options.QueryStringCallbackAsync != null)
 			{
-				var queryString = string.Concat("db.", Builder.Containers.First().DBSideName, ".aggregate(", new BsonArray(query).ToString(), ");");
+				var queryString = string.Concat("db.", Builder.Containers.First().DBSideName, ".aggregate(", new BsonArray(prep.query).ToString(), ");");
 				await options.QueryStringCallbackAsync(queryString).ConfigureAwait(false);
 			}
 			else if (options.QueryStringCallback != null)
 			{
-				var queryString = string.Concat("db.", Builder.Containers.First().DBSideName, ".aggregate(", new BsonArray(query).ToString(), ");");
+				var queryString = string.Concat("db.", Builder.Containers.First().DBSideName, ".aggregate(", new BsonArray(prep.query).ToString(), ");");
 				options.QueryStringCallback(queryString);
 			}
 		}
 
-		var cursor = clientSessionHandle == null
-			? await Collection.AggregateAsync<TSelect>(query, aggregateOptions, cancellationToken)
-			: await Collection.AggregateAsync<TSelect>(clientSessionHandle, query, aggregateOptions, cancellationToken);
+		var cursor = prep.clientSessionHandle == null
+			? await Collection.AggregateAsync<TSelect>(prep.query, prep.aggregateOptions, cancellationToken)
+			: await Collection.AggregateAsync<TSelect>(prep.clientSessionHandle, prep.query, prep.aggregateOptions, cancellationToken);
 
-		if (options?.ObtainLastPageMarker == true)
+		return options?.ObtainLastPageMark == true
+			? new DSAsyncCursorWithLastPageMark<TSelect>(cursor, take, cancellationToken)
+			: new DSAsyncCursor<TSelect>(cursor, cancellationToken);
+	}
+
+	public IDSAsyncCursor<TSelect> Select(long skip = 0L, int take = -1, DataSourceSelectOptions? options = null, CancellationToken cancellationToken = default(CancellationToken))
+	{
+		var prep = SelectImpl(skip, take, options);
+
+		if (options != null)
 		{
-			return await Task.FromResult(new DSAsyncCursorWithLastPageMarker<TSelect>(cursor, take, cancellationToken));
+			if (options.NativeSelectQueryCallback != null)
+			{
+				options.NativeSelectQueryCallback(prep.query);
+			}
+			if (options.QueryStringCallback != null)
+			{
+				var queryString = string.Concat("db.", Builder.Containers.First().DBSideName, ".aggregate(", new BsonArray(prep.query).ToString(), ");");
+				options.QueryStringCallback(queryString);
+			}
+			else if (options.QueryStringCallbackAsync != null)
+			{
+				throw new NotSupportedException($"Incompatible options of select query builder '{typeof(TSelect).ToPretty()}': '{nameof(DataSourceSelectOptions.QueryStringCallbackAsync)}' is not supported in sync method.");
+			}
 		}
-		else
-		{
-			return await Task.FromResult(new DSAsyncCursor<TSelect>(cursor, cancellationToken));
-		}
+
+		var cursor = prep.clientSessionHandle == null
+			? Collection.Aggregate<TSelect>(prep.query, prep.aggregateOptions, cancellationToken)
+			: Collection.Aggregate<TSelect>(prep.clientSessionHandle, prep.query, prep.aggregateOptions, cancellationToken);
+
+		return options?.ObtainLastPageMark == true
+			? new DSAsyncCursorWithLastPageMark<TSelect>(cursor, take, cancellationToken)
+			: new DSAsyncCursor<TSelect>(cursor, cancellationToken);
 	}
 
 	private static List<StageInfo> BuildSelectPipelineStages(IReadOnlyList<QBContainer> containers, IReadOnlyList<QBCondition> connects, IReadOnlyList<QBCondition> conditions, IReadOnlyList<QBField> fields, IReadOnlyList<QBSortOrder> sortOrders)

@@ -28,7 +28,8 @@ public class DataSourceInsertOptions : DataSourceOperationOptions
 public class DataSourceQueryableOptions : DataSourceOperationOptions { }
 public class DataSourceSelectOptions : DataSourceOperationOptions
 {
-	public bool ObtainLastPageMarker;
+	public bool ObtainLastPageMark;
+	public bool ObtainTotalCount;
 	public Action<object>? NativeSelectQueryCallback;
 }
 public class DataSourceUpdateOptions : DataSourceOperationOptions

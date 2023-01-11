@@ -770,41 +770,6 @@ internal abstract class QueryBuilder<TDoc, TDto> : IQueryBuilder<TDoc, TDto> whe
 
 	#endregion
 
-	protected static async IAsyncEnumerable<T> GetAsyncEnumerable<T>(NpgsqlCommand command, bool disposeConnection, [EnumeratorCancellation] CancellationToken cancellationToken)
-	{
-		NpgsqlDataReader? dataReader = null;
-		try
-		{
-			dataReader = await command.ExecuteReaderAsync().ConfigureAwait(false);
-
-			var rowParser = dataReader.GetRowParser<T>();
-
-			while (await dataReader.ReadAsync(cancellationToken).ConfigureAwait(false))
-			{
-				yield return rowParser(dataReader);
-			}
-
-			while (await dataReader.NextResultAsync().ConfigureAwait(false))
-			{ }
-		}
-		finally
-		{
-			var connection = command.Connection;
-
-			if (dataReader != null)
-			{
-				await dataReader.DisposeAsync().ConfigureAwait(false);
-			}
-
-			await command.DisposeAsync().ConfigureAwait(false);
-
-			if (disposeConnection && connection != null)
-			{
-				await connection.DisposeAsync().ConfigureAwait(false);
-			}
-		}
-	}
-
 	/// <summary>
 	/// Slice the conditions to the smalest possible parts separated by AND
 	/// </summary>

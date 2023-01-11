@@ -1,7 +1,7 @@
 namespace QBCore.DataSource;
 
 [Flags]
-public enum DataSourceOptions
+public enum DataSourceOptions : ulong
 {
 	None = 0,
 	CanInsert = 1,

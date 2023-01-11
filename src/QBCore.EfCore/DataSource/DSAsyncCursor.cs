@@ -1,58 +1,134 @@
+using System.Data;
+using System.Runtime.CompilerServices;
+using Microsoft.EntityFrameworkCore;
+using QBCore.Extensions.Threading.Tasks;
+
 namespace QBCore.DataSource;
 
-internal sealed class DSAsyncCursor<T> : IDSAsyncCursor<T>, IAsyncDisposable
+internal class DSAsyncCursor<T> : IDSAsyncCursor<T>
 {
-	private readonly AsyncCursorAdapter<T> _cursor;
+	private IQueryable<T>? _queryable;
+	private IAsyncEnumerator<T>? _asyncEnumerator;
+	private IEnumerator<T>? _syncEnumerator;
+	private T _current;
 	private readonly CancellationToken _cancellationToken;
 
+	public T Current => _current;
 	public CancellationToken CancellationToken => _cancellationToken;
-	public IEnumerable<T> Current => _cursor.Current;
 
-	public bool ObtainsLastPageMarker => false;
-	public bool IsLastPageMarkerAvailable => false;
-	public bool LastPageMarker => throw new InvalidOperationException("LastPageMarker is not acknowledged by this cursor!");
-	public Action<bool>? LastPageMarkerCallback
+	public bool ObtainsLastPage => false;
+	public bool IsLastPageAvailable => throw NotSupportedByThisCursor();
+	public bool IsLastPage => throw NotSupportedByThisCursor();
+	public event Action<bool> OnLastPage
 	{
-		get => throw new InvalidOperationException("LastPageMarker is not acknowledged by this cursor!");
-		set => throw new InvalidOperationException("LastPageMarker is not acknowledged by this cursor!");
+		add => throw NotSupportedByThisCursor();
+		remove => throw NotSupportedByThisCursor();
 	}
 
 	public bool ObtainsTotalCount => false;
-	public bool IsTotalCountAvailable => false;
-	public long TotalCount => throw new InvalidOperationException("TotalCount is not obtained by this cursor!");
-	public Action<long>? TotalCountCallback
+	public bool IsTotalCountAvailable => throw NotSupportedByThisCursor();
+	public long TotalCount => throw NotSupportedByThisCursor();
+	public event Action<long> OnTotalCount
 	{
-		get => throw new InvalidOperationException("TotalCount is not obtained by this cursor!");
-		set => throw new InvalidOperationException("TotalCount is not obtained by this cursor!");
+		add => throw NotSupportedByThisCursor();
+		remove => throw NotSupportedByThisCursor();
 	}
 
-	public DSAsyncCursor(IAsyncEnumerable<T> cursor, CancellationToken cancellationToken)
+	public DSAsyncCursor(IQueryable<T> queryable, CancellationToken cancellationToken = default(CancellationToken))
 	{
-		_cursor = new AsyncCursorAdapter<T>(cursor, 20);
+		_queryable = queryable;
 		_cancellationToken = cancellationToken;
+		_current = default(T)!;
 	}
 
-	public bool MoveNext(CancellationToken cancellationToken = default(CancellationToken))
+	public async ValueTask<bool> MoveNextAsync(CommandBehavior commandBehavior = CommandBehavior.Default, CancellationToken cancellationToken = default(CancellationToken))
 	{
-		if (cancellationToken == default(CancellationToken)) cancellationToken = _cancellationToken;
+		if (_asyncEnumerator == null)
+		{
+			if (_queryable == null) throw new ObjectDisposedException(GetType().FullName);
+			if (_syncEnumerator != null) throw new InvalidOperationException();
 
-		return _cursor.MoveNext(cancellationToken);
+			_asyncEnumerator = _queryable.AsAsyncEnumerable().GetAsyncEnumerator(cancellationToken);
+		}
+
+		if (await _asyncEnumerator.MoveNextAsync().ConfigureAwait(false))
+		{
+			_current = _asyncEnumerator.Current;
+			return true;
+		}
+
+		await DisposeAsync().ConfigureAwait(false);
+		return false;
 	}
 
-	public async ValueTask<bool> MoveNextAsync(CancellationToken cancellationToken = default(CancellationToken))
+	public bool MoveNext(CommandBehavior commandBehavior = CommandBehavior.Default, CancellationToken cancellationToken = default(CancellationToken))
 	{
-		if (cancellationToken == default(CancellationToken)) cancellationToken = _cancellationToken;
+		if (_syncEnumerator == null)
+		{
+			if (_queryable == null) throw new ObjectDisposedException(GetType().FullName);
+			if (_asyncEnumerator != null) throw new InvalidOperationException();
 
-		return await _cursor.MoveNextAsync(cancellationToken).ConfigureAwait(false);
-	}
+			_syncEnumerator = _queryable.GetEnumerator();
+		}
 
-	public void Dispose()
-	{
-		_cursor.Dispose();
+		if (_syncEnumerator.MoveNext())
+		{
+			_current = _syncEnumerator.Current;
+			return true;
+		}
+
+		Dispose();
+		return false;
 	}
 
 	public async ValueTask DisposeAsync()
 	{
-		await _cursor.DisposeAsync().ConfigureAwait(false);
+		if (_queryable != null)
+		{
+			var queryable = _queryable as IDisposable;
+			_queryable = null;
+
+			var asyncEnumerator = _asyncEnumerator;
+			_asyncEnumerator = null;
+
+			var syncEnumerator = _syncEnumerator;
+			_syncEnumerator = null;
+
+			if (asyncEnumerator != null) await asyncEnumerator.DisposeAsync().ConfigureAwait(false);
+			syncEnumerator?.Dispose();
+			queryable?.Dispose();
+		}
 	}
+
+	public void Dispose()
+	{
+		if (_queryable != null)
+		{
+			var queryable = _queryable as IDisposable;
+			_queryable = null;
+
+			var asyncEnumerator = _asyncEnumerator;
+			_asyncEnumerator = null;
+
+			var syncEnumerator = _syncEnumerator;
+			_syncEnumerator = null;
+
+			if (asyncEnumerator != null)
+			{
+				if (asyncEnumerator is IDisposable disposable)
+				{
+					disposable.Dispose();
+				}
+				else
+				{
+					AsyncHelper.RunSync(async () => await asyncEnumerator.DisposeAsync());
+				}
+			}
+			syncEnumerator?.Dispose();
+			queryable?.Dispose();
+		}
+	}
+
+	static NotSupportedException NotSupportedByThisCursor([CallerMemberName] string memberName = "")
+		=> new NotSupportedException($"Property or method '{memberName}' is not supported by this cursor!");
 }

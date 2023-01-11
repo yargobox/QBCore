@@ -1,20 +1,22 @@
+using System.Data;
+
 namespace QBCore.DataSource;
 
-public interface IDSAsyncCursor<out T> : IDisposable
+public interface IDSAsyncCursor<out T> : IAsyncDisposable, IDisposable
 {
-	IEnumerable<T> Current { get; }
-	bool MoveNext(CancellationToken cancellationToken = default(CancellationToken));
-	ValueTask<bool> MoveNextAsync(CancellationToken cancellationToken = default(CancellationToken));
-
+	T Current { get; }
 	CancellationToken CancellationToken { get; }
 
-	bool ObtainsLastPageMarker { get; }
-	bool IsLastPageMarkerAvailable { get; }
-	bool LastPageMarker { get; }
-	Action<bool>? LastPageMarkerCallback { get; set; }
+	bool ObtainsLastPage { get; }
+	bool IsLastPageAvailable { get; }
+	bool IsLastPage { get; }
+	event Action<bool> OnLastPage;
 
 	bool ObtainsTotalCount { get; }
 	bool IsTotalCountAvailable { get; }
 	long TotalCount { get; }
-	Action<long>? TotalCountCallback { get; set; }
+	event Action<long> OnTotalCount;
+
+	ValueTask<bool> MoveNextAsync(CommandBehavior commandBehavior = CommandBehavior.Default, CancellationToken cancellationToken = default(CancellationToken));
+	bool MoveNext(CommandBehavior commandBehavior = CommandBehavior.Default, CancellationToken cancellationToken = default(CancellationToken));
 }

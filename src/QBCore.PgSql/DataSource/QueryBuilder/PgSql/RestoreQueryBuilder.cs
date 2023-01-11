@@ -131,7 +131,7 @@ internal sealed class RestoreQueryBuilder<TDoc, TRestore> : QueryBuilder<TDoc, T
 
 				connection ??= await DataContext.AsNpgsqlDataSource().OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
 				command.Connection = connection;
-				command.Transaction = transaction;
+				command.Transaction ??= transaction;
 
 				var rowsAffected = await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
 				if (rowsAffected == 0)
