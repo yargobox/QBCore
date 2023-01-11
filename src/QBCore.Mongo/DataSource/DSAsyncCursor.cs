@@ -1,6 +1,6 @@
 using System.Data;
-using System.Runtime.CompilerServices;
 using MongoDB.Driver;
+using QBCore.Extensions.Internals;
 
 namespace QBCore.DataSource;
 
@@ -14,21 +14,21 @@ internal class DSAsyncCursor<T> : IDSAsyncCursor<T>
 	public CancellationToken CancellationToken => _cancellationToken;
 
 	public bool ObtainsLastPage => false;
-	public bool IsLastPageAvailable => throw NotSupportedByThisCursor();
-	public bool IsLastPage => throw NotSupportedByThisCursor();
+	public bool IsLastPageAvailable => throw EX.DataSource.Make.PropertyOrMethodNotSupportedByThisCursor();
+	public bool IsLastPage => throw EX.DataSource.Make.PropertyOrMethodNotSupportedByThisCursor();
 	public event Action<bool> OnLastPage
 	{
-		add => throw NotSupportedByThisCursor();
-		remove => throw NotSupportedByThisCursor();
+		add => throw EX.DataSource.Make.PropertyOrMethodNotSupportedByThisCursor();
+		remove => throw EX.DataSource.Make.PropertyOrMethodNotSupportedByThisCursor();
 	}
 
 	public bool ObtainsTotalCount => false;
-	public bool IsTotalCountAvailable => throw NotSupportedByThisCursor();
-	public long TotalCount => throw NotSupportedByThisCursor();
+	public bool IsTotalCountAvailable => throw EX.DataSource.Make.PropertyOrMethodNotSupportedByThisCursor();
+	public long TotalCount => throw EX.DataSource.Make.PropertyOrMethodNotSupportedByThisCursor();
 	public event Action<long> OnTotalCount
 	{
-		add => throw NotSupportedByThisCursor();
-		remove => throw NotSupportedByThisCursor();
+		add => throw EX.DataSource.Make.PropertyOrMethodNotSupportedByThisCursor();
+		remove => throw EX.DataSource.Make.PropertyOrMethodNotSupportedByThisCursor();
 	}
 
 	public DSAsyncCursor(IAsyncCursor<T> cursor, CancellationToken cancellationToken = default(CancellationToken))
@@ -124,7 +124,4 @@ internal class DSAsyncCursor<T> : IDSAsyncCursor<T>
 			cursor?.Dispose();
 		}
 	}
-
-	static NotSupportedException NotSupportedByThisCursor([CallerMemberName] string memberName = "")
-		=> new NotSupportedException($"Property or method '{memberName}' is not supported by this cursor!");
 }

@@ -1,6 +1,6 @@
 using System.Data;
-using System.Runtime.CompilerServices;
 using MongoDB.Driver;
+using QBCore.Extensions.Internals;
 
 namespace QBCore.DataSource;
 
@@ -17,20 +17,25 @@ internal class DSAsyncCursorWithLastPageMark<T> : IDSAsyncCursor<T>
 
 	public bool ObtainsLastPage => true;
 	public bool IsLastPageAvailable => _cursor == null;
-	public bool IsLastPage => _cursor == null ? _take >= 0 : throw NotAvailableYet();
+	public bool IsLastPage => _cursor == null ? _take >= 0 : throw EX.DataSource.Make.PropertyOrMethodIsNotAvailableYet();
 	public event Action<bool> OnLastPage
 	{
-		add => _callback += value ?? throw new ArgumentNullException(nameof(value));
-		remove => _callback -= value ?? throw new ArgumentNullException(nameof(value));
+		add
+		{
+			if (_callback != null) throw EX.DataSource.Make.EventHandlerIsAlreadySetMoreThanOneIsNotSupported();
+
+			_callback = value ?? throw new ArgumentNullException(nameof(value));
+		}
+		remove => _callback = null;
 	}
 
 	public bool ObtainsTotalCount => false;
-	public bool IsTotalCountAvailable => throw NotSupportedByThisCursor();
-	public long TotalCount => throw NotSupportedByThisCursor();
+	public bool IsTotalCountAvailable => throw EX.DataSource.Make.PropertyOrMethodNotSupportedByThisCursor();
+	public long TotalCount => throw EX.DataSource.Make.PropertyOrMethodNotSupportedByThisCursor();
 	public event Action<long> OnTotalCount
 	{
-		add => throw NotSupportedByThisCursor();
-		remove => throw NotSupportedByThisCursor();
+		add => throw EX.DataSource.Make.PropertyOrMethodNotSupportedByThisCursor();
+		remove => throw EX.DataSource.Make.PropertyOrMethodNotSupportedByThisCursor();
 	}
 
 	public DSAsyncCursorWithLastPageMark(IAsyncCursor<T> cursor, int take, CancellationToken cancellationToken = default(CancellationToken))
@@ -161,9 +166,4 @@ internal class DSAsyncCursorWithLastPageMark<T> : IDSAsyncCursor<T>
 			cursor?.Dispose();
 		}
 	}
-
-	static NotSupportedException NotSupportedByThisCursor([CallerMemberName] string memberName = "")
-		=> new NotSupportedException($"Property or method '{memberName}' is not supported by this cursor!");
-	static InvalidOperationException NotAvailableYet([CallerMemberName] string memberName = "")
-		=> new InvalidOperationException($"{nameof(IsLastPage)} is not available yet!");
 }
