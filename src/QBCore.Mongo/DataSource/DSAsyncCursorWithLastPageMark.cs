@@ -20,13 +20,8 @@ internal class DSAsyncCursorWithLastPageMark<T> : IDSAsyncCursor<T>
 	public bool IsLastPage => _cursor == null ? _take >= 0 : throw EX.DataSource.Make.PropertyOrMethodIsNotAvailableYet();
 	public event Action<bool> OnLastPage
 	{
-		add
-		{
-			if (_callback != null) throw EX.DataSource.Make.EventHandlerIsAlreadySetMoreThanOneIsNotSupported();
-
-			_callback = value ?? throw new ArgumentNullException(nameof(value));
-		}
-		remove => _callback = null;
+		add => _callback += value;
+		remove => _callback -= value;
 	}
 
 	public bool ObtainsTotalCount => false;

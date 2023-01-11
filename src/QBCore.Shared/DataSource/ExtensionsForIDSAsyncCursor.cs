@@ -669,11 +669,11 @@ public static class ExtensionsForIDSAsyncCursor
 	}
 
 	/// <summary>
-    /// Sets a callback action to get the total number of rows. It is called when a cursor reaches the end.
+    /// Sets a callback action to get the total number of rows. It is called when a cursor reaches the first row.
     /// </summary>
     /// <typeparam name="T">The type of the elements of source.</typeparam>
     /// <param name="source">An <see cref="IDSAsyncCursor{T}"/> to return the total number of rows of.</param>
-    /// <param name="totalCountCallback">Callback action to call when the cursor reaches the end.</param>
+    /// <param name="totalCountCallback">Callback action to call when the cursor reaches the the first row.</param>
     /// <exception cref="ArgumentNullException"><paramref name="source"/> or <paramref name="totalCountCallback"/> is null.</exception>
 	/// <exception cref="NotSupportedException">Obtaining the total number of rows is not supported by <paramref name="source"/>.</exception>
 	public static IDSAsyncCursor<T> GetTotalCount<T>(this IDSAsyncCursor<T> source, Action<long> totalCountCallback)
