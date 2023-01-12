@@ -120,7 +120,7 @@ internal sealed partial class SelectQueryBuilder<TDoc, TSelect> : QueryBuilder<T
 			var sb = new StringBuilder();
 			var command = new NpgsqlCommand();
 
-			BuildSelectQuery(sb, skip, take >= 0 && options?.ObtainLastPageMark == true ? take + 1 : take, command.Parameters);
+			BuildSelectQuery(sb, skip, take >= 0 && options?.ObtainLastPageMark == true ? take + 1 : take, options?.ObtainTotalCount == true, command.Parameters);
 
 			queryString = sb.ToString();
 
@@ -146,7 +146,9 @@ internal sealed partial class SelectQueryBuilder<TDoc, TSelect> : QueryBuilder<T
 
 				return options?.ObtainLastPageMark == true
 					? new DSAsyncCursorWithLastPageMark<TSelect>(command, connection == null, take, cancellationToken)
-					: new DSAsyncCursor<TSelect>(command, connection == null, cancellationToken);
+					: options?.ObtainTotalCount == true
+						? new DSAsyncCursorWithTotalCount<TSelect>(command, connection == null, skip, cancellationToken)
+						: new DSAsyncCursor<TSelect>(command, connection == null, cancellationToken);
 			}
 			catch
 			{
@@ -189,6 +191,11 @@ internal sealed partial class SelectQueryBuilder<TDoc, TSelect> : QueryBuilder<T
 		NpgsqlTransaction? transaction = null;
 		if (options != null)
 		{
+			if (options.ObtainLastPageMark && options.ObtainTotalCount)
+			{
+				throw new ArgumentException(nameof(options.ObtainLastPageMark));
+			}
+
 			if (options.Connection != null)
 			{
 				connection = (options.Connection as NpgsqlConnection) ?? throw new ArgumentException(nameof(options.Connection));
@@ -210,7 +217,7 @@ internal sealed partial class SelectQueryBuilder<TDoc, TSelect> : QueryBuilder<T
 			var sb = new StringBuilder();
 			var command = new NpgsqlCommand();
 
-			BuildSelectQuery(sb, skip, take >= 0 && options?.ObtainLastPageMark == true ? take + 1 : take, command.Parameters);
+			BuildSelectQuery(sb, skip, take >= 0 && options?.ObtainLastPageMark == true ? take + 1 : take, options?.ObtainTotalCount == true, command.Parameters);
 
 			queryString = sb.ToString();
 
@@ -236,7 +243,9 @@ internal sealed partial class SelectQueryBuilder<TDoc, TSelect> : QueryBuilder<T
 
 				return options?.ObtainLastPageMark == true
 					? new DSAsyncCursorWithLastPageMark<TSelect>(command, connection == null, take, cancellationToken)
-					: new DSAsyncCursor<TSelect>(command, connection == null, cancellationToken);
+					: options?.ObtainTotalCount == true
+						? new DSAsyncCursorWithTotalCount<TSelect>(command, connection == null, skip, cancellationToken)
+						: new DSAsyncCursor<TSelect>(command, connection == null, cancellationToken);
 			}
 			catch
 			{
@@ -261,7 +270,7 @@ internal sealed partial class SelectQueryBuilder<TDoc, TSelect> : QueryBuilder<T
 		}
 	}
 
-	private void BuildSelectQuery(StringBuilder sb, long skip, int take, NpgsqlParameterCollection commandParams)
+	private void BuildSelectQuery(StringBuilder sb, long skip, int take, bool obtainTotalCount, NpgsqlParameterCollection commandParams)
 	{
 		var top = Builder.Containers.First();
 		var topDbo = ExtensionsForSql.ParseDbObjectName(top.DBSideName);
@@ -272,6 +281,10 @@ internal sealed partial class SelectQueryBuilder<TDoc, TSelect> : QueryBuilder<T
 		Func<string?, DEPath, string> getDBSideName = topAlias.Length > 0
 			? GetQuotedDBSideName
 			: (alias, fieldPath) => GetQuotedDBSideName(alias == top.Alias ? null : alias, fieldPath);
+
+		if (obtainTotalCount)
+			sb
+				.Append("WITH ____cte AS (").AppendLine();
 
 		foreach (var container in Builder.Containers)
 		{
@@ -317,8 +330,6 @@ internal sealed partial class SelectQueryBuilder<TDoc, TSelect> : QueryBuilder<T
 				{
 					sb.Append(" AS ").Append(container.Alias);
 				}
-
-				sb.AppendLine();
 			}
 			else if (container.ContainerOperation == ContainerOperations.Join || container.ContainerOperation == ContainerOperations.LeftJoin)
 			{
@@ -328,14 +339,12 @@ internal sealed partial class SelectQueryBuilder<TDoc, TSelect> : QueryBuilder<T
 						.AppendContainer(container).Append(" AS ").Append(container.Alias).Append(" ON ");
 
 				BuildConditionTree(sb, Builder.Connects, getDBSideName, Builder.Parameters, commandParams);
-
-				sb.AppendLine();
 			}
 			else if (container.ContainerOperation == ContainerOperations.CrossJoin)
 			{
 				sb
 					.AppendLine()
-					.Append("CROSS JOIN ").AppendContainer(container).Append(" AS ").Append(container.Alias).AppendLine();
+					.Append("CROSS JOIN ").AppendContainer(container).Append(" AS ").Append(container.Alias);
 			}
 			else
 			{
@@ -345,12 +354,16 @@ internal sealed partial class SelectQueryBuilder<TDoc, TSelect> : QueryBuilder<T
 
 		if (Builder.Conditions.Count > 0)
 		{
-			sb.Append("WHERE ");
+			sb.AppendLine().Append("WHERE ");
 
 			BuildConditionTree(sb, Builder.Conditions, getDBSideName, Builder.Parameters, commandParams);
-
-			sb.AppendLine();
 		}
+
+		if (obtainTotalCount)
+			sb
+				.AppendLine()
+				.Append(") SELECT * FROM (").AppendLine()
+				.Append("\tTABLE ____cte");
 
 		next = false;
 		foreach (var sort in Builder.SortOrders)
@@ -362,7 +375,7 @@ internal sealed partial class SelectQueryBuilder<TDoc, TSelect> : QueryBuilder<T
 			else
 			{
 				next = true;
-				sb.Append("ORDER BY ");
+				sb.AppendLine().Append(obtainTotalCount ? "\t" : "").Append("ORDER BY ");
 			}
 
 			if (sort.Alias.Length == 0)
@@ -402,15 +415,14 @@ internal sealed partial class SelectQueryBuilder<TDoc, TSelect> : QueryBuilder<T
 				throw new NotSupportedException($"{Builder.DataLayer.Name} does not support the sort order operation '{sort.SortOrder.ToString()}'.");
 			}
 		}
-		if (next) sb.AppendLine();
 
-		if (take >= 0)
-		{
-			sb.Append("LIMIT ").Append(take).AppendLine();
-		}
-		if (skip > 0)
-		{
-			sb.Append("OFFSET ").Append(skip).AppendLine();
-		}
+		if (take >= 0) sb.AppendLine().Append(obtainTotalCount ? "\t" : "").Append("LIMIT ").Append(take);
+		if (skip > 0) sb.AppendLine().Append(obtainTotalCount ? "\t" : "").Append("OFFSET ").Append(skip);
+
+		if (obtainTotalCount)
+			sb
+				.AppendLine()
+				.Append(") ____result").AppendLine()
+				.Append("RIGHT JOIN (SELECT count(*) FROM ____cte) c(").Append(DSAsyncCursorWithTotalCount<TSelect>.TotalCountFieldName).Append(") ON true");
 	}
 }

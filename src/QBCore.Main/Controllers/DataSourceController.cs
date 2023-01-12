@@ -66,13 +66,15 @@ public class DataSourceController<TKey, TCreate, TSelect, TUpdate, TDelete, TRes
 		};
 		var options = new DataSourceSelectOptions
 		{
-			ObtainLastPageMark = true,
+			//ObtainLastPageMark = true,
+			ObtainTotalCount = true,
 			QueryStringCallback = x => Console.WriteLine(x)//!!!
 		};
 
 		dataSourceResponse.Data =
 			await ( await _ds.SelectAsync(softDelMode, filterConditions, sortOrders, null, skip, psize ?? -1, options) )
-				.GetLastPageMark(isLastPage => dataSourceResponse.IsLastPage = isLastPage ? 1 : 0)
+				//.GetLastPageMark(isLastPage => dataSourceResponse.IsLastPage = isLastPage ? 1 : 0)
+				.GetTotalCount(totalCount => dataSourceResponse.TotalCount = totalCount)
 				.ToListAsync();
 
 		return Ok(dataSourceResponse);
