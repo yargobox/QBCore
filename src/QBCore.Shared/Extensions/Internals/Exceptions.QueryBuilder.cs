@@ -26,6 +26,9 @@ public static class ExtensionsForEXQueryBuilder
 	public static InvalidOperationException QueryBuilderMustHaveAtLeastOneCondition(this EX.QueryBuilder _, string dataLayerName, string queryBuilderType)
 		=> new InvalidOperationException($"{dataLayerName} {queryBuilderType} query builder must have at least one condition.");
 	
+	public static InvalidOperationException QueryBuilderRequiresMapper(this EX.QueryBuilder _, string dataLayerName, string queryBuilderType, string documentType)
+		=> new InvalidOperationException($"{dataLayerName} {queryBuilderType} query builder of '{documentType}' requires a mapper.");
+	
 	public static InvalidOperationException DocumentDoesNotHaveIdDataEntry(this EX.QueryBuilder _, string documentType)
 		=> new InvalidOperationException($"Document '{documentType}' does not have an id data entry.");
 	
