@@ -4,7 +4,7 @@ internal static class ExtensionsForSql
 {
 	public static string GetDBSideName(this DEPath path)
 	{
-		return ((SqlDEInfo)path.Single())?.DBSideName!;
+		return ((SqlDEInfo)path.Single()).DBSideName;
 	}
 
 	public static (string Schema, string Object) ParseDbObjectName(string dbObjectName)

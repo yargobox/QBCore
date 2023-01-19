@@ -21,7 +21,7 @@ public interface IQueryBuilder<TDoc, TDto> : IQueryBuilder
 
 public interface IInsertQueryBuilder<TDoc, TCreate> : IQueryBuilder<TDoc, TCreate>
 {
-	Task<TDoc> InsertAsync(TDoc document, DataSourceInsertOptions? options = null, CancellationToken cancellationToken = default(CancellationToken));
+	Task<object> InsertAsync(TCreate document, DataSourceInsertOptions? options = null, CancellationToken cancellationToken = default(CancellationToken));
 }
 
 public interface ISelectQueryBuilder<TDoc, TSelect> : IQueryBuilder<TDoc, TSelect>

@@ -17,9 +17,9 @@ internal sealed class InsertQueryBuilder<TDoc, TCreate> : QueryBuilder<TDoc, TCr
 		builder.Normalize();
 	}
 
-	public async Task<TDoc> InsertAsync(TDoc document, DataSourceInsertOptions? options = null, CancellationToken cancellationToken = default(CancellationToken))
+	public async Task<object> InsertAsync(TCreate dto, DataSourceInsertOptions? options = null, CancellationToken cancellationToken = default(CancellationToken))
 	{
-		if (document is null) throw EX.QueryBuilder.Make.DocumentNotSpecified(nameof(document));
+		if (dto is null) throw EX.QueryBuilder.Make.DocumentNotSpecified(nameof(dto));
 
 		var top = Builder.Containers.FirstOrDefault();
 		if (top?.ContainerOperation != ContainerOperations.Insert && top?.ContainerOperation != ContainerOperations.Exec)
@@ -48,20 +48,21 @@ internal sealed class InsertQueryBuilder<TDoc, TCreate> : QueryBuilder<TDoc, TCr
 
 		if (top.ContainerOperation == ContainerOperations.Insert)
 		{
-			var deId = (SqlDEInfo?)Builder.DocInfo.IdField;
-			var deCreated = (SqlDEInfo?)Builder.DocInfo.DateCreatedField;
-			var deModified = (SqlDEInfo?)Builder.DocInfo.DateModifiedField;
-
-			var sb = new StringBuilder();
-
-			sb.Append("INSERT INTO ").AppendContainer(top);
-
+			var deDocId = (SqlDEInfo?)Builder.DocInfo.IdField;
+			var dtoInfo = Builder.DtoInfo ?? Builder.DocInfo;
+			var deId = (SqlDEInfo?)dtoInfo.IdField;
+			var deCreated = (SqlDEInfo?)dtoInfo.DateCreatedField;
+			var deModified = (SqlDEInfo?)dtoInfo.DateModifiedField;
 			var command = new NpgsqlCommand();
 			bool isSetValue, isCreatedSet = false, isModifiedSet = false, next = false;
 			object? value;
 			QBParameter? param;
+			string queryString;
+			var sb = new StringBuilder();
 
-			foreach (var de in Builder.DocInfo.DataEntries.Values.Cast<SqlDEInfo>())
+			sb.Append("INSERT INTO ").AppendContainer(top);
+
+			foreach (var de in dtoInfo.DataEntries.Values.Cast<SqlDEInfo>())
 			{
 				if (de.Flags.HasAnyFlag(DataEntryFlags.ReadOnly | DataEntryFlags.NoStorage))
 				{
@@ -69,7 +70,7 @@ internal sealed class InsertQueryBuilder<TDoc, TCreate> : QueryBuilder<TDoc, TCr
 				}
 
 				isSetValue = true;
-				value = de.Getter(document);
+				value = de.Getter(dto);
 
 				if (de == deCreated)
 				{
@@ -84,24 +85,24 @@ internal sealed class InsertQueryBuilder<TDoc, TCreate> : QueryBuilder<TDoc, TCr
 				{
 					if (next) sb.Append(", "); else { next = true; sb.Append('('); }
 
-					sb.Append('"').Append(de.DBSideName!).Append('"');
+					sb.Append('"').Append(de.DBSideName).Append('"');
 
 					param = Builder.Parameters.FirstOrDefault(x => x.ParameterName == de.Name);
 					command.Parameters.Add(MakeUnnamedParameter(param, value));
 				}
 			}
 
-			if (deCreated != null && !isCreatedSet && !deCreated.Flags.HasAnyFlag(DataEntryFlags.ReadOnly))
+			if (deCreated != null && !isCreatedSet && !deCreated.Flags.HasAnyFlag(DataEntryFlags.ReadOnly | DataEntryFlags.NoStorage))
 			{
 				if (next) sb.Append(", "); else { next = true; sb.Append('('); }
 
-				sb.Append('"').Append(deCreated.DBSideName!).Append('"');
+				sb.Append('"').Append(deCreated.DBSideName).Append('"');
 			}
-			if (deModified != null && !isModifiedSet && !deModified.Flags.HasAnyFlag(DataEntryFlags.ReadOnly))
+			if (deModified != null && !isModifiedSet && !deModified.Flags.HasAnyFlag(DataEntryFlags.ReadOnly | DataEntryFlags.NoStorage))
 			{
 				if (next) sb.Append(", "); else { next = true; sb.Append('('); }
 
-				sb.Append('"').Append(deModified.DBSideName!).Append('"');
+				sb.Append('"').Append(deModified.DBSideName).Append('"');
 			}
 
 			if (next)
@@ -116,13 +117,13 @@ internal sealed class InsertQueryBuilder<TDoc, TCreate> : QueryBuilder<TDoc, TCr
 					sb.Append("$").Append(i);
 				}
 
-				if (deCreated != null && !isCreatedSet && !deCreated.Flags.HasAnyFlag(DataEntryFlags.ReadOnly))
+				if (deCreated != null && !isCreatedSet && !deCreated.Flags.HasAnyFlag(DataEntryFlags.ReadOnly | DataEntryFlags.NoStorage))
 				{
 					if (i++ > 1) sb.Append(", ");
 
 					sb.Append("NOW()");
 				}
-				if (deModified != null && !isModifiedSet && !deModified.Flags.HasAnyFlag(DataEntryFlags.ReadOnly))
+				if (deModified != null && !isModifiedSet && !deModified.Flags.HasAnyFlag(DataEntryFlags.ReadOnly | DataEntryFlags.NoStorage))
 				{
 					if (i++ > 1) sb.Append(", ");
 
@@ -139,20 +140,39 @@ internal sealed class InsertQueryBuilder<TDoc, TCreate> : QueryBuilder<TDoc, TCr
 					sb.AppendLine().Append("RETURNING ");
 
 					next = false;
-					foreach (var de in deId.DependsOn.Select(x => Builder.DocInfo.DataEntries[x]).Cast<SqlDEInfo>())
+					foreach (var de in deId.DependsOn.Select(x => dtoInfo.DataEntries[x]).Cast<SqlDEInfo>())
 					{
 						if (next) sb.Append(", "); else next = true;
 
 						sb.Append('"').Append(de.DBSideName).Append('"');
 					}
 				}
-				else if (deId.Setter != null)
+				else
 				{
 					sb.AppendLine().Append("RETURNING \"").Append(deId.DBSideName).Append('"');
 				}
 			}
+			else if (deId != deDocId && deDocId?.Flags.HasAnyFlag(DataEntryFlags.ReadOnly | DataEntryFlags.NoStorage) == true)
+			{
+				if (deDocId.DependsOn != null)
+				{
+					sb.AppendLine().Append("RETURNING ");
 
-			var queryString = sb.ToString();
+					next = false;
+					foreach (var de in deDocId.DependsOn.Select(x => Builder.DocInfo.DataEntries[x]).Cast<SqlDEInfo>())
+					{
+						if (next) sb.Append(", "); else next = true;
+
+						sb.Append('"').Append(de.DBSideName).Append('"');
+					}
+				}
+				else
+				{
+					sb.AppendLine().Append("RETURNING \"").Append(deDocId.DBSideName).Append('"');
+				}
+			}
+
+			queryString = sb.ToString();
 
 			if (options != null)
 			{
@@ -179,23 +199,52 @@ internal sealed class InsertQueryBuilder<TDoc, TCreate> : QueryBuilder<TDoc, TCr
 					if (deId.DependsOn != null)
 					{
 						await using var dataReader = await command.ExecuteReaderAsync(CommandBehavior.SingleRow, cancellationToken).ConfigureAwait(false);
-						if (!await dataReader.NextResultAsync(cancellationToken).ConfigureAwait(false))
+						if (!await dataReader.ReadAsync(cancellationToken).ConfigureAwait(false))
 						{
 							throw new InvalidOperationException();
 						}
 
-						foreach (var de in deId.DependsOn.Select(x => Builder.DocInfo.DataEntries[x]).Cast<SqlDEInfo>())
+						foreach (var de in deId.DependsOn.Select(x => dtoInfo.DataEntries[x]).Cast<SqlDEInfo>())
 						{
 							if (de.Setter != null)
 							{
-								de.Setter(document, dataReader[de.DBSideName!]);
+								de.Setter(dto, dataReader[de.Name]);
 							}
 						}
+
+						while (await dataReader.NextResultAsync(cancellationToken).ConfigureAwait(false)) { }
+
+						value = deId.Getter(dto);
+					}
+					else
+					{
+						value = await command.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false);
+					}
+				}
+				else if (deId != deDocId && deDocId?.Flags.HasAnyFlag(DataEntryFlags.ReadOnly | DataEntryFlags.NoStorage) == true)
+				{
+					if (deDocId.DependsOn != null)
+					{
+						await using var dataReader = await command.ExecuteReaderAsync(CommandBehavior.SingleRow, cancellationToken).ConfigureAwait(false);
+						if (!await dataReader.ReadAsync(cancellationToken).ConfigureAwait(false))
+						{
+							throw new InvalidOperationException();
+						}
+
+						foreach (var de in deDocId.DependsOn.Select(x => Builder.DocInfo.DataEntries[x]).Cast<SqlDEInfo>())
+						{
+							if (de.Setter != null)
+							{
+								de.Setter(dto, dataReader[de.Name]);
+							}
+						}
+
+						while (await dataReader.NextResultAsync(cancellationToken).ConfigureAwait(false)) { }
 					}
 					else if (deId.Setter != null)
 					{
 						value = await command.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false);
-						deId.Setter(document, value);
+						deId.Setter(dto, value);
 					}
 					else
 					{
@@ -206,6 +255,8 @@ internal sealed class InsertQueryBuilder<TDoc, TCreate> : QueryBuilder<TDoc, TCr
 				{
 					await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
 				}
+
+				return value ?? throw new InvalidOperationException();
 			}
 			finally
 			{
@@ -217,7 +268,7 @@ internal sealed class InsertQueryBuilder<TDoc, TCreate> : QueryBuilder<TDoc, TCr
 				}
 			}
 
-			return document;
+			return dto;
 		}
 		else/*  if (top.ContainerOperation == ContainerOperations.Exec) */
 		{

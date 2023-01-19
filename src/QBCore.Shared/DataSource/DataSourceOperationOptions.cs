@@ -11,6 +11,7 @@ public class DataSourceOperationOptions
 	public Func<string, Task>? QueryStringCallbackAsync;
 	public DbConnection? Connection;
 	public DbTransaction? Transaction;
+	public Delegate? DocumentMapper;
 }
 
 public class DataSourceIdGeneratorOptions : DataSourceOperationOptions { }

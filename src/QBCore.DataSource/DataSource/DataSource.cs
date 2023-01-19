@@ -23,8 +23,10 @@ public abstract partial class DataSource<TKey, TDoc, TCreate, TSelect, TUpdate, 
 	public IDSInfo DSInfo { get; }
 	public object SyncRoot => _syncRoot ?? Interlocked.CompareExchange(ref _syncRoot, new object(), null) ?? _syncRoot;
 
+	protected IMapper Mapper => _mapper ?? (_mapper = _serviceProvider.GetRequiredService<IMapper>());
+
 	private readonly IServiceProvider _serviceProvider;
-	private readonly IMapper _mapper;
+	private IMapper? _mapper;
 	private readonly IDataContext _dataContext;
 	private DSKeyName? _okeyName;
 	protected List<DataSourceListener<TKey, TDoc, TCreate, TSelect, TUpdate, TDelete, TRestore>>? _listeners;
@@ -36,7 +38,6 @@ public abstract partial class DataSource<TKey, TDoc, TCreate, TSelect, TUpdate, 
 		DSInfo = StaticFactory.DataSources[typeof(TDataSource)];
 
 		_serviceProvider = serviceProvider;
-		_mapper = _serviceProvider.GetRequiredService<IMapper>();
 		var dataContextProvider = (IDataContextProvider) _serviceProvider.GetRequiredService(DSInfo.QBFactory.DataLayer.DataContextProviderInterfaceType);
 		_dataContext = dataContextProvider.GetDataContext(DSInfo.DataContextName);
 
@@ -82,21 +83,17 @@ public abstract partial class DataSource<TKey, TDoc, TCreate, TSelect, TUpdate, 
 			}
 		}
 
-		TDoc result;
-		if (typeof(TDoc) != typeof(TCreate))
+		if (qb.Builder.IsDocumentMapperRequired)
 		{
-			result = _mapper.Map<TDoc>(document);
-			result = await qb.InsertAsync(result, options, cancellationToken).ConfigureAwait(false);
+			options ??= new DataSourceInsertOptions();
+			options.DocumentMapper ??= TDoc (TCreate dto) => Mapper.Map<TCreate, TDoc>(dto);
 		}
-		else
-		{
-			result = (TDoc)(object)document!;
-			result = await qb.InsertAsync(result, options, cancellationToken).ConfigureAwait(false);
-		}
+
+		var result = await qb.InsertAsync(document, options, cancellationToken).ConfigureAwait(false);
 
 		UpdateOutputParameters(parameters, builder.Parameters);
 
-		return (TKey) getId(result!)!;
+		return (TKey) result;
 	}
 
 	public IQueryable<TDoc> AsQueryable(DataSourceQueryableOptions? options = null)

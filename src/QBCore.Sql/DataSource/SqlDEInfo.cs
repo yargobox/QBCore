@@ -4,7 +4,7 @@ namespace QBCore.DataSource;
 
 internal sealed class SqlDEInfo : DEInfo
 {
-	public string? DBSideName { get; }
+	public string DBSideName { get; }
 
 	public SqlDEInfo(SqlDocumentInfo document, MemberInfo memberInfo, DataEntryFlags flags)
 		: base(document, memberInfo, flags)

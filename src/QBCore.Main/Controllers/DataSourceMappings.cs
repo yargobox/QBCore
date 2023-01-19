@@ -6,53 +6,21 @@ namespace QBCore.Controllers;
 
 public class DataSourceMappings : Profile
 {
-	public DataSourceMappings()
+	public DataSourceMappings() : this((_, _) => true)
 	{
-		foreach (var info in StaticFactory.DataSources.Values)
-		{
-			if (info.DSTypeInfo.TCreate != info.DSTypeInfo.TDoc && info.DSTypeInfo.TCreate != typeof(NotSupported) && info.Options.HasFlag(DataSourceOptions.CanInsert))
-			{
-				CreateMap(info.DSTypeInfo.TCreate, info.DSTypeInfo.TDoc);
-			}
-			if (info.DSTypeInfo.TUpdate != info.DSTypeInfo.TDoc && info.DSTypeInfo.TUpdate != typeof(NotSupported) && info.Options.HasFlag(DataSourceOptions.CanUpdate))
-			{
-				CreateMap(info.DSTypeInfo.TUpdate, info.DSTypeInfo.TDoc);
-			}
-			if (info.DSTypeInfo.TSelect != info.DSTypeInfo.TSelect && info.DSTypeInfo.TSelect != typeof(NotSupported) && info.Options.HasFlag(DataSourceOptions.CanSelect))
-			{
-				CreateMap(info.DSTypeInfo.TDoc, info.DSTypeInfo.TSelect);
-			}
-		}
 	}
 
-	public DataSourceMappings(Func<Type, Type, bool> createDefaultMap)
+	public DataSourceMappings(Func<Type, Type, bool> createMapSelector)
 	{
-		if (createDefaultMap == null)
-		{
-			throw new ArgumentNullException(nameof(createDefaultMap));
-		}
+		if (createMapSelector == null) throw new ArgumentNullException(nameof(createMapSelector));
 
 		foreach (var info in StaticFactory.DataSources.Values)
 		{
 			if (info.DSTypeInfo.TCreate != info.DSTypeInfo.TDoc && info.DSTypeInfo.TCreate != typeof(NotSupported) && info.Options.HasFlag(DataSourceOptions.CanInsert))
 			{
-				if (createDefaultMap(info.DSTypeInfo.TCreate, info.DSTypeInfo.TDoc))
+				if (createMapSelector(info.DSTypeInfo.TCreate, info.DSTypeInfo.TDoc))
 				{
 					CreateMap(info.DSTypeInfo.TCreate, info.DSTypeInfo.TDoc);
-				}
-			}
-			if (info.DSTypeInfo.TUpdate != info.DSTypeInfo.TDoc && info.DSTypeInfo.TUpdate != typeof(NotSupported) && info.Options.HasFlag(DataSourceOptions.CanUpdate))
-			{
-				if (createDefaultMap(info.DSTypeInfo.TUpdate, info.DSTypeInfo.TDoc))
-				{
-					CreateMap(info.DSTypeInfo.TUpdate, info.DSTypeInfo.TDoc);
-				}
-			}
-			if (info.DSTypeInfo.TSelect != info.DSTypeInfo.TDoc && info.DSTypeInfo.TSelect != typeof(NotSupported) && info.Options.HasFlag(DataSourceOptions.CanSelect))
-			{
-				if (createDefaultMap(info.DSTypeInfo.TDoc, info.DSTypeInfo.TSelect))
-				{
-					CreateMap(info.DSTypeInfo.TDoc, info.DSTypeInfo.TSelect);
 				}
 			}
 		}

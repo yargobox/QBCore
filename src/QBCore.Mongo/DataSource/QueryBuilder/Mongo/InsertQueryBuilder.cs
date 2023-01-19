@@ -15,8 +15,10 @@ internal sealed class InsertQueryBuilder<TDoc, TCreate> : QueryBuilder<TDoc, TCr
 		building.Normalize();
 	}
 
-	public async Task<TDoc> InsertAsync(TDoc document, DataSourceInsertOptions? options = null, CancellationToken cancellationToken = default(CancellationToken))
+	public async Task<object> InsertAsync(TCreate dto, DataSourceInsertOptions? options = null, CancellationToken cancellationToken = default(CancellationToken))
 	{
+		if (dto is null) throw EX.QueryBuilder.Make.DocumentNotSpecified(nameof(dto));
+
 		var top = Builder.Containers.First();
 		if (top.ContainerOperation != ContainerOperations.Insert)
 		{
@@ -35,21 +37,51 @@ internal sealed class InsertQueryBuilder<TDoc, TCreate> : QueryBuilder<TDoc, TCr
 			}
 		}
 
+		TDoc document;
+		if (typeof(TDoc) == typeof(TCreate))
+		{
+			document = ConvertTo<TDoc>.From(dto);
+		}
+		else if (options?.DocumentMapper != null)
+		{
+			if (options.DocumentMapper is not Func<TCreate, TDoc> mapper)
+			{
+				throw new ArgumentException(nameof(DataSourceInsertOptions.DocumentMapper));
+			}
+
+			document = mapper(dto);
+		}
+		else if (Builder.IsDocumentMapperRequired)
+		{
+			throw EX.QueryBuilder.Make.QueryBuilderRequiresMapper(Builder.DataLayer.Name, QueryBuilderType.ToString(), typeof(TDoc).ToPretty());
+		}
+		else
+		{
+			document = ConvertTo<TDoc>.MapFrom(dto);
+		}
+
 		var collection = _mongoDbContext.AsMongoDatabase().GetCollection<TDoc>(top.DBSideName);
 
 		var insertOneOptions = (InsertOneOptions?)options?.NativeOptions;
 		var clientSessionHandle = (IClientSessionHandle?)options?.NativeClientSession;
 
-		var deId = (MongoDEInfo?)Builder.DocInfo.IdField;
+		var deId = (MongoDEInfo?)Builder.DocInfo.IdField
+			?? throw EX.QueryBuilder.Make.DocumentDoesNotHaveIdDataEntry(Builder.DocInfo.DocumentType.ToPretty());
 		var deCreated = (MongoDEInfo?)Builder.DocInfo.DateCreatedField;
 		var deModified = (MongoDEInfo?)Builder.DocInfo.DateModifiedField;
 
-		var customIdGenerator = Builder.IdGenerator != null ? Builder.IdGenerator() : null;
-		var generateId = customIdGenerator != null && deId?.Setter != null && customIdGenerator.IsEmpty(deId.Getter(document!));
-		object id;
+		object? id = null;
+		var generator = Builder.IdGenerator != null ? Builder.IdGenerator() : null;
+		var useGenerator = generator != null && deId.Setter != null;
+		if (useGenerator)
+		{
+			id = deId.Getter(document!)!;
+			useGenerator = generator!.IsEmpty(id);
+		}
+
 		DataSourceIdGeneratorOptions? generatorOptions = null;
 
-		if (generateId && options != null)
+		if (useGenerator && options != null)
 		{
 			generatorOptions = options.GeneratorOptions ?? new DataSourceIdGeneratorOptions();
 			generatorOptions.NativeClientSession ??= options.NativeClientSession;
@@ -57,12 +89,12 @@ internal sealed class InsertQueryBuilder<TDoc, TCreate> : QueryBuilder<TDoc, TCr
 			generatorOptions.QueryStringCallbackAsync ??= options.QueryStringCallbackAsync;
 		}
 
-		for (int i = 0; ; )
+		for (int attempt = 0; ; )
 		{
-			if (generateId)
+			if (useGenerator)
 			{
-				id = await customIdGenerator!.GenerateIdAsync(collection, document!, generatorOptions, cancellationToken);
-				deId!.Setter!(document!, id);
+				id = await generator!.GenerateIdAsync(collection, document!, generatorOptions, cancellationToken);
+				deId.Setter!(document!, id);
 			}
 
 			if (deCreated?.Flags.HasFlag(DataEntryFlags.ReadOnly) == false && deCreated.Setter != null)
@@ -118,11 +150,11 @@ internal sealed class InsertQueryBuilder<TDoc, TCreate> : QueryBuilder<TDoc, TCr
 					await collection.InsertOneAsync(clientSessionHandle, document, insertOneOptions, cancellationToken);
 				}
 
-				return document;
+				return useGenerator ? id! : deId.Getter(document!)!;
 			}
 			catch (MongoWriteException ex) when (ex.WriteError.Category == ServerErrorCategory.DuplicateKey)
 			{
-				if (generateId && ++i < customIdGenerator!.MaxAttempts)
+				if (useGenerator && ++attempt < generator!.MaxAttempts)
 				{
 					continue;
 				}

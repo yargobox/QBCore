@@ -14,17 +14,44 @@ internal sealed class InsertQueryBuilder<TDoc, TCreate> : QueryBuilder<TDoc, TCr
 		building.Normalize();
 	}
 
-	public async Task<TDoc> InsertAsync(TDoc document, DataSourceInsertOptions? options = null, CancellationToken cancellationToken = default(CancellationToken))
+	public async Task<object> InsertAsync(TCreate dto, DataSourceInsertOptions? options = null, CancellationToken cancellationToken = default(CancellationToken))
 	{
+		if (dto is null) throw EX.QueryBuilder.Make.DocumentNotSpecified(nameof(dto));
+
 		var top = Builder.Containers.First();
 		if (top.ContainerOperation != ContainerOperations.Insert)
 		{
 			throw EX.QueryBuilder.Make.QueryBuilderOperationNotSupported(Builder.DataLayer.Name, QueryBuilderType.ToString(), top?.ContainerOperation.ToString());
 		}
 
+		TDoc document;
+		if (typeof(TDoc) == typeof(TCreate))
+		{
+			document = ConvertTo<TDoc>.From(dto);
+		}
+		else if (options?.DocumentMapper != null)
+		{
+			if (options.DocumentMapper is not Func<TCreate, TDoc> mapper)
+			{
+				throw new ArgumentException(nameof(DataSourceInsertOptions.DocumentMapper));
+			}
+
+			document = mapper(dto);
+		}
+		else if (Builder.IsDocumentMapperRequired)
+		{
+			throw EX.QueryBuilder.Make.QueryBuilderRequiresMapper(Builder.DataLayer.Name, QueryBuilderType.ToString(), typeof(TDoc).ToPretty());
+		}
+		else
+		{
+			document = ConvertTo<TDoc>.MapFrom(dto);
+		}
+
 		var dbContext = _dataContext.AsDbContext();
 		var logger = dbContext as IEfCoreDbContextLogger;
 
+		var deId = (EfCoreDEInfo?)Builder.DocInfo.IdField
+			?? throw EX.QueryBuilder.Make.DocumentDoesNotHaveIdDataEntry(Builder.DocInfo.DocumentType.ToPretty());
 		var deCreated = (EfCoreDEInfo?)Builder.DocInfo.DateCreatedField;
 		var deModified = (EfCoreDEInfo?)Builder.DocInfo.DateModifiedField;
 
@@ -57,7 +84,7 @@ internal sealed class InsertQueryBuilder<TDoc, TCreate> : QueryBuilder<TDoc, TCr
 			await dbContext.AddAsync<TDoc>(document, cancellationToken);
 			await dbContext.SaveChangesAsync(cancellationToken);
 
-			return document;
+			return deId.Getter(document)!;
 		}
 		finally
 		{

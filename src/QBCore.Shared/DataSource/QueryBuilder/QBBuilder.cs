@@ -52,6 +52,7 @@ public abstract class QBBuilder<TDoc, TDto> : IQBBuilder
 	public DSDocumentInfo? DtoInfo => _dtoInfo;
 	public bool IsNormalized { get => (_state & 1) == 1; protected set => _state = value ? (_state | 1) : (_state & ~3); }
 	public bool IsPrepared { get => (_state & 3) == 3; protected set => _state = value ? (_state | 2) : (_state & ~2); }
+	public bool IsDocumentMapperRequired { get => (_state & 4) == 4; set => _state = value ? (_state | 4) : (_state & ~4); }
 
 	public virtual IReadOnlyList<QBContainer> Containers => EmptyLists.Containers;
 	public virtual IReadOnlyList<QBCondition> Connects => EmptyLists.Conditions;
@@ -103,6 +104,12 @@ public abstract class QBBuilder<TDoc, TDto> : IQBBuilder
 	protected virtual void OnPrepare() { }
 
 	public virtual Func<IDSIdGenerator>? IdGenerator { get => throw new NotSupportedException(); set => throw new NotSupportedException(); }
+
+	public virtual QBBuilder<TDoc, TDto> DocumentMapperRequired()
+	{
+		IsDocumentMapperRequired = true;
+		return this;
+	}
 
 	public virtual QBBuilder<TDoc, TDto> Insert(string? tableName = null) => throw new NotSupportedException();
 	public virtual QBBuilder<TDoc, TDto> Update(string? tableName = null) => throw new NotSupportedException();
