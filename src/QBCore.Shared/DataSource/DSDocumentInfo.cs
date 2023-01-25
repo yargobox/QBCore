@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations.Schema;
 using System.Reflection;
 using QBCore.ObjectFactory;
 
@@ -57,19 +58,19 @@ public abstract class DSDocumentInfo
 				IdField = de.Value;
 			}
 			
-			if (de.Value.Flags.HasFlag(DataEntryFlags.DateCreatedField))
+			if (de.Value.Flags.HasFlag(DataEntryFlags.CreatedAtField))
 			{
 				DateCreatedField = de.Value;
 			}
-			else if (de.Value.Flags.HasFlag(DataEntryFlags.DateModifiedField))
+			else if (de.Value.Flags.HasFlag(DataEntryFlags.ModifiedAtField))
 			{
 				DateModifiedField = de.Value;
 			}
-			else if (de.Value.Flags.HasFlag(DataEntryFlags.DateUpdatedField))
+			else if (de.Value.Flags.HasFlag(DataEntryFlags.UpdatedAtField))
 			{
 				DateUpdatedField = de.Value;
 			}
-			else if (de.Value.Flags.HasFlag(DataEntryFlags.DateDeletedField))
+			else if (de.Value.Flags.HasFlag(DataEntryFlags.DeletedAtField))
 			{
 				DateDeletedField = de.Value;
 			}
@@ -102,56 +103,65 @@ public abstract class DSDocumentInfo
 
 		foreach (var propertyInfo in documentType.GetProperties(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.GetProperty))
 		{
+			if (propertyInfo.GetMethod == null)
+			{
+				continue;
+			}
+
 			flags = DataEntryFlags.None;
 
-			if (propertyInfo.IsDefined(typeof(DeIdAttribute), true))
+			if (propertyInfo.IsDefined(typeof(DeIdAttribute), false))
 			{
 				flags |= DataEntryFlags.IdField;
 			}
-			if (propertyInfo.IsDefined(typeof(DeReadOnlyAttribute), true))
+			if (propertyInfo.IsDefined(typeof(DeReadOnlyAttribute), false))
 			{
 				flags |= DataEntryFlags.ReadOnly;
 			}
-			if (propertyInfo.IsDefined(typeof(DeCreatedAttribute), true))
+			if (propertyInfo.IsDefined(typeof(DeCreatedAttribute), false))
 			{
-				flags |= DataEntryFlags.DateCreatedField;
+				flags |= DataEntryFlags.CreatedAtField;
 			}
-			else if (propertyInfo.IsDefined(typeof(DeModifiedAttribute), true))
+			else if (propertyInfo.IsDefined(typeof(DeModifiedAttribute), false))
 			{
-				flags |= DataEntryFlags.DateModifiedField;
+				flags |= DataEntryFlags.ModifiedAtField;
 			}
-			else if (propertyInfo.IsDefined(typeof(DeUpdatedAttribute), true))
+			else if (propertyInfo.IsDefined(typeof(DeUpdatedAttribute), false))
 			{
-				flags |= DataEntryFlags.DateUpdatedField;
+				flags |= DataEntryFlags.UpdatedAtField;
 			}
-			else if (propertyInfo.IsDefined(typeof(DeDeletedAttribute), true))
+			else if (propertyInfo.IsDefined(typeof(DeDeletedAttribute), false))
 			{
-				flags |= DataEntryFlags.DateDeletedField;
+				flags |= DataEntryFlags.DeletedAtField;
 			}
-			if (propertyInfo.IsDefined(typeof(DeForeignIdAttribute), true))
+			if (propertyInfo.IsDefined(typeof(DeForeignIdAttribute), false))
 			{
 				flags |= DataEntryFlags.ForeignId;
 			}
-			if (propertyInfo.IsDefined(typeof(DeNoStorageAttribute), true))
+			if (propertyInfo.IsDefined(typeof(NotMappedAttribute), false))
 			{
-				flags |= DataEntryFlags.NoStorage;
+				flags |= DataEntryFlags.NotMapped;
 			}
-			if (propertyInfo.IsDefined(typeof(DeViewNameAttribute), true))
+			if (propertyInfo.IsDefined(typeof(DeNameAttribute), false))
 			{
 				flags |= DataEntryFlags.DocumentName;
 			}
-			if (propertyInfo.IsDefined(typeof(DeDependsOnAttribute), true))
+			if (propertyInfo.IsDefined(typeof(DeDependsOnAttribute), false))
 			{
 				flags |= DataEntryFlags.Dependent;
+			}
+			if (propertyInfo.IsDefined(typeof(DeHiddenAttribute), false))
+			{
+				flags |= DataEntryFlags.Hidden;
 			}
 
 			if (flags == DataEntryFlags.None)
 			{
-				if (propertyInfo.SetMethod == null && !propertyInfo.IsDefined(typeof(DeDataEntryAttribute), true))
+				if (propertyInfo.SetMethod == null && !propertyInfo.IsDefined(typeof(ColumnAttribute), false))
 				{
 					continue;
 				}
-				if (propertyInfo.IsDefined(typeof(DeIgnoreAttribute), true))
+				if (propertyInfo.IsDefined(typeof(DeIgnoreAttribute), false))
 				{
 					continue;
 				}
@@ -164,48 +174,52 @@ public abstract class DSDocumentInfo
 		{
 			flags = DataEntryFlags.None;
 
-			if (fieldInfo.IsDefined(typeof(DeIdAttribute), true))
+			if (fieldInfo.IsDefined(typeof(DeIdAttribute), false))
 			{
 				flags |= DataEntryFlags.IdField;
 			}
-			if (fieldInfo.IsDefined(typeof(DeReadOnlyAttribute), true))
+			if (fieldInfo.IsDefined(typeof(DeReadOnlyAttribute), false))
 			{
 				flags |= DataEntryFlags.ReadOnly;
 			}
-			if (fieldInfo.IsDefined(typeof(DeCreatedAttribute), true))
+			if (fieldInfo.IsDefined(typeof(DeCreatedAttribute), false))
 			{
-				flags |= DataEntryFlags.DateCreatedField;
+				flags |= DataEntryFlags.CreatedAtField;
 			}
-			else if (fieldInfo.IsDefined(typeof(DeModifiedAttribute), true))
+			else if (fieldInfo.IsDefined(typeof(DeModifiedAttribute), false))
 			{
-				flags |= DataEntryFlags.DateModifiedField;
+				flags |= DataEntryFlags.ModifiedAtField;
 			}
-			else if (fieldInfo.IsDefined(typeof(DeUpdatedAttribute), true))
+			else if (fieldInfo.IsDefined(typeof(DeUpdatedAttribute), false))
 			{
-				flags |= DataEntryFlags.DateUpdatedField;
+				flags |= DataEntryFlags.UpdatedAtField;
 			}
-			else if (fieldInfo.IsDefined(typeof(DeDeletedAttribute), true))
+			else if (fieldInfo.IsDefined(typeof(DeDeletedAttribute), false))
 			{
-				flags |= DataEntryFlags.DateDeletedField;
+				flags |= DataEntryFlags.DeletedAtField;
 			}
-			if (fieldInfo.IsDefined(typeof(DeForeignIdAttribute), true))
+			if (fieldInfo.IsDefined(typeof(DeForeignIdAttribute), false))
 			{
 				flags |= DataEntryFlags.ForeignId;
 			}
-			if (fieldInfo.IsDefined(typeof(DeNoStorageAttribute), true))
+			if (fieldInfo.IsDefined(typeof(NotMappedAttribute), false))
 			{
-				flags |= DataEntryFlags.NoStorage;
+				flags |= DataEntryFlags.NotMapped;
 			}
-			if (fieldInfo.IsDefined(typeof(DeViewNameAttribute), true))
+			if (fieldInfo.IsDefined(typeof(DeNameAttribute), false))
 			{
 				flags |= DataEntryFlags.DocumentName;
 			}
-			if (fieldInfo.IsDefined(typeof(DeDependsOnAttribute), true))
+			if (fieldInfo.IsDefined(typeof(DeDependsOnAttribute), false))
 			{
 				flags |= DataEntryFlags.Dependent;
 			}
+			if (fieldInfo.IsDefined(typeof(DeHiddenAttribute), false))
+			{
+				flags |= DataEntryFlags.Hidden;
+			}
 
-			if (flags == DataEntryFlags.None && !fieldInfo.IsDefined(typeof(DeDataEntryAttribute), true))
+			if (flags == DataEntryFlags.None && !fieldInfo.IsDefined(typeof(ColumnAttribute), false))
 			{
 				continue;
 			}

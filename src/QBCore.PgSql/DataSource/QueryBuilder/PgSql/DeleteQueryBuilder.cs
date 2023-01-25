@@ -79,7 +79,7 @@ internal sealed class DeleteQueryBuilder<TDoc, TDelete> : QueryBuilder<TDoc, TDe
 			}
 
             //sb.Append("WITH deleted AS (");
-            sb.Append("DELETE FROM ").AppendContainer(top).AppendLine().Append("WHERE ");
+            sb.Append("DELETE FROM ").AppendQuotedContainer(top).AppendLine().Append("WHERE ");
 			BuildConditionTree(sb, Builder.Conditions, GetQuotedDBSideNameWithoutAlias, Builder.Parameters, command.Parameters);
 			//sb.Append(" RETURNING *) SELECT count(*) FROM deleted");
 

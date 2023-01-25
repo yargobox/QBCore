@@ -4,7 +4,11 @@ internal static class ExtensionsForSql
 {
 	public static string GetDBSideName(this DEPath path)
 	{
-		return ((SqlDEInfo)path.Single()).DBSideName;
+		if (path == null) throw new ArgumentNullException(nameof(path));
+		if (path.Count != 1) throw new ArgumentOutOfRangeException(nameof(path));
+		if (path[0] is not SqlDEInfo de) throw new ArgumentException(nameof(path));
+
+		return de.DBSideName;
 	}
 
 	public static (string Schema, string Object) ParseDbObjectName(string dbObjectName)

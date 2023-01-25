@@ -92,7 +92,7 @@ internal sealed class SoftDelQueryBuilder<TDoc, TDelete> : QueryBuilder<TDoc, TD
 				}
 			}
 
-			sb.Append("UPDATE ").AppendContainer(top).Append(" SET").AppendLine();
+			sb.Append("UPDATE ").AppendQuotedContainer(top).Append(" SET").AppendLine();
 			sb.Append("\t\"").Append(deDeleted.DBSideName).Append("\" = ");
 			
 			if (isDeletedSet)

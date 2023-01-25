@@ -7,7 +7,7 @@ namespace Example1.DAL.Entities.Products;
 public class ProductSelectDto
 {
 	[DeId] public int? Id { get; set; }
-	[DeViewName] public string? Name { get; set; }
+	[DeName] public string? Name { get; set; }
 
 	[DeForeignId] public int? BrandId { get; set; }
 	public BrandSelectDto? Brand { get; set; }

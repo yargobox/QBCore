@@ -15,6 +15,7 @@ var builder = appBuilder.Services
 		{
 			RoutePrefix = "api/"
 		});
+		//options.ModelBinderProviders.Insert(0, new QBCoreEntityBinderProvider());
 		
 	})
 	.AddApplicationPart(typeof(Develop.Entities.DVP.Project).Assembly)

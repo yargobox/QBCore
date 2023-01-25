@@ -205,7 +205,7 @@ internal abstract class SqlSelectQBBuilder<TDoc, TSelect> : QBBuilder<TDoc, TSel
 		}
 
 		alias ??= ExtensionsForSql.ParseDbObjectName(dbSideName).Object;
-		if (string.IsNullOrEmpty(alias))
+		if (string.IsNullOrWhiteSpace(alias))
 		{
 			throw new ArgumentException(nameof(alias));
 		}
@@ -547,7 +547,7 @@ internal abstract class SqlSelectQBBuilder<TDoc, TSelect> : QBBuilder<TDoc, TSel
 		{
 			throw new ArgumentNullException(nameof(field));
 		}
-		if (field.Count == 0 || field.DocumentType != typeof(TSelect))
+		if (field.Count != 1 || field.DocumentType != typeof(TSelect))
 		{
 			throw new ArgumentException(nameof(field));
 		}
@@ -555,7 +555,7 @@ internal abstract class SqlSelectQBBuilder<TDoc, TSelect> : QBBuilder<TDoc, TSel
 		{
 			throw new ArgumentNullException(nameof(refField));
 		}
-		if (refField.Count > 0 && refField.DocumentType != typeof(TRef))
+		if (refField.Count != 1 || refField.DocumentType != typeof(TRef))
 		{
 			throw new ArgumentException(nameof(refField));
 		}
@@ -574,8 +574,7 @@ internal abstract class SqlSelectQBBuilder<TDoc, TSelect> : QBBuilder<TDoc, TSel
 		{
 			_fields = new List<QBField>(8);
 		}
-
-		if (_fields.Any(x => x.Field.Path == field.Path))
+		else if (_fields.Any(x => x.Field.Path == field.Path))
 		{
 			throw new InvalidOperationException($"Incorrect field definition of select query builder '{typeof(TSelect).ToPretty()}': field {field.Path} has already been included/excluded before.");
 		}
@@ -585,7 +584,8 @@ internal abstract class SqlSelectQBBuilder<TDoc, TSelect> : QBBuilder<TDoc, TSel
 			Field: field,
 			RefAlias: refAlias,
 			RefField: refField,
-			OptionalExclusion: false
+			IsOptional: false,
+			IsExcluded: false
 		));
 
 		return this;
@@ -609,13 +609,16 @@ internal abstract class SqlSelectQBBuilder<TDoc, TSelect> : QBBuilder<TDoc, TSel
 		{
 			throw new ArgumentNullException(nameof(field));
 		}
-		
+		if (field.Count != 1 || field.DocumentType != typeof(TSelect))
+		{
+			throw new ArgumentException(nameof(field));
+		}
+
 		if (_fields == null)
 		{
 			_fields = new List<QBField>(8);
 		}
-
-		if (_fields.Any(x => x.Field.Path == field.Path))
+		else if (_fields.Any(x => x.Field.Path == field.Path))
 		{
 			throw new InvalidOperationException($"Incorrect field definition of select query builder '{typeof(TSelect).ToPretty()}': field '{field.Path}' has already been included/excluded before.");
 		}
@@ -625,7 +628,8 @@ internal abstract class SqlSelectQBBuilder<TDoc, TSelect> : QBBuilder<TDoc, TSel
 			Field: field,
 			RefAlias: null,
 			RefField: null,
-			OptionalExclusion: optional
+			IsOptional: optional,
+			IsExcluded: optional
 		));
 
 		return this;
@@ -663,8 +667,7 @@ internal abstract class SqlSelectQBBuilder<TDoc, TSelect> : QBBuilder<TDoc, TSel
 		{
 			_sortOrders = new List<QBSortOrder>(4);
 		}
-
-		if (_sortOrders.Any(x => x.Alias == alias && x.Field.Path == field.Path))
+		else if (_sortOrders.Any(x => x.Alias == alias && x.Field.Path == field.Path))
 		{
 			throw new InvalidOperationException($"Incorrect sort order definition of select query builder '{typeof(TSelect).ToPretty()}': field '{field.Path}' already has a sort order.");
 		}

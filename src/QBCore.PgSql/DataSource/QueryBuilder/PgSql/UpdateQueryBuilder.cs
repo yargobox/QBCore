@@ -66,7 +66,7 @@ internal sealed class UpdateQueryBuilder<TDoc, TUpdate> : QueryBuilder<TDoc, TUp
 			var sb = new StringBuilder();
 			var command = new NpgsqlCommand();
 
-			sb.Append("UPDATE ").AppendContainer(top).Append(" SET").AppendLine();
+			sb.Append("UPDATE ").AppendQuotedContainer(top).Append(" SET").AppendLine();
 
 			var dataEntries = (Builder.DtoInfo?.DataEntries ?? Builder.DocInfo.DataEntries).Values.Cast<SqlDEInfo>();
 			bool isSetValue, isUpdatedSet = false, isModifiedSet = false, next = false;
@@ -118,7 +118,7 @@ internal sealed class UpdateQueryBuilder<TDoc, TUpdate> : QueryBuilder<TDoc, TUp
 				{
 					sb.Clear();
 					
-					sb.Append("SELECT * FROM ").AppendContainer(top);
+					sb.Append("SELECT * FROM ").AppendQuotedContainer(top);
 
 					foreach (var p in Builder.Parameters.Where(x => (x.Direction & ParameterDirection.Input) == ParameterDirection.Input && x.ParameterName == "@id"))
 					{

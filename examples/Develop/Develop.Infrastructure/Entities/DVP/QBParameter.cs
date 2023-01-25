@@ -8,7 +8,7 @@ public class QBParameter
 	[DeId, Required]
 	public int QBParameterId { get; set; }
 
-	[DeViewName, MaxLength(80), Required]
+	[DeName, MaxLength(80), Required]
 	public string Name { get; set; } = null!;
 
 	[MaxLength(400)]

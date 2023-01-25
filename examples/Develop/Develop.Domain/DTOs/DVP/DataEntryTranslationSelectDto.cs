@@ -1,13 +1,28 @@
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
-using Develop.DTOs.DVP;
+using System.Runtime.Serialization;
+using System.Text.Json.Serialization;
+using System.Xml.Serialization;
 using QBCore.DataSource;
 
-namespace Develop.Entities.DVP;
+namespace Develop.DTOs.DVP;
 
-public class DataEntryTranslation
+public record struct DataEntryTranslationID
 {
-	[DeId, NotMapped, DeDependsOn(nameof(DataEntryId), nameof(LanguageId))]
+	public int DataEntryId { get; set; }
+	public int LanguageId { get; set; }
+
+	public DataEntryTranslationID() { }
+	public DataEntryTranslationID(int DataEntryId, int LanguageId)
+	{
+		this.DataEntryId = DataEntryId;
+		this.LanguageId = LanguageId;
+	}
+}
+
+public class DataEntryTranslationSelectDto
+{
+	[DeId, DeDependsOn(nameof(DataEntryId), nameof(LanguageId)), NotMapped]
 	public DataEntryTranslationID DataEntryTranslationId
 	{
 		get => new DataEntryTranslationID(DataEntryId, LanguageId);
@@ -18,11 +33,8 @@ public class DataEntryTranslation
 		}
 	}
 
-	[Required, Column("RefId")]
+	[Required, Column("RefId"), XmlIgnore, JsonIgnore]
 	public int DataEntryId { get; set; }
-
-	[DeHidden]
-	public string RefKey => "DataEntry";
 
 	[DeName, MaxLength(80), Required]
 	public string Name { get; set; } = null!;
@@ -39,9 +51,7 @@ public class DataEntryTranslation
 	[DeDeleted]
 	public DateTime? Deleted { get; set; }
 
-	[DeForeignId, Required]
+	[DeForeignId, Required, XmlIgnore, JsonIgnore]
 	public int LanguageId { get; set; }
-	//public virtual Language Language { get; set; } = null!;
-
-	//public virtual DataEntry? DataEntry { get; set; } = null!;
+	public string LanguageName { get; set; } = null!;
 }

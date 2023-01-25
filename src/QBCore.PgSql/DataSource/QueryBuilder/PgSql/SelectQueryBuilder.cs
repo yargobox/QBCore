@@ -120,7 +120,7 @@ internal sealed partial class SelectQueryBuilder<TDoc, TSelect> : QueryBuilder<T
 			var sb = new StringBuilder();
 			var command = new NpgsqlCommand();
 
-			BuildSelectQuery(sb, skip, take >= 0 && options?.ObtainLastPageMark == true ? take + 1 : take, options?.ObtainTotalCount == true, command.Parameters);
+			BuildSelectQuery(sb, skip, take >= 0 && options?.ObtainLastPageMark == true ? take + 1 : take, options?.ObtainTotalCount == true, command.Parameters, options?.IncludeOptionalFields);
 
 			queryString = sb.ToString();
 
@@ -217,7 +217,7 @@ internal sealed partial class SelectQueryBuilder<TDoc, TSelect> : QueryBuilder<T
 			var sb = new StringBuilder();
 			var command = new NpgsqlCommand();
 
-			BuildSelectQuery(sb, skip, take >= 0 && options?.ObtainLastPageMark == true ? take + 1 : take, options?.ObtainTotalCount == true, command.Parameters);
+			BuildSelectQuery(sb, skip, take >= 0 && options?.ObtainLastPageMark == true ? take + 1 : take, options?.ObtainTotalCount == true, command.Parameters, options?.IncludeOptionalFields);
 
 			queryString = sb.ToString();
 
@@ -270,63 +270,82 @@ internal sealed partial class SelectQueryBuilder<TDoc, TSelect> : QueryBuilder<T
 		}
 	}
 
-	private void BuildSelectQuery(StringBuilder sb, long skip, int take, bool obtainTotalCount, NpgsqlParameterCollection commandParams)
+	private void BuildSelectQuery(StringBuilder sb, long skip, int take, bool obtainTotalCount, NpgsqlParameterCollection commandParams, DEPath[]? includeOptionalFields)
 	{
 		var top = Builder.Containers.First();
 		var topDbo = ExtensionsForSql.ParseDbObjectName(top.DBSideName);
-		var topAlias = Builder.Containers.Count > 1 || topDbo.Object != top.Alias ? top.Alias : string.Empty;
+		var topAlias = Builder.Containers.Count > 1 || topDbo.Object != top.Alias ? top.Alias : null;
 		bool next;
 		var dataEntries = Builder.DtoInfo?.DataEntries ?? Builder.DocInfo.DataEntries;
+		QBField? field;
 
-		Func<string?, DEPath, string> getDBSideName = topAlias.Length > 0
+		Func<string?, DEPath, string> getDBSideName = topAlias != null
 			? GetQuotedDBSideName
 			: (alias, fieldPath) => GetQuotedDBSideName(alias == top.Alias ? null : alias, fieldPath);
 
 		if (obtainTotalCount)
+		{
 			sb
-				.Append("WITH ____cte AS (").AppendLine();
+				.Append("WITH ____cte AS").AppendLine()
+				.Append('(').AppendLine();
+		}
 
 		foreach (var container in Builder.Containers)
 		{
 			if (container.ContainerOperation == ContainerOperations.Select)
 			{
-				sb.Append("SELECT").AppendLine();
+				sb.Append("SELECT").AppendLine().Append('\t');
 
 				next = false;
 				foreach (var de in dataEntries.Values.Cast<SqlDEInfo>())
 				{
-					if (next) sb.AppendLine(","); next = true;
+					if (de.Flags.HasAnyFlag(DataEntryFlags.NotMapped)) continue;
 
-					//!!!
-					var fld = Builder.Fields.FirstOrDefault(x => x.Field.Path == de.Name);
-					if (fld == null)
+					if (next) sb.AppendLine(",").Append('\t'); else next = true;
+
+					field = Builder.Fields.FirstOrDefault(x => x.Field.Path == de.Name);
+					if (field == null)
 					{
-						sb.Append('\t');
-						
-						if (topAlias.Length > 0)
+						sb.AppendQuotedDataEntry(topAlias, de);
+						if (de.Name != de.DBSideName)
 						{
-							sb.Append(topAlias).Append('.');
+							sb.Append(" AS \"").Append(de.Name).Append('"');
 						}
-						sb.Append('"').Append(de.DBSideName).Append('"');
 					}
-					else if (!fld.IncludeOrExclude && fld.OptionalExclusion)
+					else if (!field.IsExcluded)
 					{
-						sb.Append("NULL");//!!!
+						if (!field.IsOptional || includeOptionalFields?.Contains(field.Field) == true)
+						{
+							if (field.RefField != null)
+							{
+								sb.AppendQuotedDataEntry(field.RefAlias, field.RefField);
+								if (field.RefField.GetDBSideName() != de.Name)
+								{
+									sb.Append(" AS \"").Append(de.Name).Append('"');
+								}
+							}
+							else
+							{
+								sb.AppendQuotedDataEntry(topAlias, de);
+								if (de.Name != de.DBSideName)
+								{
+									sb.Append(" AS \"").Append(de.Name).Append('"');
+								}
+							}
+						}
+						else
+						{
+							sb.Append("NULL AS \"").Append(de.Name).Append('"');
+						}
 					}
 					else
 					{
-						throw new NotSupportedException("Field inclusion is not supported.");//!!!
-					}
-					
-					if (de.Name != de.DBSideName)
-					{
-						sb.Append(" AS \"").Append(de.Name).Append('"');
+						sb.Append("NULL AS \"").Append(de.Name).Append('"');
 					}
 				}
 
-				sb.AppendLine().Append("FROM ").AppendContainer(topDbo);
-
-				if (topAlias.Length > 0)
+				sb.AppendLine().Append("FROM ").AppendQuotedContainer(topDbo);
+				if (topAlias != null)
 				{
 					sb.Append(" AS ").Append(container.Alias);
 				}
@@ -336,7 +355,7 @@ internal sealed partial class SelectQueryBuilder<TDoc, TSelect> : QueryBuilder<T
 				sb
 					.AppendLine()
 					.Append(container.ContainerOperation == ContainerOperations.Join ? "JOIN " : "LEFT JOIN ")
-						.AppendContainer(container).Append(" AS ").Append(container.Alias).Append(" ON ");
+						.AppendQuotedContainer(container).Append(" AS ").Append(container.Alias).Append(" ON ");
 
 				BuildConditionTree(sb, Builder.Connects, getDBSideName, Builder.Parameters, commandParams);
 			}
@@ -344,7 +363,7 @@ internal sealed partial class SelectQueryBuilder<TDoc, TSelect> : QueryBuilder<T
 			{
 				sb
 					.AppendLine()
-					.Append("CROSS JOIN ").AppendContainer(container).Append(" AS ").Append(container.Alias);
+					.Append("CROSS JOIN ").AppendQuotedContainer(container).Append(" AS ").Append(container.Alias);
 			}
 			else
 			{
@@ -359,12 +378,6 @@ internal sealed partial class SelectQueryBuilder<TDoc, TSelect> : QueryBuilder<T
 			BuildConditionTree(sb, Builder.Conditions, getDBSideName, Builder.Parameters, commandParams);
 		}
 
-		if (obtainTotalCount)
-			sb
-				.AppendLine()
-				.Append(") SELECT * FROM (").AppendLine()
-				.Append("\tTABLE ____cte");
-
 		next = false;
 		foreach (var sort in Builder.SortOrders)
 		{
@@ -375,36 +388,10 @@ internal sealed partial class SelectQueryBuilder<TDoc, TSelect> : QueryBuilder<T
 			else
 			{
 				next = true;
-				sb.AppendLine().Append(obtainTotalCount ? "\t" : "").Append("ORDER BY ");
+				sb.AppendLine().Append("ORDER BY ");
 			}
 
-			if (sort.Alias.Length == 0)
-			{
-				//!!!
-				var de = (SqlDEInfo?)dataEntries.GetValueOrDefault(sort.Field.Path)
-					?? throw new InvalidOperationException("");
-				var fld = Builder.Fields.FirstOrDefault(x => x.Field.Path == de.Name);
-				if (fld == null)
-				{
-					if (topAlias.Length > 0)
-					{
-						sb.Append(topAlias).Append('.');
-					}
-					sb.Append('"').Append(de.DBSideName).Append('"');
-				}
-				else if (!fld.IncludeOrExclude && fld.OptionalExclusion)
-				{
-					sb.Append("NULL");//!!!
-				}
-				else
-				{
-					throw new NotSupportedException("Field inclusion is not supported.");//!!!
-				}
-			}
-			else
-			{
-				sb.Append(getDBSideName(sort.Alias, sort.Field));
-			}
+			sb.AppendQuotedDataEntry(string.IsNullOrEmpty(sort.Alias) || sort.Alias == top.Alias ? topAlias : sort.Alias, sort.Field);
 
 			if (sort.SortOrder == SO.Descending)
 			{
@@ -416,13 +403,26 @@ internal sealed partial class SelectQueryBuilder<TDoc, TSelect> : QueryBuilder<T
 			}
 		}
 
+		if (obtainTotalCount)
+		{
+			sb
+				.AppendLine()
+				.Append(')').AppendLine()
+				.Append("SELECT * FROM").AppendLine()
+				.Append('(').AppendLine()
+				.Append("\tTABLE ____cte");
+		}
+
 		if (take >= 0) sb.AppendLine().Append(obtainTotalCount ? "\t" : "").Append("LIMIT ").Append(take);
 		if (skip > 0) sb.AppendLine().Append(obtainTotalCount ? "\t" : "").Append("OFFSET ").Append(skip);
 
 		if (obtainTotalCount)
+		{
+
 			sb
 				.AppendLine()
-				.Append(") ____result").AppendLine()
+				.Append(") AS ____result").AppendLine()
 				.Append("RIGHT JOIN (SELECT count(*) FROM ____cte) c(").Append(DSAsyncCursorWithTotalCount<TSelect>.TotalCountFieldName).Append(") ON true");
+		}
 	}
 }

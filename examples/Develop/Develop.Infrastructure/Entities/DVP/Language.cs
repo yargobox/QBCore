@@ -8,7 +8,7 @@ public class Language
 	[DeId, Required]
 	public int LanguageId { get; set; }
 	
-	[DeViewName, MaxLength(20), Required]
+	[DeName, MaxLength(20), Required]
 	public string Name { get; set; } = null!;
 	
 	[MaxLength(400)]

@@ -1,12 +1,38 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Develop.DAL.PostgreSQL;
+using QBCore.DataSource;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace Develop.Entities.DVP;
 
-public class DataEntryTranslation
+public record struct DataEntryTranslationID
 {
 	public int DataEntryId { get; set; }
+	public int LanguageId { get; set; }
+
+	public DataEntryTranslationID() { }
+	public DataEntryTranslationID(int DataEntryId, int LanguageId)
+	{
+		this.DataEntryId = DataEntryId;
+		this.LanguageId = LanguageId;
+	}
+}
+
+public class DataEntryTranslation
+{
+	[DeId, NotMapped, DeDependsOn(nameof(DataEntryId), nameof(LanguageId))]
+	public DataEntryTranslationID DataEntryTranslationId
+	{
+		get => new DataEntryTranslationID(DataEntryId, LanguageId);
+		set
+		{
+			DataEntryId = value.DataEntryId;
+			LanguageId = value.LanguageId;
+		}
+	}
+
+	private int DataEntryId { get; set; }
 	private string RefKey { get => nameof(DataEntry); set { } }
 	public string Name { get; set; } = string.Empty;
 	public string? Desc { get; set; }
@@ -14,7 +40,7 @@ public class DataEntryTranslation
 	public DateTime? Updated { get; set; }
 	public DateTime? Deleted { get; set; }
 
-	public int LanguageId { get; set; }
+	private int LanguageId { get; set; }
 	public virtual Language Language { get; set; } = null!;
 
 	public virtual DataEntry? DataEntry { get; set; } = null!;

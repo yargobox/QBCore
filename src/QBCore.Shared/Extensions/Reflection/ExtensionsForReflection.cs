@@ -104,6 +104,21 @@ public static class ExtensionsForReflection
 		return type.IsValueType && Nullable.GetUnderlyingType(type) is not null;
 	}
 
+	public static bool IsTuple(this Type type)
+	{
+		return type.IsValueType && type.FullName?.StartsWith("System.ValueTuple`") == true;
+	}
+
+	public static bool IsAnonymous(this Type type)
+	{
+		return
+			type.Namespace == null &&
+			(type.Name.StartsWith("<>") || type.Name.StartsWith("VB$")) &&
+			type.Name.Contains("AnonymousType") &&
+			type.IsDefined(typeof(CompilerGeneratedAttribute), false) &&
+			type.Attributes.HasFlag(TypeAttributes.NotPublic);
+	}
+
 	public static Type GetUnderlyingType(this Type type)
 	{
 		return type.IsValueType ? Nullable.GetUnderlyingType(type) ?? type : type;

@@ -1,11 +1,12 @@
 using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 using QBCore.DataSource;
 
 namespace Develop.Entities.DVP;
 
 public class Translation
 {
-	[DeId, DeNoStorage, DeDependsOn(nameof(RefId), nameof(LanguageId), nameof(RefKey))]
+	[DeId, NotMapped, DeDependsOn(nameof(RefId), nameof(LanguageId), nameof(RefKey))]
 	public (int RefId, int LanguageId, string RefKey) TranslationId
 	{
 		get => (RefId, LanguageId, RefKey);

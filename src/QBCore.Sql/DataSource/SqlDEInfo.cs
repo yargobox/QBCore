@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations.Schema;
 using System.Reflection;
 
 namespace QBCore.DataSource;
@@ -9,8 +10,8 @@ internal sealed class SqlDEInfo : DEInfo
 	public SqlDEInfo(SqlDocumentInfo document, MemberInfo memberInfo, DataEntryFlags flags)
 		: base(document, memberInfo, flags)
 	{
-		var dataEntryAttr = memberInfo.GetCustomAttribute<DeDataEntryAttribute>(false);
+		var dataEntryAttr = memberInfo.GetCustomAttribute<ColumnAttribute>(false);
 
-		DBSideName = dataEntryAttr?.DBSideName ?? memberInfo.Name;
+		DBSideName = dataEntryAttr?.Name ?? memberInfo.Name;
 	}
 }

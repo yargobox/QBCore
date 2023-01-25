@@ -235,7 +235,7 @@ public static class StaticFactory
 			Type? type, gtd;
 
 			type = documentType.BaseType;
-			while (type != null && type != typeof(object))
+			while (type != null && type != typeof(object) && type != typeof(ValueType))
 			{
 				isDocumentType = documentTypesSelector(type);
 				if (pool.TryAdd(type, isDocumentType) && isDocumentType)

@@ -373,7 +373,7 @@ public static class ConvertTo<To>
 				var exToVar = Expression.Variable(typeof(To), "to");
 				var list = new List<Expression>(pairs.Count + 2) { Expression.Assign(exToVar, exNew) };
 				
-				#region Build aassign expressions for properties and fields
+				#region Build assign expressions for properties and fields
 				if (!isCopyConstructor) 
 				{
 					Expression exFrom;

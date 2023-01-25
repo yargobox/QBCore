@@ -8,7 +8,7 @@ public class QBJoinCondition
 	[DeId, Required]
 	public int QBJoinConditionId { get; set; }
 
-	[DeViewName, MaxLength(80), Required]
+	[DeName, MaxLength(80), Required]
 	public string Name { get; set; } = null!;
 
 	[MaxLength(400)]

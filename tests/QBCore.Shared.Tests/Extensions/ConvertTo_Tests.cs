@@ -198,6 +198,20 @@ public class ConvertTo_Tests
 		}
 	}
 
+	readonly record struct Dto4
+	{
+		public readonly int PublicInitOnlyIntProp { get; init; } = 6000;
+		public readonly int PublicReadOnlyIntProp { get; } = 6010;
+		public readonly int PublicReadonlyIntField = 6020;
+
+		public Dto4() { }
+		public Dto4(int publicReadOnlyIntProp, int publicReadonlyIntField)
+		{
+			PublicReadOnlyIntProp = publicReadOnlyIntProp;
+			PublicReadonlyIntField = publicReadonlyIntField;
+		}
+	}
+
 	[Fact]
 	public void MapFrom_ForClassicPOCOClasses_ExpectedBehavior()
 	{
@@ -278,6 +292,14 @@ public class ConvertTo_Tests
 			p.PublicIntProp.Should().Be(10);
 			p.PublicNullableIntProp.Should().Be(20);
 			p.SomeDefaultValue.Should().Be(-1);
+		}
+
+		{
+			var p = ConvertTo<Dto4>.MapFrom(dto1);
+
+			p.PublicInitOnlyIntProp.Should().Be(70);
+			p.PublicReadOnlyIntProp.Should().Be(1060);
+			p.PublicReadonlyIntField.Should().Be(1160);
 		}
 	}
 }

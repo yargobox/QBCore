@@ -8,7 +8,7 @@ public class CDSCondition
 	[DeId, Required]
 	public int CDSConditionId { get; set; }
 
-	[DeViewName, MaxLength(80), Required]
+	[DeName, MaxLength(80), Required]
 	public string Name { get; set; } = null!;
 
 	[MaxLength(400)]

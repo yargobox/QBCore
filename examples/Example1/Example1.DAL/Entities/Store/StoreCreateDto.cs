@@ -5,7 +5,7 @@ namespace Example1.DAL.Entities.Stores;
 
 public class StoreCreateDto
 {
-	[DeViewName] public string? Name { get; set; }
+	[DeName] public string? Name { get; set; }
 
 	static void Builder(IMongoInsertQBBuilder<Store, StoreCreateDto> builder)
 	{

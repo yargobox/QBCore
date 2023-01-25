@@ -5,7 +5,7 @@ namespace Example1.DAL.Entities.OrderPositions;
 
 public class OrderPositionUpdateDto
 {
-	[DeViewName] public string? Name { get; set; } = null!;
+	[DeName] public string? Name { get; set; } = null!;
 	[DeForeignId] public int? ProductId { get; set; }
 	public decimal? Quantity { get; set; }
 

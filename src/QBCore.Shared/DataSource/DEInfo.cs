@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations.Schema;
 using System.Diagnostics;
 using System.Linq.Expressions;
 using System.Reflection;
@@ -12,14 +13,15 @@ public enum DataEntryFlags : ulong
 	None = 0,
 	IdField = 1,
 	ReadOnly = 2,
-	DateCreatedField = 4,
-	DateModifiedField = 8,
-	DateUpdatedField = 0x10,
-	DateDeletedField = 0x20,
+	CreatedAtField = 4,
+	ModifiedAtField = 8,
+	UpdatedAtField = 0x10,
+	DeletedAtField = 0x20,
 	ForeignId = 0x40,
-	NoStorage = 0x80,
+	NotMapped = 0x80,
 	DocumentName = 0x0100,
-	Dependent = 0x2000
+	Dependent = 0x2000,
+	Hidden = 0x4000
 }
 
 
@@ -71,7 +73,7 @@ public abstract class DEInfo : IComparable<DEInfo>, IEquatable<DEInfo>
 			throw new ArgumentException(nameof(memberInfo));
 		}
 
-		Order = memberInfo.GetCustomAttribute<DeOrderAttribute>()?.Order ?? 0;
+		Order = memberInfo.GetCustomAttribute<ColumnAttribute>()?.Order ?? 0;
 		DependsOn = memberInfo.GetCustomAttribute<DeDependsOnAttribute>()?.DataEntries;
 		if (DependsOn?.Length == 0)
 		{

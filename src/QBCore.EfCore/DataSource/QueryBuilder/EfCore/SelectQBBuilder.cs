@@ -577,7 +577,8 @@ internal sealed class SelectQBBuilder<TDoc, TSelect> : QBBuilder<TDoc, TSelect>,
 			Field: field,
 			RefAlias: refAlias,
 			RefField: refField,
-			OptionalExclusion: false
+			IsOptional: false,
+			IsExcluded: false
 		));
 
 		return this;
@@ -617,7 +618,8 @@ internal sealed class SelectQBBuilder<TDoc, TSelect> : QBBuilder<TDoc, TSelect>,
 			Field: field,
 			RefAlias: null,
 			RefField: null,
-			OptionalExclusion: optional
+			IsOptional: optional,
+			IsExcluded: optional
 		));
 
 		return this;

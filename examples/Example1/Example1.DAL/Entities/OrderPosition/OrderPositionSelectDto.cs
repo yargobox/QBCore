@@ -7,7 +7,7 @@ namespace Example1.DAL.Entities.OrderPositions;
 public class OrderPositionSelectDto
 {
 	[DeId] public int? Id { get; set; }
-	[DeViewName] public string? Name { get; set; }
+	[DeName] public string? Name { get; set; }
 
 	[DeForeignId] public int? ProductId { get; set; }
 	public virtual ProductSelectDto? Product { get; set; }

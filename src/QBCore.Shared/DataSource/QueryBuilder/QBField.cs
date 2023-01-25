@@ -5,19 +5,44 @@ namespace QBCore.DataSource.QueryBuilder;
 [DebuggerDisplay("{DebuggerDisplay,nq}")]
 public record QBField
 {
+	protected const int OptionalFieldFlag = 1;
+	protected const int ExcludedFieldFlag = 2;
+
 	public readonly DEPath Field;
 	public readonly string? RefAlias;
 	public readonly DEPath? RefField;
-	public readonly bool OptionalExclusion;
 
-	public bool IncludeOrExclude => RefAlias != null;
+	protected readonly int _flags;
 
-	public QBField(DEPath Field, string? RefAlias, DEPath? RefField, bool OptionalExclusion)
+	public bool IsOptional => (_flags & OptionalFieldFlag) != 0;
+	public bool IsExcluded => (_flags & ExcludedFieldFlag) != 0;
+
+	public QBField(DEPath Field, bool IsOptional = false, bool IsExcluded = false)
+	{
+		this.Field = Field;
+		if (IsExcluded)
+		{
+			this._flags = ExcludedFieldFlag;
+		}
+		else if (IsOptional)
+		{
+			this._flags = OptionalFieldFlag;
+		}
+	}
+
+	public QBField(DEPath Field, string? RefAlias, DEPath? RefField, bool IsOptional = false, bool IsExcluded = false)
 	{
 		this.Field = Field;
 		this.RefAlias = RefAlias;
 		this.RefField = RefField;
-		this.OptionalExclusion = OptionalExclusion;
+		if (IsExcluded)
+		{
+			this._flags = ExcludedFieldFlag;
+		}
+		else if (IsOptional)
+		{
+			this._flags = OptionalFieldFlag;
+		}
 	}
 
 	protected string DebuggerDisplay
@@ -25,8 +50,8 @@ public record QBField
 		get
 		{
 			return RefAlias != null
-				? string.Format("Include {0} as {1}:{2}", Field.Path, RefAlias, RefField?.Path)
-				: string.Format("{0} {1}", OptionalExclusion ? "Optional" : "Exclude", Field.Path);
+				? $"{(IsOptional ? "Optional" : "Exclude")} {Field.Path} as {RefAlias}:{RefField?.Path}"
+				: $"{(IsOptional ? "Optional" : "Exclude")} {Field.Path}";
 		}
 	}
 }

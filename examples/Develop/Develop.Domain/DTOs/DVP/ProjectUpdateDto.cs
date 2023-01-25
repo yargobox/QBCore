@@ -5,7 +5,7 @@ namespace Develop.DTOs.DVP;
 
 public class ProjectUpdateDto
 {
-	[DeViewName, MaxLength(80), Required]
+	[DeName, MaxLength(80), Required]
 	public string Name { get; set; } = null!;
 
 	[MaxLength(400)]

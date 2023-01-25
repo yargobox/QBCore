@@ -3,14 +3,11 @@ using QBCore.DataSource;
 
 namespace Develop.DTOs.DVP;
 
-public class AppCreateDto
+public class DataEntryTranslationUpdateDto
 {
-	[DeName, Required, MaxLength(80)]
+	[DeName, MaxLength(80), Required]
 	public string Name { get; set; } = null!;
-	
+
 	[MaxLength(400)]
 	public string? Desc { get; set; }
-
-	[DeForeignId, Required]
-	public int ProjectId { get; set; }
 }

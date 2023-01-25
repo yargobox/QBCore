@@ -6,7 +6,7 @@ namespace Example1.DAL.Entities.Stores;
 public class StoreSelectDto
 {
 	[DeId] public int? Id { get; set; }
-	[DeViewName] public string? Name { get; set; }
+	[DeName] public string? Name { get; set; }
 
 	[DeCreated] public DateTimeOffset? Created { get; set; }
 	[DeUpdated] public DateTimeOffset? Updated { get; set; }

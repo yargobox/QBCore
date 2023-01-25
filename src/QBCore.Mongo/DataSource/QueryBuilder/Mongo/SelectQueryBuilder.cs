@@ -604,7 +604,7 @@ internal sealed partial class SelectQueryBuilder<TDoc, TSelect> : QueryBuilder<T
 		int stageIndex;
 
 		// Fill the includes and change the LookupAs names for the joining documents the result of which is directly projected into the field.
-		foreach (var field in fields.Where(x => x.IncludeOrExclude).OrderBy(x => x.RefAlias ?? string.Empty).ThenBy(x => x.RefField?.Count ?? 0))
+		foreach (var field in fields.Where(x => x.RefAlias != null).OrderBy(x => x.RefAlias!).ThenBy(x => x.RefField!.Count))
 		{
 			stageIndex = stages.FindIndex(x => x.Container.Alias == field.RefAlias);
 
@@ -637,12 +637,12 @@ internal sealed partial class SelectQueryBuilder<TDoc, TSelect> : QueryBuilder<T
 			}
 		}
 
-		foreach (var field in fields.Where(x => !x.IncludeOrExclude))
+		foreach (var field in fields.Where(x => x.RefAlias == null))
 		{
 			// Is this exclude for the entire joined document?
 			var joinedDoc = fields.FirstOrDefault(x =>
 				// search in includes
-				x.IncludeOrExclude
+				x.RefAlias != null
 				// for the entire document: (store) => store
 				&& x.RefField!.DataEntryType == stages.First(xx => xx.Container.Alias == x.RefAlias).Container.DocumentType
 				// in this case our exclude must be a part of it: (sel) => sel.Store.LogoImg, (sel) => sel.Store
@@ -810,7 +810,7 @@ internal sealed partial class SelectQueryBuilder<TDoc, TSelect> : QueryBuilder<T
 	private static void OutputProjections(List<BsonDocument> result, List<(string fromPath, string? toPath, QBField? builderField)> projectInfo)
 	{
 		BsonDocument? projection = null;
-		foreach (var projField in projectInfo.Where(x => x.toPath == null && x.builderField?.OptionalExclusion == true))
+		foreach (var projField in projectInfo.Where(x => x.toPath == null && x.builderField?.IsOptional == true))
 		{
 			if (projection == null) projection = new BsonDocument();
 
@@ -846,7 +846,7 @@ internal sealed partial class SelectQueryBuilder<TDoc, TSelect> : QueryBuilder<T
 		}
 		
 		projection = null;
-		foreach (var projField in projectInfo.Where(x => x.toPath != null || x.builderField == null || !x.builderField.OptionalExclusion))
+		foreach (var projField in projectInfo.Where(x => x.toPath != null || x.builderField == null || !x.builderField.IsOptional))
 		{
 			if (projection == null) projection = new BsonDocument();
 

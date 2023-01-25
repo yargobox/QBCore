@@ -8,7 +8,7 @@ public class App
 	[DeId, Required]
 	public int AppId { get; set; }
 	
-	[DeViewName, Required, MaxLength(80)]
+	[DeName, Required, MaxLength(80)]
 	public string Name { get; set; } = null!;
 	
 	[MaxLength(400)]

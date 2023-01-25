@@ -15,7 +15,7 @@ public class OrderSelectDto
 	[DeId] public int? Id { get; set; }
 	
 	[Required, MinLength(4), MaxLength(32)]
-	[DeViewName] public string? Name { get; set; }
+	[DeName] public string? Name { get; set; }
 
 	[DeForeignId] public int? StoreId { get; set; }
 

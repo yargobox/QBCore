@@ -64,7 +64,7 @@ public sealed class EfCoreDataLayer : IDataLayerInfo
 
 	private bool IsDocumentTypeImplementation(Type type)
 	{
-		if (type.IsEnum) return false;
+		if (type.IsEnum || type.IsTuple() || type.IsAnonymous()) return false;
 		if (ArgumentHelper.IsStandardValueType(type)) return false;
 		if (ArgumentHelper.IsStandardRefType(type)) return false;
 		if (type == typeof(NotSupported)) return false;
@@ -76,7 +76,7 @@ public sealed class EfCoreDataLayer : IDataLayerInfo
 			if (i == typeof(IEnumerable)) return false;
 			if (i.IsGenericType)
 			{
-				gtd = type.GetGenericTypeDefinition();
+				gtd = i.GetGenericTypeDefinition();
 				if (gtd == typeof(IEnumerable<>) || gtd == typeof(Nullable<>)) return false;
 			}
 		}

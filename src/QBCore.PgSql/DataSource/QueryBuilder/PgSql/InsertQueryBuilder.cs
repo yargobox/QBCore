@@ -1,9 +1,13 @@
 using System.Data;
+using System.Linq.Expressions;
+using System.Reflection;
 using System.Text;
+using Dapper;
 using Npgsql;
 using QBCore.Configuration;
 using QBCore.DataSource.Options;
 using QBCore.Extensions.Internals;
+using QBCore.ObjectFactory;
 
 namespace QBCore.DataSource.QueryBuilder.PgSql;
 
@@ -38,10 +42,10 @@ internal sealed class InsertQueryBuilder<TDoc, TCreate> : QueryBuilder<TDoc, TCr
 			if (options.Transaction != null)
 			{
 				transaction = (options.Transaction as NpgsqlTransaction) ?? throw new ArgumentException(nameof(options.Transaction));
-				
+
 				if (transaction.Connection != connection)
 				{
-					throw  EX.QueryBuilder.Make.SpecifiedTransactionOpenedForDifferentConnection();
+					throw EX.QueryBuilder.Make.SpecifiedTransactionOpenedForDifferentConnection();
 				}
 			}
 		}
@@ -54,17 +58,17 @@ internal sealed class InsertQueryBuilder<TDoc, TCreate> : QueryBuilder<TDoc, TCr
 			var deCreated = (SqlDEInfo?)dtoInfo.DateCreatedField;
 			var deModified = (SqlDEInfo?)dtoInfo.DateModifiedField;
 			var command = new NpgsqlCommand();
-			bool isSetValue, isCreatedSet = false, isModifiedSet = false, next = false;
+			bool isSetValue, isCreatedSet = false, isModifiedSet = false, isNextItem = false;
 			object? value;
 			QBParameter? param;
 			string queryString;
 			var sb = new StringBuilder();
 
-			sb.Append("INSERT INTO ").AppendContainer(top);
+			sb.Append("INSERT INTO ").AppendQuotedContainer(top);
 
 			foreach (var de in dtoInfo.DataEntries.Values.Cast<SqlDEInfo>())
 			{
-				if (de.Flags.HasAnyFlag(DataEntryFlags.ReadOnly | DataEntryFlags.NoStorage))
+				if (de.Flags.HasAnyFlag(DataEntryFlags.ReadOnly | DataEntryFlags.NotMapped))
 				{
 					continue;
 				}
@@ -83,7 +87,7 @@ internal sealed class InsertQueryBuilder<TDoc, TCreate> : QueryBuilder<TDoc, TCr
 
 				if (isSetValue)
 				{
-					if (next) sb.Append(", "); else { next = true; sb.Append('('); }
+					if (isNextItem) sb.Append(", "); else { isNextItem = true; sb.Append('('); }
 
 					sb.Append('"').Append(de.DBSideName).Append('"');
 
@@ -92,20 +96,20 @@ internal sealed class InsertQueryBuilder<TDoc, TCreate> : QueryBuilder<TDoc, TCr
 				}
 			}
 
-			if (deCreated != null && !isCreatedSet && !deCreated.Flags.HasAnyFlag(DataEntryFlags.ReadOnly | DataEntryFlags.NoStorage))
+			if (deCreated != null && !isCreatedSet && !deCreated.Flags.HasAnyFlag(DataEntryFlags.ReadOnly | DataEntryFlags.NotMapped))
 			{
-				if (next) sb.Append(", "); else { next = true; sb.Append('('); }
+				if (isNextItem) sb.Append(", "); else { isNextItem = true; sb.Append('('); }
 
 				sb.Append('"').Append(deCreated.DBSideName).Append('"');
 			}
-			if (deModified != null && !isModifiedSet && !deModified.Flags.HasAnyFlag(DataEntryFlags.ReadOnly | DataEntryFlags.NoStorage))
+			if (deModified != null && !isModifiedSet && !deModified.Flags.HasAnyFlag(DataEntryFlags.ReadOnly | DataEntryFlags.NotMapped))
 			{
-				if (next) sb.Append(", "); else { next = true; sb.Append('('); }
+				if (isNextItem) sb.Append(", "); else { isNextItem = true; sb.Append('('); }
 
 				sb.Append('"').Append(deModified.DBSideName).Append('"');
 			}
 
-			if (next)
+			if (isNextItem)
 			{
 				sb.AppendLine(")").Append("VALUES (");
 
@@ -117,13 +121,13 @@ internal sealed class InsertQueryBuilder<TDoc, TCreate> : QueryBuilder<TDoc, TCr
 					sb.Append("$").Append(i);
 				}
 
-				if (deCreated != null && !isCreatedSet && !deCreated.Flags.HasAnyFlag(DataEntryFlags.ReadOnly | DataEntryFlags.NoStorage))
+				if (deCreated != null && !isCreatedSet && !deCreated.Flags.HasAnyFlag(DataEntryFlags.ReadOnly | DataEntryFlags.NotMapped))
 				{
 					if (i++ > 1) sb.Append(", ");
 
 					sb.Append("NOW()");
 				}
-				if (deModified != null && !isModifiedSet && !deModified.Flags.HasAnyFlag(DataEntryFlags.ReadOnly | DataEntryFlags.NoStorage))
+				if (deModified != null && !isModifiedSet && !deModified.Flags.HasAnyFlag(DataEntryFlags.ReadOnly | DataEntryFlags.NotMapped))
 				{
 					if (i++ > 1) sb.Append(", ");
 
@@ -132,43 +136,38 @@ internal sealed class InsertQueryBuilder<TDoc, TCreate> : QueryBuilder<TDoc, TCr
 
 				sb.Append(')');
 			}
-
-			if (deId?.Flags.HasAnyFlag(DataEntryFlags.ReadOnly | DataEntryFlags.NoStorage) == true)
+			else
 			{
-				if (deId.DependsOn != null)
-				{
-					sb.AppendLine().Append("RETURNING ");
-
-					next = false;
-					foreach (var de in deId.DependsOn.Select(x => dtoInfo.DataEntries[x]).Cast<SqlDEInfo>())
-					{
-						if (next) sb.Append(", "); else next = true;
-
-						sb.Append('"').Append(de.DBSideName).Append('"');
-					}
-				}
-				else
-				{
-					sb.AppendLine().Append("RETURNING \"").Append(deId.DBSideName).Append('"');
-				}
+				sb.Append(" DEFAULT VALUES");
 			}
-			else if (deId != deDocId && deDocId?.Flags.HasAnyFlag(DataEntryFlags.ReadOnly | DataEntryFlags.NoStorage) == true)
+
+			if (deDocId?.Flags.HasAnyFlag(DataEntryFlags.ReadOnly | DataEntryFlags.NotMapped) == true)
 			{
 				if (deDocId.DependsOn != null)
 				{
 					sb.AppendLine().Append("RETURNING ");
 
-					next = false;
-					foreach (var de in deDocId.DependsOn.Select(x => Builder.DocInfo.DataEntries[x]).Cast<SqlDEInfo>())
+					isNextItem = false;
+					foreach (var de in deDocId.DependsOn.Select(x => deDocId.Document.DataEntries[x]).Cast<SqlDEInfo>())
 					{
-						if (next) sb.Append(", "); else next = true;
+						if (isNextItem) sb.Append(", "); else isNextItem = true;
 
 						sb.Append('"').Append(de.DBSideName).Append('"');
+
+						if (de.DBSideName != de.Name)
+						{
+							sb.Append(" AS \"").Append(de.Name).Append('"');
+						}
 					}
 				}
 				else
 				{
 					sb.AppendLine().Append("RETURNING \"").Append(deDocId.DBSideName).Append('"');
+
+					if (deDocId.DBSideName != deDocId.Name)
+					{
+						sb.Append(" AS \"").Append(deDocId.Name).Append('"');
+					}
 				}
 			}
 
@@ -194,34 +193,7 @@ internal sealed class InsertQueryBuilder<TDoc, TCreate> : QueryBuilder<TDoc, TCr
 				command.Connection = connection;
 				command.Transaction ??= transaction;
 
-				if (deId?.Flags.HasAnyFlag(DataEntryFlags.ReadOnly | DataEntryFlags.NoStorage) == true)
-				{
-					if (deId.DependsOn != null)
-					{
-						await using var dataReader = await command.ExecuteReaderAsync(CommandBehavior.SingleRow, cancellationToken).ConfigureAwait(false);
-						if (!await dataReader.ReadAsync(cancellationToken).ConfigureAwait(false))
-						{
-							throw new InvalidOperationException();
-						}
-
-						foreach (var de in deId.DependsOn.Select(x => dtoInfo.DataEntries[x]).Cast<SqlDEInfo>())
-						{
-							if (de.Setter != null)
-							{
-								de.Setter(dto, dataReader[de.Name]);
-							}
-						}
-
-						while (await dataReader.NextResultAsync(cancellationToken).ConfigureAwait(false)) { }
-
-						value = deId.Getter(dto);
-					}
-					else
-					{
-						value = await command.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false);
-					}
-				}
-				else if (deId != deDocId && deDocId?.Flags.HasAnyFlag(DataEntryFlags.ReadOnly | DataEntryFlags.NoStorage) == true)
+				if (deDocId?.Flags.HasAnyFlag(DataEntryFlags.ReadOnly | DataEntryFlags.NotMapped) == true)
 				{
 					if (deDocId.DependsOn != null)
 					{
@@ -231,29 +203,21 @@ internal sealed class InsertQueryBuilder<TDoc, TCreate> : QueryBuilder<TDoc, TCr
 							throw new InvalidOperationException();
 						}
 
-						foreach (var de in deDocId.DependsOn.Select(x => Builder.DocInfo.DataEntries[x]).Cast<SqlDEInfo>())
-						{
-							if (de.Setter != null)
-							{
-								de.Setter(dto, dataReader[de.Name]);
-							}
-						}
+						var idRowParser = dataReader.GetRowParser(deDocId.UnderlyingType, 0, -1, false);
+						value = idRowParser(dataReader);
 
 						while (await dataReader.NextResultAsync(cancellationToken).ConfigureAwait(false)) { }
 					}
-					else if (deId.Setter != null)
-					{
-						value = await command.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false);
-						deId.Setter(dto, value);
-					}
 					else
 					{
-						await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+						value = await command.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false);
 					}
 				}
 				else
 				{
 					await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+
+					value = deId?.Getter(dto);
 				}
 
 				return value ?? throw new InvalidOperationException();
@@ -267,8 +231,6 @@ internal sealed class InsertQueryBuilder<TDoc, TCreate> : QueryBuilder<TDoc, TCr
 					await connection.DisposeAsync().ConfigureAwait(false);
 				}
 			}
-
-			return dto;
 		}
 		else/*  if (top.ContainerOperation == ContainerOperations.Exec) */
 		{

@@ -8,7 +8,7 @@ public class CDSNode
 	[DeId, Required]
 	public int CDSNodeId { get; set; }
 
-	[DeViewName, MaxLength(80), Required]
+	[DeName, MaxLength(80), Required]
 	public string Name { get; set; } = null!;
 	
 	[MaxLength(400)]

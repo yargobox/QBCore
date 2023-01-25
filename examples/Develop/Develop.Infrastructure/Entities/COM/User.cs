@@ -11,7 +11,7 @@ public class User
 	[Required, MaxLength(60)]
 	public string Login { get; set; } = null!;
 
-	[DeViewName, MaxLength(100)]
+	[DeName, MaxLength(100)]
 	public string? Name { get; set; }
 
 	[MaxLength(400)]

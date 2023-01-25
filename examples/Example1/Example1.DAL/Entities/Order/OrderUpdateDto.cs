@@ -6,7 +6,7 @@ namespace Example1.DAL.Entities.Orders;
 
 public class OrderUpdateDto
 {
-	[DeViewName] public string? Name { get; set; }
+	[DeName] public string? Name { get; set; }
 	public List<OrderPositionSelectDto>? OrderPositions { get; set; }
 	public decimal? Total { get; set; }
 

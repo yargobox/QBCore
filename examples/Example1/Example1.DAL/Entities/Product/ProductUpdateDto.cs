@@ -5,7 +5,7 @@ namespace Example1.DAL.Entities.Products;
 
 public class ProductUpdateDto
 {
-	[DeViewName] public string? Name { get; set; }
+	[DeName] public string? Name { get; set; }
 	[DeForeignId] public int? BrandId { get; set; }
 
 	static void Builder(IMongoUpdateQBBuilder<Product, ProductUpdateDto> builder)

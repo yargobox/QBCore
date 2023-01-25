@@ -32,6 +32,7 @@ public class DataSourceSelectOptions : DataSourceOperationOptions
 	public bool ObtainLastPageMark;
 	public bool ObtainTotalCount;
 	public Action<object>? NativeSelectQueryCallback;
+	public DEPath[]? IncludeOptionalFields;
 }
 public class DataSourceUpdateOptions : DataSourceOperationOptions
 {
