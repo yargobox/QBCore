@@ -27,7 +27,15 @@ public sealed class AppDS : DataSource<int, App, AppCreateDto, AppSelectDto, App
 		builder.Select("dvp.Apps")
 			.LeftJoin<Project>("dvp.Projects")
 				.Connect<Project, App>(project => project.ProjectId, app => app.ProjectId, FO.Equal)
-				.Include<Project>(sel => sel.ProjectName, project => project.Name);
+				.Include<Project>(sel => sel.ProjectName, project => project.Name)
+		;
+
+		/* builder.Select("dvp.Apps", "t0")
+			.LeftJoin<Project>("dvp.Projects", "t1")
+				.Connect<Project, App>("t1", project => project.ProjectId, "t0", app => app.ProjectId, FO.Equal)
+				.Include<Project>(sel => sel.ProjectName, "t1", project => project.Name)
+		; */
+
 	}
 	static void Builder(ISqlUpdateQBBuilder<App, AppUpdateDto> builder)
 	{

@@ -167,10 +167,15 @@ public sealed class DEPath : IEquatable<DEPath>, IReadOnlyList<DEInfo>
 	}
 
 	public override bool Equals(object? obj)
-		=> obj == null ? false : Equals(obj as DEPath);
+		=> obj is null ? false : Equals(obj as DEPath);
 
 	public bool Equals(DEPath? other)
-		=> other == null ? false : this.SequenceEqual(other);
+		=> other is null ? false : this.SequenceEqual(other);
+
+	public static bool operator ==(DEPath? left, DEPath? right)
+		=> left is not null ? left.Equals(right) : right is null;
+	public static bool operator !=(DEPath? left, DEPath? right)
+		=> left is not null ? !left.Equals(right) : right is not null;
 
 	public DEInfo this[int index]
 		=> _dataEntries != null

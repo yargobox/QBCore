@@ -92,12 +92,21 @@ public abstract class DEInfo : IComparable<DEInfo>, IEquatable<DEInfo>
 		=> Document.DocumentType.GetHashCode() ^ Name.GetHashCode();
 
 	public override bool Equals(object? obj)
-		=> obj == null ? false : Equals(obj as DEInfo);
+		=> obj is DEInfo value ? Equals(value) : false;
 
 	public bool Equals(DEInfo? other)
-		=> other == null
-			? false
-			: Document.DocumentType == other.Document.DocumentType && Name == other.Name;
+		=> other is not null
+			? object.ReferenceEquals(this, other) || (Document.DocumentType == other.Document.DocumentType && Name == other.Name)
+			: false;
+
+	public static bool operator ==(DEInfo? left, DEInfo? right)
+		=> left is not null
+			? left.Equals(right)
+			: right is null;
+	public static bool operator !=(DEInfo? left, DEInfo? right)
+		=> left is not null
+			? !left.Equals(right)
+			: right is not null;
 
 	public int CompareTo(DEInfo? other)
 	{
@@ -280,81 +289,34 @@ public readonly struct DEDefinition<TDoc> : IEquatable<DEDefinition<TDoc>>
 	public readonly DEInfo? Info;
 
 	public DEDefinition(string propertyOrFieldName)
-	{
-		if (propertyOrFieldName == null)
-		{
-			throw new ArgumentNullException(nameof(propertyOrFieldName));
-		}
-
-		Name = propertyOrFieldName;
-		Info = null;
-	}
+		=> Name = propertyOrFieldName ?? throw new ArgumentNullException(nameof(propertyOrFieldName));
 
 	public DEDefinition(DEInfo dataEntryInfo)
-	{
-		if (dataEntryInfo == null)
-		{
-			throw new ArgumentNullException(nameof(dataEntryInfo));
-		}
-
-		Name = null;
-		Info = dataEntryInfo;
-	}
+		=> Info = dataEntryInfo ?? throw new ArgumentNullException(nameof(dataEntryInfo));
 
 	public readonly DEInfo ToDataEntry(IDataLayerInfo dataLayer)
-	{
-		if (Info != null)
-		{
-			return Info;
-		}
-
-		return DEInfo.GetDataEntryInfo<TDoc>(Name!, dataLayer);
-	}
+		=> Info != null
+			? Info
+			: DEInfo.GetDataEntryInfo<TDoc>(Name!, dataLayer);
 	
 	public readonly DEPath ToDataEntryPath(IDataLayerInfo dataLayer)
-	{
-		if (Info != null)
-		{
-			return new DEPath(Info);
-		}
-
-		return new DEPath(typeof(TDoc), Name!, false, dataLayer);
-	}
+		=> Info != null
+			? new DEPath(Info)
+			: new DEPath(typeof(TDoc), Name!, false, dataLayer);
 
 	public readonly override string ToString()
-	{
-		return Name ?? Info!.Name;
-	}
+		=> Name ?? Info!.Name;
 
 	public readonly string ToString(bool shortDocumentName)
-	{
-		if (shortDocumentName)
-		{
-			return string.Concat(typeof(TDoc).Name, ".", (Name ?? Info!.Name));
-		}
-		else
-		{
-			return string.Concat(typeof(TDoc).FullName, ".", (Name ?? Info!.Name));
-		}
-	}
+		=> shortDocumentName
+			? string.Concat(typeof(TDoc).Name, ".", (Name ?? Info!.Name))
+			: string.Concat(typeof(TDoc).FullName, ".", (Name ?? Info!.Name));
 
 	public readonly override int GetHashCode()
-	{
-		return typeof(TDoc).GetHashCode() ^ (Name ?? Info!.Name).GetHashCode();
-	}
+		=> typeof(TDoc).GetHashCode() ^ (Name ?? Info!.Name).GetHashCode();
 
 	public readonly override bool Equals(object? obj)
-	{
-		if (obj == null)
-		{
-			return false;
-		}
-		if (obj is DEDefinition<TDoc> value2)
-		{
-			return Equals(value2);
-		}
-		return false;
-	}
+		=> obj is DEDefinition<TDoc> value ? Equals(value) : false;
 
 	public readonly bool Equals(DEDefinition<TDoc> other)
 		=> (Name ?? Info!.Name) == (other.Name ?? other.Info!.Name);
@@ -380,15 +342,7 @@ public readonly struct DEDefinition<TDoc, TField> : IEquatable<DEDefinition<TDoc
 	public readonly DEInfo? Info;
 
 	public DEDefinition(string propertyOrFieldName)
-	{
-		if (propertyOrFieldName == null)
-		{
-			throw new ArgumentNullException(nameof(propertyOrFieldName));
-		}
-
-		Name = propertyOrFieldName;
-		Info = null;
-	}
+		=> Name = propertyOrFieldName ?? throw new ArgumentNullException(nameof(propertyOrFieldName));
 
 	public DEDefinition(DEInfo dataEntryInfo)
 	{
@@ -401,7 +355,6 @@ public readonly struct DEDefinition<TDoc, TField> : IEquatable<DEDefinition<TDoc
 			throw new ArgumentException($"DataEntry '{dataEntryInfo.ToString(true)}' is of type '{dataEntryInfo.DataEntryType.ToPretty()}' which does not match the expected '{typeof(TField).ToPretty()}'.", nameof(dataEntryInfo));
 		}
 
-		Name = null;
 		Info = dataEntryInfo;
 	}
 
@@ -421,43 +374,22 @@ public readonly struct DEDefinition<TDoc, TField> : IEquatable<DEDefinition<TDoc
 	}
 
 	public readonly override string ToString()
-	{
-		return Name ?? Info!.Name;
-	}
+		=> Name ?? Info!.Name;
 
 	public readonly string ToString(bool shortDocumentName)
-	{
-		if (shortDocumentName)
-		{
-			return string.Concat(typeof(TDoc).Name, ".", (Name ?? Info!.Name));
-		}
-		else
-		{
-			return string.Concat(typeof(TDoc).FullName, ".", (Name ?? Info!.Name));
-		}
-	}
+		=> shortDocumentName
+			? string.Concat(typeof(TDoc).Name, ".", (Name ?? Info!.Name))
+			: string.Concat(typeof(TDoc).FullName, ".", (Name ?? Info!.Name));
 
 	public readonly override int GetHashCode()
-	{
-		return typeof(TDoc).GetHashCode() ^ (Name ?? Info!.Name).GetHashCode();
-	}
+		=> typeof(TDoc).GetHashCode() ^ (Name ?? Info!.Name).GetHashCode();
 
 	public readonly override bool Equals(object? obj)
-	{
-		if (obj == null)
-		{
-			return false;
-		}
-		if (obj is DEDefinition<TDoc, TField> a)
-		{
-			return Equals(a);
-		}
-		if (obj is DEDefinition<TDoc> b)
-		{
-			return Equals(b);
-		}
-		return false;
-	}
+		=> obj is DEDefinition<TDoc, TField> a
+			? Equals(a)
+			: obj is DEDefinition<TDoc> b
+				? Equals(b)
+				: false;
 
 	public readonly bool Equals(DEDefinition<TDoc> other)
 		=> (Name ?? Info!.Name) == (other.Name ?? other.Info!.Name);

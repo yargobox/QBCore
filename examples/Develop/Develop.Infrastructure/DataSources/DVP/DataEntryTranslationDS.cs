@@ -27,7 +27,8 @@ public sealed class DataEntryTranslationDS : DataSource<DataEntryTranslationID, 
 		builder.Select("dvp.Translations")
 			.LeftJoin<Language>("dvp.Languages")
 				.Connect<Language, DataEntryTranslation>(lang => lang.LanguageId, trans => trans.LanguageId, FO.Equal)
-				.Include<Language>(sel => sel.LanguageName, lang => lang.Name);
+				.Include<Language>(sel => sel.LanguageName, lang => lang.Name)
+		;
 	}
 	static void Builder(ISqlUpdateQBBuilder<DataEntryTranslation, DataEntryTranslationUpdateDto> builder)
 	{

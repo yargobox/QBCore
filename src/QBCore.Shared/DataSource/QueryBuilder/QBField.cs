@@ -50,8 +50,8 @@ public record QBField
 		get
 		{
 			return RefAlias != null
-				? $"{(IsOptional ? "Optional" : "Exclude")} {Field.Path} as {RefAlias}:{RefField?.Path}"
-				: $"{(IsOptional ? "Optional" : "Exclude")} {Field.Path}";
+				? $"{(IsExcluded ? "Excluded" : "Regular")} {(IsOptional ? "Optional" : "")} {Field.Path} as {RefAlias}:{RefField?.Path}"
+				: $"{(IsExcluded ? "Excluded" : "Regular")} {Field.Path}";
 		}
 	}
 }

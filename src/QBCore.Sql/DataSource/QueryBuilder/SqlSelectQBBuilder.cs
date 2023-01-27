@@ -522,27 +522,29 @@ internal abstract class SqlSelectQBBuilder<TDoc, TSelect> : QBBuilder<TDoc, TSel
 		return this;
 	}
 
-	private SqlSelectQBBuilder<TDoc, TSelect> AddInclude<TRef>(DEPathDefinition<TSelect> field, string? refAlias, DEPathDefinition<TRef>? refField)
+	private SqlSelectQBBuilder<TDoc, TSelect> AddInclude<TRef>(DEPathDefinition<TSelect> field, string? refAlias, DEPathDefinition<TRef> refField)
 	{
 		return AddInclude<TRef>(
 			field.ToDataEntryPath(DataLayer),
 			refAlias,
-			refField?.ToDataEntryPath(DataLayer)
+			refField.ToDataEntryPath(DataLayer)
 		);
 	}
 	private SqlSelectQBBuilder<TDoc, TSelect> AddInclude<TRef>(Expression<Func<TSelect, object?>> field, string? refAlias, Expression<Func<TRef, object?>> refField)
 	{
 		return AddInclude<TRef>(
 			new DEPath(field, false, DataLayer),
-			refAlias, refField != null ? new DEPath(refField, true, DataLayer) : null
+			refAlias,
+			new DEPath(refField ?? throw new ArgumentNullException(nameof(refField)), true, DataLayer)
 		);
 	}
-	private SqlSelectQBBuilder<TDoc, TSelect> AddInclude<TRef>(DEPath field, string? refAlias, DEPath? refField)
+	private SqlSelectQBBuilder<TDoc, TSelect> AddInclude<TRef>(DEPath field, string? refAlias, DEPath refField)
 	{
 		if (_isByOr != null || _parentheses > 0)
 		{
 			throw new InvalidOperationException($"Incorrect condition definition of select query builder '{typeof(TSelect).ToPretty()}'.");
 		}
+
 		if (field == null)
 		{
 			throw new ArgumentNullException(nameof(field));
@@ -551,6 +553,7 @@ internal abstract class SqlSelectQBBuilder<TDoc, TSelect> : QBBuilder<TDoc, TSel
 		{
 			throw new ArgumentException(nameof(field));
 		}
+
 		if (refField == null)
 		{
 			throw new ArgumentNullException(nameof(refField));
@@ -569,24 +572,53 @@ internal abstract class SqlSelectQBBuilder<TDoc, TSelect> : QBBuilder<TDoc, TSel
 			throw new InvalidOperationException($"Incorrect field definition of select query builder '{typeof(TSelect).ToPretty()}': referenced container '{refAlias}' of  document '{typeof(TRef).ToPretty()}' has not been added yet.");
 		}
 
+		QBField? existingField = null;
+		int index = -1;
 
 		if (_fields == null)
 		{
 			_fields = new List<QBField>(8);
 		}
-		else if (_fields.Any(x => x.Field.Path == field.Path))
+		else
 		{
-			throw new InvalidOperationException($"Incorrect field definition of select query builder '{typeof(TSelect).ToPretty()}': field {field.Path} has already been included/excluded before.");
+			index = _fields.FindIndex(x => x.Field == field);
+			if (index >= 0)
+			{
+				existingField = _fields[index];
+				if (existingField.RefAlias != null)
+				{
+					if (existingField.RefAlias != refAlias || existingField.RefField != field)
+					{
+						throw new InvalidOperationException($"Incorrect field definition of select query builder '{typeof(TSelect).ToPretty()}': field {field.Path} has already been included/excluded before.");
+					}
+
+					return this;
+				}
+			}
 		}
 
 		IsNormalized = false;
-		_fields.Add(new QBField(
-			Field: field,
-			RefAlias: refAlias,
-			RefField: refField,
-			IsOptional: false,
-			IsExcluded: false
-		));
+
+		if (existingField == null)
+		{
+			_fields.Add(new QBField(
+				Field: field,
+				RefAlias: refAlias,
+				RefField: refField,
+				IsOptional: false,
+				IsExcluded: false
+			));
+		}
+		else
+		{
+			_fields[index] = new QBField(
+				Field: existingField.Field,
+				RefAlias: refAlias,
+				RefField: refField,
+				IsOptional: existingField.IsOptional,
+				IsExcluded: existingField.IsExcluded
+			);
+		}
 
 		return this;
 	}
@@ -605,6 +637,7 @@ internal abstract class SqlSelectQBBuilder<TDoc, TSelect> : QBBuilder<TDoc, TSel
 		{
 			throw new InvalidOperationException($"Incorrect condition definition of select query builder '{typeof(TSelect).ToPretty()}'.");
 		}
+
 		if (field == null)
 		{
 			throw new ArgumentNullException(nameof(field));
@@ -614,23 +647,57 @@ internal abstract class SqlSelectQBBuilder<TDoc, TSelect> : QBBuilder<TDoc, TSel
 			throw new ArgumentException(nameof(field));
 		}
 
+		if (!Containers.Any(x => x.ContainerOperation.HasAnyFlag(ContainerOperations.MainMask) && (x.DocumentType == typeof(TSelect) || x.DocumentType == typeof(TDoc))))
+		{
+			throw new InvalidOperationException($"Incorrect field definition of select query builder '{typeof(TSelect).ToPretty()}': referenced main container of document '{typeof(TSelect).ToPretty()}' has not been added yet.");
+		}
+
+		QBField? existingField = null;
+		int index = -1;
+
 		if (_fields == null)
 		{
 			_fields = new List<QBField>(8);
 		}
-		else if (_fields.Any(x => x.Field.Path == field.Path))
+		else
 		{
-			throw new InvalidOperationException($"Incorrect field definition of select query builder '{typeof(TSelect).ToPretty()}': field '{field.Path}' has already been included/excluded before.");
+			index = _fields.FindIndex(x => x.Field == field);
+			if (index >= 0)
+			{
+				existingField = _fields[index];
+				if ((existingField.IsExcluded && optional) || (existingField.IsOptional && !optional))
+				{
+					throw new InvalidOperationException($"Incorrect field definition of select query builder '{typeof(TSelect).ToPretty()}': field {field.Path} has already been included/excluded before.");
+				}
+				else if (existingField.IsExcluded == !optional && existingField.IsOptional == optional)
+				{
+					return this;
+				}
+			}
 		}
 
 		IsNormalized = false;
-		_fields.Add(new QBField(
-			Field: field,
-			RefAlias: null,
-			RefField: null,
-			IsOptional: optional,
-			IsExcluded: optional
-		));
+
+		if (existingField == null)
+		{
+			_fields.Add(new QBField(
+				Field: field,
+				RefAlias: null,
+				RefField: null,
+				IsOptional: optional,
+				IsExcluded: !optional
+			));
+		}
+		else
+		{
+			_fields[index] = new QBField(
+				Field: existingField.Field,
+				RefAlias: existingField.RefAlias,
+				RefField: existingField.RefField,
+				IsOptional: optional,
+				IsExcluded: !optional
+			);
+		}
 
 		return this;
 	}
