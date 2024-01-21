@@ -58,27 +58,25 @@ public abstract partial class DataSource<TKey, TDoc, TCreate, TSelect, TUpdate, 
 			throw new InvalidOperationException($"DataSource {DSInfo.Name} does not support the insert operation.");
 		}
 
-		var getId = DSInfo.DocumentInfo.Value.IdField?.Getter
-			?? throw new InvalidOperationException($"Document '{DSInfo.DocumentInfo.Value.DocumentType.ToPretty()}' does not have an id data entry.");
+		var getId = DSInfo.DocInfo.Value.IdField?.Getter
+			?? throw new InvalidOperationException($"Document '{DSInfo.DocInfo.Value.DocumentType.ToPretty()}' does not have an id data entry.");
 
 		var qb = DSInfo.QBFactory.CreateQBInsert<TDoc, TCreate>(_dataContext);
-		var builder = qb.Builder;
 
 		object? value;
-		DEInfo? deInfo;
-		foreach (var param in builder.Parameters.Where(x => x.Direction.HasFlag(ParameterDirection.Input)))
+		foreach (var param in qb.Builder.Parameters.Where(x => x.Direction.HasFlag(ParameterDirection.Input)))
 		{
 			param.ResetValue();
+
 			if (parameters != null && parameters.TryGetValue(param.ParameterName, out value))
 			{
 				param.Value = value;
 			}
-			else if (param.ParameterName.StartsWith('@') && document is not null)
+			else if (param.ParameterName.StartsWith('='))
 			{
-				deInfo = qb.Builder.DtoInfo?.DataEntries.GetValueOrDefault(param.ParameterName.Substring(1));
-				if (deInfo != null)
+				if (_dataContext.Args != null && _dataContext.Args.TryGetValue(param.ParameterName, out value))
 				{
-					param.Value = deInfo.Getter(document!);
+					param.Value = value;
 				}
 			}
 		}
@@ -91,7 +89,7 @@ public abstract partial class DataSource<TKey, TDoc, TCreate, TSelect, TUpdate, 
 
 		var result = await qb.InsertAsync(document, options, cancellationToken).ConfigureAwait(false);
 
-		UpdateOutputParameters(parameters, builder.Parameters);
+		UpdateOutputParameters(parameters, qb.Builder.Parameters);
 
 		return (TKey) result;
 	}
@@ -138,8 +136,8 @@ public abstract partial class DataSource<TKey, TDoc, TCreate, TSelect, TUpdate, 
 			throw EX.QueryBuilder.Make.IdentifierValueNotSpecified(nameof(id));
 		}
 
-		var idField = DSInfo.DocumentInfo.Value.IdField
-			?? throw new InvalidOperationException($"Document '{DSInfo.DocumentInfo.Value.DocumentType.ToPretty()}' does not have an id data entry.");
+		var idField = DSInfo.DocInfo.Value.IdField
+			?? throw new InvalidOperationException($"Document '{DSInfo.DocInfo.Value.DocumentType.ToPretty()}' does not have an id data entry.");
 
 		var qb = DSInfo.QBFactory.CreateQBSelect<TDoc, TSelect>(_dataContext);
 		var builder = qb.Builder;
@@ -150,9 +148,26 @@ public abstract partial class DataSource<TKey, TDoc, TCreate, TSelect, TUpdate, 
 		foreach (var param in builder.Parameters.Where(x => x.Direction.HasFlag(ParameterDirection.Input)))
 		{
 			param.ResetValue();
+
 			if (parameters != null && parameters.TryGetValue(param.ParameterName, out value))
 			{
 				param.Value = value;
+			}
+			else if (param.ParameterName.StartsWith('='))
+			{
+				if (_dataContext.Args != null && _dataContext.Args.TryGetValue(param.ParameterName, out value))
+				{
+					param.Value = value;
+				}
+				else
+				{
+					switch (param.ParameterName)
+					{
+						case "=skip": param.Value = 0; break;
+						case "=take": param.Value = -1; break;
+						case "=mode": param.Value = (int)2; break;
+					}
+				}
 			}
 		}
 
@@ -181,18 +196,16 @@ public abstract partial class DataSource<TKey, TDoc, TCreate, TSelect, TUpdate, 
 
 		if (DSInfo.Options.HasFlag(DataSourceOptions.SoftDelete))
 		{
-			if (DSInfo.DocumentInfo.Value.DateDeletedField == null)
-			{
-				throw new InvalidOperationException($"Incorrect definition of select query builder '{typeof(TSelect).ToPretty()}': option '{nameof(DSInfo.DocumentInfo.Value.DateDeletedField)}' is not set.");
-			}
+			var deDeleted = builder.DtoInfo?.DateDeletedField ?? builder.DocInfo.DateDeletedField
+				?? throw new InvalidOperationException($"Incorrect definition of select query builder '{typeof(TSelect).ToPretty()}': option '{nameof(DSInfo.DocInfo.Value.DateDeletedField)}' is not set.");
 
 			if (mode == SoftDel.Actual)
 			{
-				builder.Condition(DSInfo.DocumentInfo.Value.DateDeletedField, null, FO.IsNull);
+				builder.Condition(deDeleted, null, FO.IsNull);
 			}
 			else if (mode == SoftDel.Deleted)
 			{
-				builder.Condition(DSInfo.DocumentInfo.Value.DateDeletedField, null, FO.IsNotNull);
+				builder.Condition(deDeleted, null, FO.IsNotNull);
 			}
 		}
 
@@ -205,14 +218,14 @@ public abstract partial class DataSource<TKey, TDoc, TCreate, TSelect, TUpdate, 
 				{
 					builder.Or();
 				}
-				
+
 				for (int i = 0; i < cond.Parentheses; i++)
 				{
 					builder.Begin();
 				}
-				
+
 				builder.Condition<TSelect>(rootAlias, cond.Field, cond.Value, cond.Operation);
-				
+
 				for (int i = cond.Parentheses; i < 0; i++)
 				{
 					builder.End();
@@ -237,9 +250,26 @@ public abstract partial class DataSource<TKey, TDoc, TCreate, TSelect, TUpdate, 
 		foreach (var param in builder.Parameters.Where(x => x.Direction.HasFlag(ParameterDirection.Input)))
 		{
 			param.ResetValue();
+
 			if (parameters != null && parameters.TryGetValue(param.ParameterName, out value))
 			{
 				param.Value = value;
+			}
+			else if (param.ParameterName.StartsWith('='))
+			{
+				if (_dataContext.Args != null && _dataContext.Args.TryGetValue(param.ParameterName, out value))
+				{
+					param.Value = value;
+				}
+				else
+				{
+					switch (param.ParameterName)
+					{
+						case "=skip": param.Value = skip; break;
+						case "=take": param.Value = take; break;
+						case "=mode": param.Value = (int)mode; break;
+					}
+				}
 			}
 		}
 
@@ -261,34 +291,28 @@ public abstract partial class DataSource<TKey, TDoc, TCreate, TSelect, TUpdate, 
 		}
 
 		var qb = DSInfo.QBFactory.CreateQBUpdate<TDoc, TUpdate>(_dataContext);
-		var builder = qb.Builder;
 
 		object? value;
-		DEInfo? deInfo;
-		foreach (var param in builder.Parameters.Where(x => x.Direction.HasFlag(ParameterDirection.Input)))
+		foreach (var param in qb.Builder.Parameters.Where(x => x.Direction.HasFlag(ParameterDirection.Input)))
 		{
 			param.ResetValue();
+
 			if (parameters != null && parameters.TryGetValue(param.ParameterName, out value))
 			{
 				param.Value = value;
 			}
-			else if (param.ParameterName == "@id")
+			else if (param.ParameterName.StartsWith('='))
 			{
-				param.Value = id;
-			}
-			else if (param.ParameterName.StartsWith('@') && document is not null)
-			{
-				deInfo = qb.Builder.DtoInfo?.DataEntries.GetValueOrDefault(param.ParameterName.Substring(1));
-				if (deInfo != null)
+				if (_dataContext.Args != null && _dataContext.Args.TryGetValue(param.ParameterName, out value))
 				{
-					param.Value = deInfo.Getter(document!);
+					param.Value = value;
 				}
 			}
 		}
 
 		await qb.UpdateAsync(id!, document, validFieldNames, options, cancellationToken).ConfigureAwait(false);
 	
-		UpdateOutputParameters(parameters, builder.Parameters);
+		UpdateOutputParameters(parameters, qb.Builder.Parameters);
 	}
 
 	public async Task DeleteAsync(
@@ -307,66 +331,54 @@ public abstract partial class DataSource<TKey, TDoc, TCreate, TSelect, TUpdate, 
 		if (DSInfo.Options.HasFlag(DataSourceOptions.SoftDelete))
 		{
 			var qb = DSInfo.QBFactory.CreateQBSoftDel<TDoc, TDelete>(_dataContext);
-			var builder = qb.Builder;
 
 			object? value;
-			DEInfo? deInfo;
-			foreach (var param in builder.Parameters.Where(x => x.Direction.HasFlag(ParameterDirection.Input)))
+			foreach (var param in qb.Builder.Parameters.Where(x => x.Direction.HasFlag(ParameterDirection.Input)))
 			{
 				param.ResetValue();
+
 				if (parameters != null && parameters.TryGetValue(param.ParameterName, out value))
 				{
 					param.Value = value;
 				}
-				else if (param.ParameterName == "@id")
+				else if (param.ParameterName.StartsWith('='))
 				{
-					param.Value = id;
-				}
-				else if (param.ParameterName.StartsWith('@') && document is not null)
-				{
-					deInfo = qb.Builder.DtoInfo?.DataEntries.GetValueOrDefault(param.ParameterName.Substring(1));
-					if (deInfo != null)
+					if (_dataContext.Args != null && _dataContext.Args.TryGetValue(param.ParameterName, out value))
 					{
-						param.Value = deInfo.Getter(document!);
+						param.Value = value;
 					}
 				}
 			}
 
 			await qb.DeleteAsync(id!, document, options, cancellationToken).ConfigureAwait(false);
 
-			UpdateOutputParameters(parameters, builder.Parameters);
+			UpdateOutputParameters(parameters, qb.Builder.Parameters);
 		}
 		else
 		{
 			var qb = DSInfo.QBFactory.CreateQBDelete<TDoc, TDelete>(_dataContext);
-			var builder = qb.Builder;
 
 			object? value;
-			DEInfo? deInfo;
-			foreach (var param in builder.Parameters.Where(x => x.Direction.HasFlag(ParameterDirection.Input)))
+			foreach (var param in qb.Builder.Parameters.Where(x => x.Direction.HasFlag(ParameterDirection.Input)))
 			{
 				param.ResetValue();
+
 				if (parameters != null && parameters.TryGetValue(param.ParameterName, out value))
 				{
 					param.Value = value;
 				}
-				else if (param.ParameterName == "@id")
+				else if (param.ParameterName.StartsWith('='))
 				{
-					param.Value = id;
-				}
-				else if (param.ParameterName.StartsWith('@') && document is not null)
-				{
-					deInfo = qb.Builder.DtoInfo?.DataEntries.GetValueOrDefault(param.ParameterName.Substring(1));
-					if (deInfo != null)
+					if (_dataContext.Args != null && _dataContext.Args.TryGetValue(param.ParameterName, out value))
 					{
-						param.Value = deInfo.Getter(document!);
+						param.Value = value;
 					}
 				}
 			}
 
 			await qb.DeleteAsync(id!, document, options, cancellationToken).ConfigureAwait(false);
 
-			UpdateOutputParameters(parameters, builder.Parameters);
+			UpdateOutputParameters(parameters, qb.Builder.Parameters);
 		}
 	}
 
@@ -384,34 +396,28 @@ public abstract partial class DataSource<TKey, TDoc, TCreate, TSelect, TUpdate, 
 		}
 
 		var qb = DSInfo.QBFactory.CreateQBRestore<TDoc, TRestore>(_dataContext);
-		var builder = qb.Builder;
 
 		object? value;
-		DEInfo? deInfo;
-		foreach (var param in builder.Parameters.Where(x => x.Direction.HasFlag(ParameterDirection.Input)))
+		foreach (var param in qb.Builder.Parameters.Where(x => x.Direction.HasFlag(ParameterDirection.Input)))
 		{
 			param.ResetValue();
+
 			if (parameters != null && parameters.TryGetValue(param.ParameterName, out value))
 			{
 				param.Value = value;
 			}
-			else if (param.ParameterName == "@id")
+			else if (param.ParameterName.StartsWith('='))
 			{
-				param.Value = id;
-			}
-			else if (param.ParameterName.StartsWith('@') && document is not null)
-			{
-				deInfo = qb.Builder.DtoInfo?.DataEntries.GetValueOrDefault(param.ParameterName.Substring(1));
-				if (deInfo != null)
+				if (_dataContext.Args != null && _dataContext.Args.TryGetValue(param.ParameterName, out value))
 				{
-					param.Value = deInfo.Getter(document!);
+					param.Value = value;
 				}
 			}
 		}
 
 		await qb.RestoreAsync(id!, document, options, cancellationToken).ConfigureAwait(false);
 
-		UpdateOutputParameters(parameters, builder.Parameters);
+		UpdateOutputParameters(parameters, qb.Builder.Parameters);
 	}
 
 	private static void UpdateOutputParameters(IDictionary<string, object?>? parameters, IReadOnlyList<QBParameter> qbParameters)

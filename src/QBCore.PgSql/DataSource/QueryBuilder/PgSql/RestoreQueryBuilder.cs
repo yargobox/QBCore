@@ -22,11 +22,8 @@ internal sealed class RestoreQueryBuilder<TDoc, TRestore> : QueryBuilder<TDoc, T
 		if (id is null) throw EX.QueryBuilder.Make.IdentifierValueNotSpecified(nameof(id));
 		if (document is null && typeof(TRestore) != typeof(EmptyDto)) throw EX.QueryBuilder.Make.DocumentNotSpecified(nameof(document));
 
-		var top = Builder.Containers.FirstOrDefault();
-		if (top?.ContainerOperation != ContainerOperations.Update && top?.ContainerOperation != ContainerOperations.Exec)
-		{
-			throw EX.QueryBuilder.Make.QueryBuilderOperationNotSupported(Builder.DataLayer.Name, QueryBuilderType.ToString(), top?.ContainerOperation.ToString());
-		}
+		Builder.Normalize();
+		var top = Builder.Containers[0];
 
 		NpgsqlConnection? connection = null;
 		NpgsqlTransaction? transaction = null;
@@ -47,8 +44,12 @@ internal sealed class RestoreQueryBuilder<TDoc, TRestore> : QueryBuilder<TDoc, T
 			}
 		}
 
-		if (top.ContainerOperation == ContainerOperations.Update)
+		if (top.ContainerOperation == ContainerOperations.Update && (top.ContainerType == ContainerTypes.Table || top.ContainerType == ContainerTypes.View))
 		{
+			var command = new NpgsqlCommand();
+			var sb = new StringBuilder();
+			string queryString;
+
 			if (Builder.Conditions.Count == 0)
 			{
 				throw EX.QueryBuilder.Make.QueryBuilderMustHaveAtLeastOneCondition(Builder.DataLayer.Name, QueryBuilderType.ToString());
@@ -58,38 +59,28 @@ internal sealed class RestoreQueryBuilder<TDoc, TRestore> : QueryBuilder<TDoc, T
 				?? throw EX.QueryBuilder.Make.DocumentDoesNotHaveIdDataEntry(Builder.DocInfo.DocumentType.ToPretty());
 			var deDeleted = (SqlDEInfo?)Builder.DocInfo.DateDeletedField
 				?? throw EX.QueryBuilder.Make.DocumentDoesNotHaveDeletedDataEntry(Builder.DocInfo.DocumentType.ToPretty());
-			var deProjDeleted = Builder.DtoInfo?.DateDeletedField;
+			var deDtoDeleted = Builder.DtoInfo?.DateDeletedField;
 
-			string queryString;
-			var sb = new StringBuilder();
-			var command = new NpgsqlCommand();
 			bool isDeletedSet = false;
 			object? deleted = null;
+			DEInfo? de;
 
-			if (document is not null)
+			foreach (var p in Builder.Parameters.Where(x => x.Direction.HasFlag(ParameterDirection.Input)))
 			{
-				DEInfo? de;
-
-				foreach (var p in Builder.Parameters)
+				if (p.ParameterName == deId.Name)
 				{
-					if (p.Direction.HasFlag(ParameterDirection.Input))
-					{
-						if (p.ParameterName == "@id")
-						{
-							p.Value = id;
-						}
-						else if (Builder.DtoInfo!.DataEntries.TryGetValue(p.ParameterName, out de))
-						{
-							p.Value = de.Getter(document);
-						}
-					}
+					p.Value = id;
 				}
-
-				if (deProjDeleted?.Getter != null)
+				else if (!p.HasValue && document is not null && Builder.DtoInfo!.DataEntries.TryGetValue(p.ParameterName, out de))
 				{
-					deleted = deProjDeleted.Getter(document);
-					isDeletedSet = deleted is not null && deleted != deProjDeleted.UnderlyingType.GetDefaultValue();
+					p.Value = de.Getter(document);
 				}
+			}
+
+			if (document is not null && deDtoDeleted?.Getter != null)
+			{
+				deleted = deDtoDeleted.Getter(document);
+				isDeletedSet = deleted is not null && deleted != deDtoDeleted.UnderlyingType.GetDefaultValue();
 			}
 
 			sb.Append("UPDATE ").AppendQuotedContainer(top).Append(" SET").AppendLine();
@@ -97,7 +88,7 @@ internal sealed class RestoreQueryBuilder<TDoc, TRestore> : QueryBuilder<TDoc, T
 
 			if (isDeletedSet)
 			{
-				var param = Builder.Parameters.FirstOrDefault(x => x.ParameterName == deProjDeleted!.Name);
+				var param = Builder.Parameters.FirstOrDefault(x => x.ParameterName == deDtoDeleted!.Name);
 				command.Parameters.Add(MakeUnnamedParameter(param, deleted));
 
 				sb.Append("$1");
@@ -149,9 +140,13 @@ internal sealed class RestoreQueryBuilder<TDoc, TRestore> : QueryBuilder<TDoc, T
 				}
 			}
 		}
-		else/*  if (top.ContainerOperation == ContainerOperations.Exec) */
+		else if (top.ContainerOperation == ContainerOperations.Exec && (top.ContainerType == ContainerTypes.Function || top.ContainerType == ContainerTypes.Procedure))
 		{
-			throw new NotImplementedException();
+			
+		}
+		else
+		{
+			throw EX.QueryBuilder.Make.QueryBuilderOperationNotSupported(Builder.DataLayer.Name, QueryBuilderType.ToString(), top.ContainerOperation.ToString());
 		}
 	}
 }

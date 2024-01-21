@@ -1,3 +1,4 @@
+using System.Data;
 using System.Linq.Expressions;
 using QBCore.Extensions.Linq;
 
@@ -498,19 +499,24 @@ internal abstract class SqlSelectQBBuilder<TDoc, TSelect> : QBBuilder<TDoc, TSel
 		return this;
 	}
 
-	private SqlSelectQBBuilder<TDoc, TSelect> AddParameter(string name, Type underlyingType, bool isNullable, System.Data.ParameterDirection direction, Enum dbType)
+	private SqlSelectQBBuilder<TDoc, TSelect> AddParameter(string name, Type underlyingType, bool isNullable, ParameterDirection direction, Enum? dbType)
 	{
 		if (_parameters == null)
 		{
 			_parameters = new List<QBParameter>(8);
 		}
 
-		var param = _parameters.FirstOrDefault(x => x.ParameterName == name);
-		if (param != null)
+		var paramIndex = _parameters.FindIndex(x => x.ParameterName == name);
+		if (paramIndex >= 0)
 		{
-			if (param.ClrType != underlyingType || param.IsNullable != isNullable || param.Direction != direction)
+			var param = _parameters[paramIndex];
+			if (param.ClrType != underlyingType || param.IsNullable != isNullable || param.Direction != direction || (dbType != null && param.DbType != null && dbType != param.DbType))
 			{
-				throw new InvalidOperationException($"Incorrect parameter definition of select query builder '{typeof(TSelect).ToPretty()}': parameter '{name}' has already been added before with different properties");
+				throw new InvalidOperationException($"Incorrect parameter definition of query builder '{typeof(TSelect).ToPretty()}': parameter '{name}' has already been added before with different properties");
+			}
+			else if (dbType != null && param.DbType == null)
+			{
+				_parameters[paramIndex] = new QBParameter(name, underlyingType, isNullable, direction, dbType);
 			}
 		}
 		else

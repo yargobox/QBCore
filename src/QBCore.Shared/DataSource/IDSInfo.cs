@@ -8,7 +8,7 @@ public interface IDSInfo : IAppObjectInfo
 	DSTypeInfo DSTypeInfo { get; }
 	Type DataSourceServiceType { get; }
 
-	Lazy<DSDocumentInfo> DocumentInfo { get; }
+	Lazy<DSDocumentInfo> DocInfo { get; }
 	Lazy<DSDocumentInfo>? CreateInfo { get; }
 	Lazy<DSDocumentInfo>? SelectInfo { get; }
 	Lazy<DSDocumentInfo>? UpdateInfo { get; }

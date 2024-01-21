@@ -1,3 +1,4 @@
+using System.Data;
 using System.Linq.Expressions;
 
 namespace QBCore.DataSource.QueryBuilder;
@@ -279,30 +280,29 @@ internal abstract class SqlCommonQBBuilder<TDoc, TDto> : QBBuilder<TDoc, TDto>
 		{
 			var fieldPath = _conditions![_conditions.Count - 1].Field;
 
-			AddParameter(paramName!, fieldPath.DataEntryType, fieldPath.IsNullable, System.Data.ParameterDirection.Input, null);
+			AddParameter(paramName!, fieldPath.DataEntryType, fieldPath.IsNullable, ParameterDirection.Input, null);
 		}
 
 		return this;
 	}
 
-	protected QBBuilder<TDoc, TDto> AddParameter(string name, Type underlyingType, bool isNullable, System.Data.ParameterDirection direction, Enum? dbType)
+	public override QBBuilder<TDoc, TDto> AddParameter(string name, Type underlyingType, bool isNullable, ParameterDirection direction, Enum? dbType)
+		=> AddParameter(new QBParameter(name, underlyingType, isNullable, direction, dbType));
+	public override QBBuilder<TDoc, TDto> AddParameter(QBParameter param)
 	{
-		if (_parameters == null)
-		{
-			_parameters = new List<QBParameter>(8);
-		}
+		_parameters ??= new List<QBParameter>(8);
 
-		var paramIndex = _parameters.FindIndex(x => x.ParameterName == name);
-		if (paramIndex >= 0)
+		var index = _parameters.FindIndex(x => x.ParameterName == name);
+		if (index >= 0)
 		{
-			var param = _parameters[paramIndex];
+			var param = _parameters[index];
 			if (param.ClrType != underlyingType || param.IsNullable != isNullable || param.Direction != direction || (dbType != null && param.DbType != null && dbType != param.DbType))
 			{
 				throw new InvalidOperationException($"Incorrect parameter definition of query builder '{typeof(TDto).ToPretty()}': parameter '{name}' has already been added before with different properties");
 			}
 			else if (dbType != null && param.DbType == null)
 			{
-				_parameters[paramIndex] = new QBParameter(name, underlyingType, isNullable, direction, dbType);
+				_parameters[index] = new QBParameter(name, underlyingType, isNullable, direction, dbType);
 			}
 		}
 		else

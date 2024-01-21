@@ -45,7 +45,7 @@ public record QBParameter
 		ParamInfo = paramInfo;
 	}
 
-	public QBParameter(string parameterName, Type clrType, bool isNullable = false, ParameterDirection direction = ParameterDirection.Input, Enum? dbType = null, string? dbTypeName = null, int size = 0, byte precision = 0, byte scale = 0, bool isErrorCode = false, bool isErrorMessage = false, string? sourceColumn = null)
+	public QBParameter(string? parameterName, Type clrType, bool isNullable = false, ParameterDirection direction = ParameterDirection.Input, Enum? dbType = null, string? dbTypeName = null, int size = 0, byte precision = 0, byte scale = 0, bool isErrorCode = false, bool isErrorMessage = false, string? sourceColumn = null)
 	{
 		ParamInfo = new QBParamInfo(parameterName, clrType, isNullable, direction, dbType, dbTypeName, size, precision, scale, isErrorCode, isErrorMessage, sourceColumn);
 	}
@@ -75,16 +75,16 @@ public record QBParamInfo
 	public bool IsErrorCode => (_binData & 0x02000000U) == 0x02000000U;
 	public bool IsErrorMessage => (_binData & 0x04000000U) == 0x04000000U;
 
-	public QBParamInfo(string parameterName, Type clrType, bool isNullable, ParameterDirection direction, Enum? dbType, string? dbTypeName = null, int size = 0, byte precision = 0, byte scale = 0, bool isErrorCode = false, bool isErrorMessage = false, string? sourceColumn = null)
+	public QBParamInfo(string? parameterName, Type clrType, bool isNullable, ParameterDirection direction, Enum? dbType, string? dbTypeName = null, int size = 0, byte precision = 0, byte scale = 0, bool isErrorCode = false, bool isErrorMessage = false, string? sourceColumn = null)
 	{
-		if (parameterName == null) throw new ArgumentNullException(nameof(parameterName));
+		//if (parameterName == null) throw new ArgumentNullException(nameof(parameterName));
 		if (clrType == null) throw new ArgumentNullException(nameof(clrType));
 		if (string.IsNullOrEmpty(dbTypeName)) dbTypeName = null;
 		if (dbTypeName?.IndexOf('(') >= 0) throw new ArgumentException(nameof(dbTypeName));
 		if (size < -1) throw new ArgumentException(nameof(size));
 		if (string.IsNullOrEmpty(sourceColumn)) sourceColumn = null;
 
-		ParameterName = parameterName;
+		ParameterName = parameterName ?? string.Empty;
 		ClrType = clrType;
 		DbType = dbType;
 		DbTypeName = dbTypeName;

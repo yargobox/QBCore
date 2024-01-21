@@ -9,3 +9,5 @@ public interface IProjectService : IDataSource<int, ProjectCreateDto, ProjectSel
 public interface IAppService : IDataSource<int, AppCreateDto, AppSelectDto, AppUpdateDto, EmptyDto, EmptyDto> { }
 
 public interface IDataEntryTranslationService : IDataSource<DataEntryTranslationID, DataEntryTranslationCreateDto, DataEntryTranslationSelectDto, DataEntryTranslationUpdateDto, EmptyDto, EmptyDto> { }
+
+public interface IFuncGroupService : IDataSource<int, FuncGroupCreateDto, FuncGroupSelectDto, FuncGroupUpdateDto, EmptyDto, EmptyDto> { }

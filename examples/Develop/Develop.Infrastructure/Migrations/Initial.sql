@@ -520,3 +520,69 @@ SELECT setval(
     false);
 
 COMMIT;
+
+/*
+CREATE OR REPLACE FUNCTION dvp."GetTranslationsByCategory"(category character varying(60), languageId integer)
+RETURNS TABLE
+(
+	"RefId" integer,
+    "Name" character varying(80)
+) LANGUAGE SQL AS
+$$
+	SELECT "RefId", "Name" FROM dvp."Translations" WHERE "RefKey" = category AND "LanguageId" = languageId ORDER BY "Name"
+$$;
+
+CREATE OR REPLACE PROCEDURE dvp."spTranslationsByCategory"(category character varying(60), languageId integer, INOUT refcursor refcursor = 'refcursor')
+LANGUAGE plpgsql AS
+$$
+BEGIN
+	OPEN refcursor FOR 
+	SELECT "RefId", "Name" FROM dvp."Translations" WHERE "RefKey" = category AND "LanguageId" = languageId ORDER BY "Name";
+END
+$$;
+
+CREATE OR REPLACE PROCEDURE dvp."spTranslationsByCategory"(category character varying(60), languageId integer, INOUT refcur refcursor)
+LANGUAGE plpgsql AS
+$$
+BEGIN
+	SELECT 'c18928928921892' INTO refcur;
+	OPEN refcur FOR
+	SELECT "RefId", "Name" FROM dvp."Translations" WHERE "RefKey" = category AND "LanguageId" = languageId ORDER BY "Name";
+END
+$$;
+
+SELECT * FROM dvp."GetTranslationsByCategory"('DataEntry', 2);
+SELECT * FROM dvp."GetTranslationsByCategory"(languageId => 2, category => 'DataEntry');
+
+BEGIN;
+	CALL dvp."spTranslationsByCategory"('DataEntry', 2);
+	FETCH ALL FROM "refcursor";
+END;
+
+
+--
+-- https://stackoverflow.com/questions/32862416/how-can-i-get-cursor-data-with-calling-stored-procedure-in-npgsql
+-- https://dba.stackexchange.com/questions/257596/returning-values-for-stored-procedures-in-postgresql
+--
+
+CREATE PROCEDURE assign_demo(INOUT _val text DEFAULT null)
+  LANGUAGE plpgsql AS
+$proc$
+BEGIN
+   SELECT val FROM tbl WHERE id = 2
+   INTO _val;                              -- !!!
+END
+$proc$;
+
+CREATE PROCEDURE lang_sql_demo(INOUT _val text DEFAULT null)
+  LANGUAGE sql AS
+$proc$
+SELECT val FROM tbl WHERE id = 2;
+$proc$;
+
+CREATE OR REPLACE PROCEDURE lang_std_sql_demo(INOUT _val text DEFAULT null)
+  LANGUAGE sql
+BEGIN ATOMIC
+SELECT val FROM tbl WHERE id = 2;
+END;
+*/

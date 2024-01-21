@@ -15,7 +15,7 @@ internal sealed class DSInfo : IDSInfo
 
 	public DSTypeInfo DSTypeInfo { get; }
 
-	public Lazy<DSDocumentInfo> DocumentInfo { get; }
+	public Lazy<DSDocumentInfo> DocInfo { get; }
 	public Lazy<DSDocumentInfo>? CreateInfo { get; }
 	public Lazy<DSDocumentInfo>? SelectInfo { get; }
 	public Lazy<DSDocumentInfo>? UpdateInfo { get; }
@@ -251,7 +251,7 @@ internal sealed class DSInfo : IDSInfo
 
 		// Register DataSource's document types, including nested ones.
 		//
-		DocumentInfo = StaticFactory.Internals.GetOrRegisterDocument(DSTypeInfo.TDoc, dataLayer);
+		DocInfo = StaticFactory.Internals.GetOrRegisterDocument(DSTypeInfo.TDoc, dataLayer);
 		CreateInfo = DSTypeInfo.TCreate != typeof(NotSupported) ? StaticFactory.Internals.GetOrRegisterDocument(DSTypeInfo.TCreate, dataLayer) : null;
 		SelectInfo = DSTypeInfo.TSelect != typeof(NotSupported) ? StaticFactory.Internals.GetOrRegisterDocument(DSTypeInfo.TSelect, dataLayer) : null;
 		UpdateInfo = DSTypeInfo.TUpdate != typeof(NotSupported) ? StaticFactory.Internals.GetOrRegisterDocument(DSTypeInfo.TUpdate, dataLayer) : null;

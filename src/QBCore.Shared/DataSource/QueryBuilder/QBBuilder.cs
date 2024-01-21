@@ -1,3 +1,4 @@
+using System.Data;
 using System.Linq.Expressions;
 using System.Reflection;
 using QBCore.ObjectFactory;
@@ -68,8 +69,10 @@ public abstract class QBBuilder<TDoc, TDto> : IQBBuilder
 
 	public QBBuilder()
 	{
-		_docInfo = StaticFactory.Documents[typeof(TDoc)].Value;
-		_dtoInfo = StaticFactory.Documents.GetValueOrDefault(typeof(TDto))?.Value;
+		_docInfo = StaticFactory.Internals.GetOrRegisterDocument(typeof(TDoc), DataLayer).Value;
+		_dtoInfo = typeof(TDto) != typeof(NotSupported)
+			? StaticFactory.Internals.GetOrRegisterDocument(typeof(TDto), DataLayer).Value
+			: null;
 	}
 	public QBBuilder(QBBuilder<TDoc, TDto> other)
 	{
@@ -115,6 +118,7 @@ public abstract class QBBuilder<TDoc, TDto> : IQBBuilder
 	public virtual QBBuilder<TDoc, TDto> Update(string? tableName = null) => throw new NotSupportedException();
 	public virtual QBBuilder<TDoc, TDto> Delete(string? tableName = null) => throw new NotSupportedException();
 	public virtual QBBuilder<TDoc, TDto> Select(string? tableName = null, string? alias = null) => throw new NotSupportedException();
+	public virtual QBBuilder<TDoc, TDto> Exec(string? procedureName = null) => throw new NotSupportedException();
 	public virtual QBBuilder<TDoc, TDto> LeftJoin<TRef>(string? tableName = null, string? alias = null) => throw new NotSupportedException();
 	public virtual QBBuilder<TDoc, TDto> Join<TRef>(string? tableName = null, string? alias = null) => throw new NotSupportedException();
 	public virtual QBBuilder<TDoc, TDto> CrossJoin<TRef>(string? tableName = null, string? alias = null) => throw new NotSupportedException();
@@ -162,6 +166,9 @@ public abstract class QBBuilder<TDoc, TDto> : IQBBuilder
 	public virtual QBBuilder<TDoc, TDto> Exclude(DEPathDefinition<TDto> field) => throw new NotSupportedException();
 	public virtual QBBuilder<TDoc, TDto> Optional(Expression<Func<TDto, object?>> field) => throw new NotSupportedException();
 	public virtual QBBuilder<TDoc, TDto> Optional(DEPathDefinition<TDto> field) => throw new NotSupportedException();
+
+	public virtual QBBuilder<TDoc, TDto> AddParameter(string name, Type underlyingType, bool isNullable, ParameterDirection direction, Enum? dbType) => throw new NotSupportedException();
+	public virtual QBBuilder<TDoc, TDto> AddParameter(QBParameter param) => throw new NotSupportedException();
 
 	public virtual QBBuilder<TDoc, TDto> SortBy(Expression<Func<TDto, object?>> field, SO sortOrder = SO.Ascending) => throw new NotSupportedException();
 	public virtual QBBuilder<TDoc, TDto> SortBy(DEPathDefinition<TDto> field, SO sortOrder = SO.Ascending) => throw new NotSupportedException();
